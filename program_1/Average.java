@@ -3,38 +3,37 @@ import java.io.*;
 
 public class Average {
     public static void main(String args[]) throws IOException {
-        System.out.println(" CMSC3200 / Group ?\n Grade Averaging Program\n Brandon Schwartz, Joshua Staffen, Ravi Dressler");
-
+        System.out.println("\n CMSC3200 / Group ?\n Grade Averaging Program\n Brandon Schwartz, Joshua Staffen, Ravi Dressler\n");
         BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
 
-        int grade_total = 0;
-        int grade_count = -1;
+        final int MIN_GRADE = 0;
+        final int MAX_GRADE = 100;
+        int grade_count = 0;
+        double grade_total = 0;
+        double grade = get_grade(stdin);
 
-        Double grade = new Double(0.0); 
-
-        do {
-            grade_total += grade;
+        while (grade >= MIN_GRADE && grade <= MAX_GRADE) {
             grade_count++;
-            
-            while (!get_grade_from_stdin(stdin, grade))
-                System.out.println(" Bad value, must be a number.");
+            grade_total += grade;
+            grade = get_grade(stdin);
+        }
 
-            System.out.println(grade);
-        } while (grade >= 0 && grade <= 100);
-            
-        System.out.println(grade_total);
-        System.out.println(grade_count);
+        if (grade_total > 0) {
+            System.out.println("The average of your " + grade_count + " grades is: " + grade_total/grade_count);
+        } else {
+            System.out.println("No grades entered, there is nothing to do.");
+        }
     }
 
-    public static boolean get_grade_from_stdin(BufferedReader stdin, Double grade) throws IOException {
-        System.out.print("Enter a grade: ");
-        System.out.flush();
+    public static double get_grade(BufferedReader stdin) throws IOException{
         try {
-            grade.set = Double.parseDouble(stdin.readLine());
+            System.out.print("Enter grade: ");
+            System.out.flush();
+            return Double.parseDouble(stdin.readLine());
         } catch (NumberFormatException e) {
-            return false;
+            System.out.println("Grade must be a number!");
         }
-        return true;
+        return get_grade(stdin);
     }
 }
 
