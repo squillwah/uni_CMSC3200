@@ -2,8 +2,8 @@
 import java.io.*;
 
 public class Average {
-    static final int MIN_GRADE = 0;
-    static final int MAX_GRADE = 100;
+    private static final int MIN_GRADE = 0;
+    private static final int MAX_GRADE = 100;
     
     public static void main(String args[]) throws IOException {
         System.out.println("\n CMSC3200 / Group ?\n" +
