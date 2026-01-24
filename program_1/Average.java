@@ -2,37 +2,55 @@
 import java.io.*;
 
 public class Average {
+    static final int MIN_GRADE = 0;
+    static final int MAX_GRADE = 100;
+    
     public static void main(String args[]) throws IOException {
-        System.out.println("\n CMSC3200 / Group ?\n Grade Averaging Program\n Brandon Schwartz, Joshua Staffen, Ravi Dressler\n");
-        BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+        System.out.println("\n CMSC3200 / Group ?\n" +
+                             " Grade Averaging Program\n" +
+                             " Brandon Schwartz, Joshua Staffen, Ravi Dressler\n" +
+                             " SCH?????@pennwest.edu, STA?????@pennwest.edu, DRE44769@pennwest.edu\n");
+        System.out.println("Welcome to the grade averaging program.\n" +
+                           "Input grades between " + MIN_GRADE + " and " + MAX_GRADE + ".\n" +
+                           "Enter a number outside those bounds to quit the program and display your average.\n");
 
-        final int MIN_GRADE = 0;
-        final int MAX_GRADE = 100;
+        // Open character stream from standard input
+        BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+        
         int grade_count = 0;
         double grade_total = 0;
         double grade = get_grade(stdin);
 
+        // Accumulate grades while within bounds
         while (grade >= MIN_GRADE && grade <= MAX_GRADE) {
             grade_count++;
             grade_total += grade;
             grade = get_grade(stdin);
         }
 
-        if (grade_total > 0) {
-            System.out.println("The average of your " + grade_count + " grades is: " + grade_total/grade_count);
+        // Display results accordingly
+        System.out.println("\nYou entered " + grade_count + " grades, totaling " + grade_total + ".\n" +
+                             "Calculating average now...\n");
+        
+        double average = grade_total / grade_count;
+
+        if (Double.isNaN(average)) {
+            System.out.println("Err: No grades entered, cannot divide by zero. Exiting...");
         } else {
-            System.out.println("No grades entered, there is nothing to do.");
+            System.out.println("The average grade is: " + average);
         }
     }
 
+    // Return grade input (as double) from BufferedReader
     public static double get_grade(BufferedReader stdin) throws IOException{
         try {
-            System.out.print("Enter grade: ");
+            System.out.print("Enter grade [" + MIN_GRADE + '-' + MAX_GRADE + "]: ");
             System.out.flush();
             return Double.parseDouble(stdin.readLine());
         } catch (NumberFormatException e) {
             System.out.println("Grade must be a number!");
         }
+        // Repeat until input can be parsed as double
         return get_grade(stdin);
     }
 }
