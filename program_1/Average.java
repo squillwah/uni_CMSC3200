@@ -6,10 +6,10 @@ public class Average {
     private static final int MAX_GRADE = 100;
     
     public static void main(String args[]) throws IOException {
-        System.out.println("\n CMSC3200 / Group ?\n" +
-                             " Grade Averaging Program\n" +
+        System.out.println("\n CMSC3200 / Group 2\n" +
+                             " Grade Averaging Program 1\n" +
                              " Brandon Schwartz, Joshua Staffen, Ravi Dressler\n" +
-                             " SCH?????@pennwest.edu, STA?????@pennwest.edu, DRE44769@pennwest.edu\n");
+                             " SCH81594@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu\n");
         System.out.println("Welcome to the grade averaging program.\n" +
                            "Input grades between " + MIN_GRADE + " and " + MAX_GRADE + ".\n" +
                            "Enter a number outside those bounds to quit the program and display your average.\n");
@@ -36,6 +36,8 @@ public class Average {
 
         if (Double.isNaN(average)) {
             System.out.println("Err: No grades entered, cannot divide by zero. Exiting...");
+        } else if (Double.isInfinite(average)) {
+            System.out.println("Err: Result is infinite, how did that happen? Exiting...");
         } else {
             System.out.println("The average grade is: " + average);
         }
