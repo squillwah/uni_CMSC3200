@@ -28,7 +28,7 @@ public class Average {
             grade = get_grade(stdin);
         }
 
-        // Display results accordingly
+        // Display results 
         System.out.println("\nYou entered " + grade_count + " grades, totaling " + grade_total + ".\n" +
                              "Calculating average now...\n");
         
@@ -39,6 +39,8 @@ public class Average {
         } else {
             System.out.println("The average grade is: " + average);
         }
+
+        stdin.close();
     }
 
     // Return grade input (as double) from BufferedReader
