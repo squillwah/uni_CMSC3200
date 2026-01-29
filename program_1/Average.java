@@ -15,7 +15,7 @@ public class Average {
     private static final int MIN_GRADE = 0;
     private static final int MAX_GRADE = 100;
     
-    public static void main(String args[]) throws IOException {
+    public static void main(String args[]) {
         System.out.println("\n CMSC3200 / Group 2\n" +
                              " Grade Averaging Program 1\n" +
                              " Brandon Schwartz, Joshua Staffen, Ravi Dressler\n" +
@@ -52,17 +52,24 @@ public class Average {
             System.out.println("The average grade is: " + average);
         }
 
-        stdin.close();
+        try {
+            stdin.close();
+            throw new IOException("ass");
+        } catch (IOException e) {
+            System.out.println("An IOException occured during buffer close: " + e);
+        }
     }
 
     // Return grade input (as double) from BufferedReader
-    public static double get_grade(BufferedReader stdin) throws IOException{
+    public static double get_grade(BufferedReader stdin) {
         try {
             System.out.print("Enter grade [" + MIN_GRADE + '-' + MAX_GRADE + "]: ");
             System.out.flush();
             return Double.parseDouble(stdin.readLine());
         } catch (NumberFormatException e) {
             System.out.println("Grade must be a number!");
+        } catch (IOException e) {
+            System.out.println("An IOException occured during line read: " + e);
         }
         // Repeat until input can be parsed as double
         return get_grade(stdin);
