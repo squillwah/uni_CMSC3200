@@ -1,4 +1,14 @@
 
+// [CMSC3200] Technical Computing Using Java
+// Program 1: Average
+//
+//  Grade averaging program. 
+//  Accumulate grades and display the average.
+//
+// Group 2
+// Brandon Schwartz, Joshua Staffen, Ravi Dressler
+// SCH81594@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
+
 import java.io.*;
 
 public class Average {
