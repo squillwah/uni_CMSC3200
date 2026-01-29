@@ -54,7 +54,6 @@ public class Average {
 
         try {
             stdin.close();
-            throw new IOException("ass");
         } catch (IOException e) {
             System.out.println("An IOException occured during buffer close: " + e);
         }
