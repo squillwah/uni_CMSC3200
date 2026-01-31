@@ -24,23 +24,35 @@ public class IOFileState {
     public void set_input(String file_name) { 
         input_file_name = null;
         status ^= !(INPUT_NOTGIVEN + INPUT_NOEXIST);
-        if (!file_name.is_empty) status | INPUT_NOTGIVEN;
-        else if (!checkexist(file_name)) status | INPUT_NOEXIST;
-        else input_file_name = file_name;
+        if (!file_name.is_empty) 
+            status | INPUT_NOTGIVEN; // can condense this into simple arithmetic instead of condition
+        else {
+            input_file_name = file_name; 
+            if (!checkexist(input)) // same here
+                status | INPUT_NOEXIST;
+        }
+
+        // better
+        input_file_name = file_name;
+        status ^= !(INPUT_NOTGIVEN + INPUT_NOEXIST);
+        status |= !file_name.is_empty() * INPUT_NOTGIVEN;
+        status |= !check_exists(file_name) * INPUT_NOEXIST;
     }
     // zzz
     public void set_output(String file_name) { 
-        input_file_name = null;
+        output_file_name = null;
         status ^= !(INPUT_NOTGIVEN + INPUT_NOEXIST);
         if (!file_name.is_empty) status | INPUT_NOTGIVEN;
         else if (!checkexist(file_name)) status | INPUT_NOEXIST;
         else input_file_name = file_name;
+        
+        output_file_name = file_name;
+        status ^= !(OUTPUT_NOTGIVEN + OUTPUT_DOEXIST);
+        status |= !file_name.is_empty() * OUTPUT_NOTGIVEN;
+        status |= check_exists(file_name) * OUTPUT_DOEXIST;
     }
 
-    public void set_output(String file_name) { output_file_name = file_name; }
-
-    public int get_status()
-
+    public int get_status() { return status; }
 }
 
 public class FileCopy {
