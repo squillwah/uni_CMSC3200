@@ -10,7 +10,8 @@ public class IOFileState {
     public static final int OUTPUT_NOTGIVEN = 0b0100;
     public static final int OUTPUT_DOEXIST  = 0b1000;
 
-    public IOFileState(String in = "", String out = "") {
+    public IOFileState() { this("",""); }
+    public IOFileState(String in, String out) {
         status = 0;
         set_input(in);
         set_output(out);
