@@ -1,30 +1,46 @@
 
-public class ArgStatus{
-    public static final int INPUT_GIVEN  = 0b00001;
-    public static final int INPUT_VALID  = 0b00010;
-    public static final int OUTPUT_GIVEN = 0b00100;
-    public static final int OUTPUT_VALID = 0b01000;
-    public static final int RIGHT_AMOUNT = 0b10000;
+public class IOFileState {
+    private int status;
+    private String input_file_name;
+    private String output_file_name;
+    
+    // Possible error states 
+    public static final int INPUT_NOTGIVEN  = 0b0001;
+    public static final int INPUT_NOEXIST   = 0b0010;
+    public static final int OUTPUT_NOTGIVEN = 0b0100;
+    public static final int OUTPUT_DOEXIST  = 0b1000;
+
+    public IOFileState(String in = "", String out = "") {
+        status = 0;
+        set_input(in);
+        set_output(out);
+    }
 
     public static int parse_args(String args[]) {
 
     }
 
-    // Conditions for good input
-    //  Input file is given and is valid
-    //  Output file is given and is valid, or is not given
-    public static boolean check(int argument_status_code) {
-        boolean good_arguments = true;
-        
-        // Correct amount of arguments were provided (1 or 2) 
-        good_arguments &= (command_code & ArgStatus.RIGHT_AMOUNT);
-        // File input is given and valid (exists)
-        good_arguments &= (command_code & (ArgStatus.INPUT_GIVEN + ArgStatus.INPUT_VALID));
-        // File output is given and exists, or was not given at all
-        good_arguments &= ((command_code & (ArgStatus.OUTPUT_GIVEN + ArgStats.OUTPUT_VALID)) || command_code ^ ArgStatus.OUTPUT_GIVEN);
-        
-        return good_arguments;
+    // @todo: make this less redundant between input and output
+    public void set_input(String file_name) { 
+        input_file_name = null;
+        status ^= !(INPUT_NOTGIVEN + INPUT_NOEXIST);
+        if (!file_name.is_empty) status | INPUT_NOTGIVEN;
+        else if (!checkexist(file_name)) status | INPUT_NOEXIST;
+        else input_file_name = file_name;
     }
+    // zzz
+    public void set_output(String file_name) { 
+        input_file_name = null;
+        status ^= !(INPUT_NOTGIVEN + INPUT_NOEXIST);
+        if (!file_name.is_empty) status | INPUT_NOTGIVEN;
+        else if (!checkexist(file_name)) status | INPUT_NOEXIST;
+        else input_file_name = file_name;
+    }
+
+    public void set_output(String file_name) { output_file_name = file_name; }
+
+    public int get_status()
+
 }
 
 public class FileCopy {
