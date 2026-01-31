@@ -1,4 +1,11 @@
 
+// Should we have one of these, composed inside of IOFileState instead of basic Strings?
+public class File {
+    String name;
+    fstream stream;
+}
+
+// Maybe this should just check files, and not store anything about them?
 public class IOFileState {
     private int status;
     private String input_file_name;
@@ -19,19 +26,21 @@ public class IOFileState {
 
     public void set_input(String file_name) { 
         input_file_name = file_name;
-        status ^= !(INPUT_NOTGIVEN + INPUT_NOEXIST);
+        status &= !(INPUT_NOTGIVEN + INPUT_NOEXIST);
         status |= !file_name.is_empty() * INPUT_NOTGIVEN;
         status |= !check_exists(file_name) * INPUT_NOEXIST;
     }
     // zzz
     public void set_output(String file_name) { 
         output_file_name = file_name;
-        status ^= !(OUTPUT_NOTGIVEN + OUTPUT_DOEXIST);
+        status &= !(OUTPUT_NOTGIVEN + OUTPUT_DOEXIST);
         status |= !file_name.is_empty() * OUTPUT_NOTGIVEN;
         status |= check_exists(file_name) * OUTPUT_DOEXIST;
     }
 
     public int get_status() { return status; }
+    public String get_input() { return input_file_name; }
+    public String get_output() { return output_file_name; }
 
     private static boolean check_exists(String file_name);
 
@@ -42,6 +51,11 @@ public class FileCopy {
     public static void main(String args[]) {
 
         IOFileState files = new IOFileState();
+
+
+        // Outer loop uses a boolean variable, which can be changed within loop
+        // Inner loop should be moved to a verify_io_files procedure
+
 
         int files_status = files.get_status();
         while (!(files_status & IOFileState.INPUT_NOTGIVEN)) {      // Blank input file is exit condition.
@@ -88,4 +102,56 @@ public class FileCopy {
             if (command_code & CommandStatusCodes.)*/
 
     }
+
+
 }
+
+
+/*
+ * boolean noquit = verify_io_files(files)  // Don't like this, not an intuitive return
+ * while (noquit) {
+ *   1. copy files and do the thing
+ *   2. prompt for new input/output files
+ *   3. noquit = verify_io_files(files)
+ */
+
+// Maybe the tests for empty input (quit signal) should be done outside of the IOFileState entirely, and occur before ever checking IOFileState for fixes?
+//
+// zzz
+//
+
+
+
+// Or extract the INPUT_NOTGIVEN bit from the status string?
+
+
+// Takes the approriate actions to handle IOFileState error states.
+// Returns true if all errors were fixed and the IOFileState is nominal, 
+//  or false if the exit condition was met and the program should quit.
+public /*bool?*/ void verify_io_files(IOFileState files) {
+    int status = files.get_status();
+    boolean exit_condition = status & IOFileState.INPUT_NOTGIVEN;
+    if (status && !exit_condition) { 
+        //if (status & IOFileState.INPUT_NOTGIVEN) {} (this is where my break would go, IF I HAD ONE!)
+        if (status & IOFileState.INPUT_NOEXIST) {
+            //
+        }
+        if (status & IOFileState.OUTPUT_NOTGIVEN) {
+            //
+        }
+        if (status & IOFileState.OUTPUT_DOEXIST) {
+            //
+        }
+        return true * verify_io_files(files);
+    }
+    return !exit_condition;
+}
+
+
+
+
+
+
+
+
+
