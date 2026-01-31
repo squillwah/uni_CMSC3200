@@ -22,14 +22,14 @@ public class IOFileState {
     public void set_input(String file_name) { 
         input_file_name = file_name;
         status &= ~(INPUT_NOTGIVEN + INPUT_NOEXIST);
-        status |= !file_name.IsEmpty() * INPUT_NOTGIVEN;
+        status |= !file_name.isEmpty() * INPUT_NOTGIVEN;
         status |= !check_exists(file_name) * INPUT_NOEXIST;
     }
     // zzz
     public void set_output(String file_name) { 
         output_file_name = file_name;
         status &= ~(OUTPUT_NOTGIVEN + OUTPUT_DOEXIST);
-        status |= !file_name.IsEmpty() * OUTPUT_NOTGIVEN;
+        status |= !file_name.isEmpty() * OUTPUT_NOTGIVEN;
         status |= check_exists(file_name) * OUTPUT_DOEXIST;
     }
 
@@ -45,18 +45,18 @@ public class FileCopy {
 
         int files_status = files.get_status();
         int files_status_exit_states = IOFileState.INPUT_NOTGIVEN;      // End program if this state is reached.
-        while (!(files_status & files_status_exit_states)) {
+        while ((files_status & files_status_exit_states) == 0) {
             // Fix error states if present.
-            if (files_status) {                                         
-                while (files_status & !files_status_exit_states) {      // Disregard exit states.
-                    //if (files_status & IOFileState.INPUT_NOTGIVEN)  
-                    if (files_status & IOFileState.INPUT_NOEXIST) {
+            if (files_status > 0) { 
+                while ((files_status & ~files_status_exit_states) > 0) {    // Disregard exit states.
+                    //if ((files_status & IOFileState.INPUT_NOTGIVEN) > 0)  
+                    if ((files_status & IOFileState.INPUT_NOEXIST) > 0) {
                         //
                     }
-                    if (files_status & IOFileState.OUTPUT_NOTGIVEN) {
+                    if ((files_status & IOFileState.OUTPUT_NOTGIVEN) > 0) {
                         //
                     }
-                    if (files_status & IOFileState.OUTPUT_DOEXIST) {
+                    if ((files_status & IOFileState.OUTPUT_DOEXIST) > 0) {
                         //
                     }
                     files_status = files.get_status();
