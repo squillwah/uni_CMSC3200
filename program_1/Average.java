@@ -6,8 +6,8 @@
 //  Accumulate grades and display the average.
 //
 // Group 2
-// Brandon Schwartz, Joshua Staffen, Ravi Dressler
-// SCH81594@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
+// Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
+// SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
 
 import java.io.*;
 
@@ -18,8 +18,8 @@ public class Average {
     public static void main(String args[]) {
         System.out.println("\n CMSC3200 / Group 2\n" +
                              " Grade Averaging Program 1\n" +
-                             " Brandon Schwartz, Joshua Staffen, Ravi Dressler\n" +
-                             " SCH81594@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu\n");
+                             " Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler\n" +
+                             " SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu\n");
         System.out.println("Welcome to the grade averaging program.\n" +
                            "Input grades between " + MIN_GRADE + " and " + MAX_GRADE + ".\n" +
                            "Enter a number outside those bounds to quit the program and display your average.\n");
