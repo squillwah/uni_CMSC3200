@@ -44,41 +44,60 @@ class IOFileState {
 
 public class FileCopy {
     public static void main(String args[]) {
+        // Construct IOFileState from args.
+        IOFileState files;
+        switch (args.length) {
+            case 0:
+                files = new IOFileState();
+                break;
+            case 1:
+                files = new IOFileState(args[0]);
+                break;
+            default:
+                files = new IOFileState(args[0], args[1]);
+                break;
+        }
 
-        IOFileState files = new IOFileState("in", "out");
-
+        // Attempt to fix error states.
         int files_status = files.get_status();
-        int files_status_exit_states = IOFileState.INPUT_NOTGIVEN;      // End program if this state is reached.
-        System.out.println(files_status);
-        while ((files_status & files_status_exit_states) == 0) {
-            // Fix error states if present.
-            if (files_status > 0) { 
-                while ((files_status & ~files_status_exit_states) > 0) {    // Disregard exit states.
-                    //if ((files_status & IOFileState.INPUT_NOTGIVEN) > 0)  
-                    if ((files_status & IOFileState.INPUT_NOEXIST) > 0) {
-                        //
-                    }
-                    if ((files_status & IOFileState.OUTPUT_NOTGIVEN) > 0) {
-                        //
-                    }
-                    if ((files_status & IOFileState.OUTPUT_DOEXIST) > 0) {
-                        //
-                    }
-
-                    // debug, clear error state and set INPUT_NOTGIVEN to test and terminate loop
-                    files_status = files.get_status() | IOFileState.INPUT_NOTGIVEN;
-                    files_status &= ~IOFileState.OUTPUT_DOEXIST;
-                    System.out.println(files_status);
-                }
-                continue;
+        int files_status_exit_states = 0;
+        while ((files_status & ~files_status_exit_states) > 0) {    // Disregard exit states. 
+            // Handle on empty IO file names on first occurences, then set as exit states for following occurences.
+            if ((files_status & IOFileState.INPUT_NOTGIVEN) > 0) {
+                files_status_exit_states |= IOFileState.INPUT_NOTGIVEN;
             }
-
-            // Copy files
-            
-            // Prompt new inputs
-
+            if ((files_status & IOFileState.OUTPUT_NOTGIVEN) > 0) {
+                files_status_exit_states |= IOFileState.OUTPUT_NOTGIVEN;
+            }
+            // Reprompt non-existent input files.
+            if ((files_status & IOFileState.INPUT_NOEXIST) > 0) {
+                //
+            }
+            // Reprompt pre-existent output files, allow backup+overwrite, or quit.
+            if ((files_status & IOFileState.OUTPUT_DOEXIST) > 0) {
+                if (quit) {
+                    files_status_exit_states |= IOFileState.OUTPUT_DOEXIST; // or files_status_exit_states = files.get_status(); for a more clear "exit now"
+                }
+            }
             files_status = files.get_status();
         }
+        
+        // Proceed with tokenization/file copy if status is nominal.
+        if (files_status == 0) {  
+ 
+        } else if (files_status & files_status_exit_states > 0) {                               // Exit state encountered, program shutdown is deliberate.
+            System.println("Cancelling FileCopy.");
+        } else {
+            System.println("Err: couldn't recover from error state '" + files_status + "'.");   // Non-exit error state maintained, shutdown unintended.
+        }
+        
+        System.println("Exiting program.");
+
+        //files.closeem();
     }
 }
+
+
+
+
 
