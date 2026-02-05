@@ -1,6 +1,32 @@
 
 import java.io.*;
 
+
+/* ======================================================================================
+ * IOFileState
+ *  
+ *  Takes filename strings and attempts to create input and output File objects.
+ *  Provides functionality to signal and explain why some Files cannot be created.
+ *  
+ *  Does checks on files:
+ *   - Is the filename valid?
+ *   - Does the file exist?
+ *   - Are the input and output files different?
+ *  
+ *  Maintains a 'status' integer, whose bits correspond to each check.
+ *   - Failed checks result in a positively flipped bit.
+ *   - The nominal state is a status of '0', all checks passed.
+ *
+ *  Methods:
+ *   - set_<input/output>(String file_name)
+ *      Attempt creation of an input or output file object, given filename.
+ *   - get_<input/output>()
+ *      Returns reference to IFile/OFile object, or null if it could not be created. 
+ *   - get_status()
+ *      Returns the status code.
+ *
+ * ====================================================================================== */
+
 class IOFileState {
     private int status;
     private String input_file_name;
