@@ -1,4 +1,3 @@
-import java.io.*;
 
 // [CMSC3200] Technical Computing Using Java
 // Program 1: Average
@@ -10,55 +9,7 @@ import java.io.*;
 // Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
 // SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
 
-
-/* ======================================================================================
- * CLog
- *
- *  Wrapper for System.out.print
- *  Provides toggles & formatting for plain, log, error, & warning messages.
- *
- *  Methods:
- *   - set_mode(int m) 
- *      Allows toggling of logs, errors, and warnings.
- *   - say(String msg)
- *      Prints message to System.out and flushes buffer.
- *   - sayln(String msg)
- *      Prints message to System.out with new line.
- *   - log(String msg)
- *      Prints message with log formatting
- *   - warn(String msg)
- *      Prints message with warning formatting
- *   - error(String msg)
- *      Prints message with error formatting
- *
- * ====================================================================================== */
-
-class CLog {
-    private static int mode;
-    
-    public static final int LOGS     = 0b001;
-    public static final int ERRORS   = 0b010;
-    public static final int WARNINGS = 0b100;
-
-    private CLog() {
-        mode = LOGS+ERRORS+WARNINGS;
-    }
-
-    public static void set_mode(int m) { mode = m; }
-    
-    public static void say(String msg) { 
-        System.out.print("> " + msg);
-        System.out.flush();
-    }
-    public static void sayln(String msg) {
-        System.out.println("> " + msg);
-    }
-
-    public static void log(String msg) { if ((mode & LOGS) > 0) sayln("log: " + msg); }
-    public static void warn(String msg) { if ((mode & WARNINGS) > 0) sayln("war: " + msg); }
-    public static void error(String msg) { if ((mode & ERRORS) > 0) sayln("err: " + msg); }
-}
-
+import java.io.*;
 
 /* ======================================================================================
  * FileTools
@@ -71,28 +22,30 @@ class CLog {
  *      If a backup already exists, it creates another backup of the backup.
  *
  * ====================================================================================== */
-
 class FileTools {
     private FileTools() {}
     
-    public static void backup_file(String file_name) {
-        //
+    public static void rename_file(String old_name, String new_name) {
+        if (file_exists(new_name)) {
+            System.out.println("File '" + new_name + "' already exists, backing up to '" + new_name + ".bak'.");
+            rename_file(new_name, new_name+".bak");
+        }
+
+        // rename the file
     }
     
     public static boolean file_exists(String file_name) {
         return (new File(file_name)).exists();
     }
     
-    public static BufferedReader open_if(String file_name) {
+    public static BufferedReader open_ifstream(String file_name) {
         return null;
     }
     
-    public static PrintWriter open_of(String file_name) {
+    public static PrintWriter open_ofstream(String file_name) {
         return null;
     }
-
 }
-
 
 /* ======================================================================================
  * WordTools
@@ -104,9 +57,8 @@ class FileTools {
  *      Returns true if given string is an integer, false otherwise.
  *
  * ====================================================================================== */
-
 class WordTools {
-    private WordTools() {}
+    private WordTools() {} // Should we have these empty constructors for purely functional classes?
     
     public static boolean is_int(String word) {
         boolean is = true;
@@ -119,9 +71,8 @@ class WordTools {
     }
 }
 
-
 /* ======================================================================================
- * IOFileState
+ * IOFileNameState
  *  
  *  Takes filename strings and evaluates them.
  *  Provides functionality to signal and explain why an input/output filename is invalid.
@@ -138,16 +89,13 @@ class WordTools {
  *  Methods:
  *   - set_<input/output>(String file_name)
  *      Set the interal input or output file name and run checks.
- *      Attempt creation of an input or output file object, given filename.
  *   - get_<input/output>()
  *      Return the internal input/output file name.
- *      Returns reference to IFile/OFile object, or null if it could not be created. 
  *   - get_status()
  *      Returns the status code.
  *
  * ====================================================================================== */
-
-class IOFileState {
+class IOFileNameState {
     private int status;
     private String input_file;
     private String output_file;
@@ -158,9 +106,9 @@ class IOFileState {
     public static final int OUTPUT_DOEXIST  = 0b01000;
     public static final int OUTPUT_IS_INPUT = 0b10000;
 
-    public IOFileState() { this(""); }
-    public IOFileState(String in) { this(in, ""); }
-    public IOFileState(String in, String out) {
+    public IOFileNameState() { this(""); }
+    public IOFileNameState(String in) { this(in, ""); }
+    public IOFileNameState(String in, String out) {
         status = 0;
         set_input(in); 
         set_output(out); 
@@ -168,18 +116,29 @@ class IOFileState {
 
     public void set_input(String file_name) { 
         input_file = file_name;
-        status &= ~(INPUT_NOTGIVEN + INPUT_NOEXIST + OUTPUT_IS_INPUT);
-        if (file_name.isEmpty()) status |= INPUT_NOTGIVEN;
-        else if (!FileTools.file_exists(file_name)) status |= INPUT_NOEXIST;
-        else if (input_file == output_file) status |= OUTPUT_IS_INPUT;
+        check_input();
     }
     public void set_output(String file_name) { 
         output_file = file_name;
-        status &= ~(OUTPUT_NOTGIVEN + OUTPUT_DOEXIST + OUTPUT_IS_INPUT);
-        if (file_name.isEmpty()) status |= OUTPUT_NOTGIVEN;
-        else if (FileTools.file_exists(file_name)) status |= OUTPUT_DOEXIST;
-        else if (input_file == output_file) status |= OUTPUT_IS_INPUT;
+        check_output();
     }
+
+    public void check_input() {
+        status &= ~(INPUT_NOTGIVEN + INPUT_NOEXIST + OUTPUT_IS_INPUT);
+        if (input_file.isEmpty()) status |= INPUT_NOTGIVEN;
+        else if (!FileTools.file_exists(input_file)) status |= INPUT_NOEXIST;
+        else if (input_file.equals(output_file)) status |= OUTPUT_IS_INPUT; // could comparing against initial null output_file cause issues?
+    }
+    public void check_output() {
+        status &= ~(OUTPUT_NOTGIVEN + OUTPUT_DOEXIST + OUTPUT_IS_INPUT);
+        if (output_file.isEmpty()) status |= OUTPUT_NOTGIVEN;
+        else if (FileTools.file_exists(output_file)) status |= OUTPUT_DOEXIST;
+        else if (input_file.equals(output_file)) status |= OUTPUT_IS_INPUT; 
+    }
+
+    // More readable method of resetting input/output filenames.
+    public void clear_input() { set_input(""); }
+    public void clear_output() { set_output(""); }
 
     public int get_status() { return status; }
     public String get_input() { return input_file; }
@@ -187,132 +146,156 @@ class IOFileState {
 }
 
 
+// ============
+// Prompts
+//
+//  Collection of static procedures for fixing IOFileNameState errors with command line prompts.
+//  Each method exacts changes upon the IOFileNameState object supplied in its arguments.
+//  All methods return IOFileNameState status codes which should exit the program (user chose to quit).
+//   - Typically being the state which they're fixing (and the user chose to quit instead), but
+//     can be a different state for more complex prompts like bad_output().
+//
+// ============
+class Prompts {
+    private static BufferedReader stdin = null;
+    
+    public static void open_stdin() {
+        stdin = new BufferedReader(new InputStreamReader(System.in));
+    }
+    public static void close_stdin() {
+        try {
+            stdin.close();
+            stdin = null;
+        } catch (IOException e) {
+            System.out.println("An IOException occurred during BufferedReader close: " + e);
+        }
+    }
+
+    public static int no_input(IOFileNameState filenames) {
+        int quit_states = 0;
+        filenames.set_input(catchLine("Please specify an input file (or nothing to quit): "));
+        quit_states = filenames.get_status() & IOFileState.INPUT_NOTGIVEN; // If nothing was given, set INPUT_NOTGIVEN as quit state.
+        return quit_states;
+    }
+    public static int no_output(IOFileNameState filenames) {
+        int quit_states = 0;
+        filenames.set_output(catchLine("Please specify an output file (or nothing to quit): "));
+        quit_states = filenames.get_status() & IOFileState.OUTPUT_NOTGIVEN;
+        return quit_states;
+    }
+
+    // Alternatively could handle the reinput itself, but currently clears input_file (throwing the prompt to no_input later on)
+    public static int bad_input(IOFileNameState filenames) {
+        int quit_states = 0;
+        System.out.println("The input file '" + filenames.get_input() + "' doesn't exist.");
+        //filenames.clear_input(); // Resets INPUT_NOEXIST and sets INPUT_NOTGIVEN, allow Prompts.no_input() to handle reentry.
+        filenames.set_input(catchLine("Please enter a different one (or nothing to quit): "));
+        quit_states = filenames.get_status() & IOFileState.INPUT_NOTGIVEN;
+        return quit_states;
+    }
+
+    public static int bad_output(IOFileNameState filenames) {
+        int quit_states = 0;
+        System.out.println("The output file '" + filenames.get_output() + "' already exists.");
+        System.out.println("You can\n 1. Pick Another\n 2. Backup & Overwrite\n 3. Quit");
+        String choice = catchLine("What would you like to do? (pick/backup/quit): ").toLowerCase();
+        boolean choosing = true;
+        while (choosing) {
+            switch (choice) {
+                case "pick":
+                    filenames.clear_output(); // Clear output, allow no_output() to handle reentry.
+                    break;
+                case "backup":
+                    // Simpler to rename original, rather than copying everything only to overwrite.
+                    FileTools.rename_file(filenames.get_output(), filenames.get_output()+".bak");
+                    filenames.check_output(); // Should clear OUTPUT_DOEXIST
+                    break;
+                case "quit":
+                    quit_states |= IOFileNameState.OUTPUT_DOEXIST;
+                    break;
+                default:
+                    choice = catchLine("Please enter 'pick', 'backup', or 'quit': ").toLowerCase();
+                    continue;
+            }
+            choosing = false;
+        } 
+        return quit_states;
+    }
+    
+    public static int io_same(IOFileNameState filenames) {
+        int quit_states = 0;
+        System.out.println("Your input file and output file are the same ('" + filenames.get_input() + "').");
+        filenames.clear_input();
+        filenames.clear_output();
+        return quit_states;
+    }
+   
+    // Helper for getting input with a prompt. 
+    // Prints prompt, opens stdin, reads a line, closes stdin, and catches any IOExceptions. 
+    private static String catchLine(String prompt) {
+        System.out.print(prompt);
+        System.out.flush();
+        String line = "";
+        try {
+            line = stdin.readLine().trim();
+        } catch (IOException e) {
+            System.out.println("An IOException occurred during line read: " + e);
+        }
+        return line;
+    }
+}
+
 /* ======================================================================================
  * FileCopy
  *
- *  Parses words in input file and prints statistics to output file.
+ *  Parses words/numbers in input file and prints occurence count to output file.
+ *  Filenames can be supplied as arguments or prompted during runtime.
  *
  * ====================================================================================== */
-
 public class FileCopy {
     public static void main(String args[]) {
-       
-        // Get file names from command line 
-        IOFileState files = args_to_iofs(args);
-        int files_status = files.get_status();   
-
-        // Reprompt file names if not given or invalid
-        if (files_status != 0) {
-            reprompt_iofs(files); 
-            files_status = files.get_status();
-        }
-        
-        // Proceed with tokenization & file copy if status is nominal.
-        if (files_status == 0) {  
- 
-        } 
-        // Otherwise, user chose a quit option during reprompt 
-        else { 
-            CLog.log("Cancelling FileCopy with state '" + files_status + "'.");
-        }
-        
-        CLog.sayln("Exiting program, goodbye!");
-    }
-
-    // Construct an IOFileState instance from args.
-    public static IOFileState args_to_iofs(String args[]) {
-        IOFileState files = null;
+        // Create a filename state object, with or without defaults from command line. 
+        IOFileNameState filenames = null;
         switch (args.length) {
             case 0:
-                files = new IOFileState();
+                filenames = new IOFileNameState();
                 break;
             case 1:
-                files = new IOFileState(args[0]);
+                filenames = new IOFileNameState(args[0]);
                 break;
             default:
-                files = new IOFileState(args[0], args[1]);
+                filenames = new IOFileNameState(args[0], args[1]);
+                System.out.println("hello");
                 break;
         }
-        return files;
-    }
+       
+        // If filename errors present, fix with interactive prompts
+        int fn_status = filenames.get_status(); 
+        int fn_quit_states = 0; // Allow for quitting by signaling an error state as a 'quit state'.
+        System.out.println(fn_status);
+        Prompts.open_stdin();
+        while (fn_status != 0 && (fn_status & fn_quit_states) == 0) {
+            if ((fn_status & IOFileNameState.INPUT_NOTGIVEN) != 0)
+                fn_quit_states |= Prompts.no_input(filenames);
+            else if ((fn_status & IOFileNameState.OUTPUT_NOTGIVEN) != 0)
+                fn_quit_states |= Prompts.no_output(filenames);
+            else if ((fn_status & IOFileNameState.INPUT_NOEXIST) != 0)
+                fn_quit_states |= Prompts.bad_input(filenames);
+            else if ((fn_status & IOFileNameState.OUTPUT_DOEXIST) != 0)
+                fn_quit_states |= Prompts.bad_output(filenames);
+            else if ((fn_status & IOFileNameState.OUTPUT_IS_INPUT) != 0)
+                fn_quit_states |= Prompts.io_same(filenames);
+            fn_status = filenames.get_status();
+        }
+        Prompts.close_stdin();
 
-    // Examine IOFileState and reprompt stdin as needed to ensure valid filenames or a program exit.
-    public static void reprompt_iofs(IOFileState files) {
-        BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
-        
-        int files_status = files.get_status();
-        int files_status_exit_states = 0;
-        while ((files_status & ~files_status_exit_states) > 0) {        // Disregard exit states. 
-            // Handle empty file names on first occurences.
-            if ((files_status & IOFileState.INPUT_NOTGIVEN) > 0) {
-                CLog.warn("No input file provided");
-                CLog.say("Please enter a valid input file name, or nothing to quit: ");
-                try {
-                    files.set_input(stdin.readLine());
-                    files_status_exit_states |= IOFileState.INPUT_NOTGIVEN; // Set as exit states for future occurences.
-                } catch (IOException e) { CLog.error("An IOException occurred during input file input: " + e); }
-            }
-            
-            if ((files_status & IOFileState.OUTPUT_NOTGIVEN) > 0) {
-                CLog.warn("No output file provided");
-                CLog.say("Please enter a valid output file name, or nothing to quit: ");
-                try {
-                    files.set_output(stdin.readLine());
-                    files_status_exit_states |= IOFileState.OUTPUT_NOTGIVEN;
-                } catch (IOException e) { CLog.error("An IOException occurred during output file input: " + e); }
-            }
-            
-            // Reprompt non-existent input files.
-            if ((files_status & IOFileState.INPUT_NOEXIST) > 0) {
-                CLog.warn("The input file '" + files.get_input() + "' doesn't exist");
-                files.set_input("");
-                files_status_exit_states &= ~IOFileState.INPUT_NOTGIVEN; 
-            }
-            
-            // Reprompt pre-existent output files, allow backup+overwrite, or quit.
-            if ((files_status & IOFileState.OUTPUT_DOEXIST) > 0) {
-                CLog.warn("The output file '" + files.get_output() + "' already exists");
-                CLog.sayln("It appears that output file already exists, would you like to: ");
-                CLog.sayln(" 1. Enter a different file name\n 2. Backup that file and proceed\n 3. Quit");
-                
-                String choice = null;
-                boolean waiting_for_choice = true;
-                while (waiting_for_choice) {
-                    try { choice = stdin.readLine(); }
-                    catch (IOException e) { CLog.error("An IOException occurred during choice: " + e); }
-
-                    switch (choice) {
-                        case "1":
-                            //CLog.say("Enter a different file name: ");
-                            files.set_output("");
-                            files_status_exit_states &= ~IOFileState.OUTPUT_NOTGIVEN; // Set output blank and clear NOTGIVEN from exit states to reroll.
-                            //files.set_output(stdin.readLine());
-                            waiting_for_choice = false;
-                            break;
-                        case "2":
-                            FileTools.backup_file(files.get_output());
-                            // could remove original, just rename original to .bak, or find a way to force the overwrite
-                            waiting_for_choice = false;
-                            break;
-                        case "3":
-                            CLog.sayln("Quit it is.");
-                            files_status_exit_states |= IOFileState.OUTPUT_DOEXIST; // or files_status_exit_states = files.get_status(); for a more clear "exit now"
-                            waiting_for_choice = false;
-                            break;
-                        default:
-                            CLog.sayln("Please enter '1', '2', or '3'");
-                            break;
-                    }
-                }
-            }
-            files_status = files.get_status();
-        }        
-        
-        if (files_status != 0) {  
-            // Exit state encountered, program shutdown is deliberate.
-            if ((files_status & files_status_exit_states) > 0) CLog.log("Cancelling FileCopy.");
-            // Non-exit error state maintained, shutdown unintended.
-            else CLog.error("iofs reprompt couldn't recover from error state '" + files_status + "'.");   
+        // Proceed if filenames nominal
+        if (fn_status == 0) {
+            System.out.println("Le program is running");
+        } else if ((fn_status & fn_quit_states) != 0) {
+            System.out.println("Quitting, goodbye!");
+        } else {
+            System.out.println("Err: couldn't recover from filename state '" + fn_status + "'. Exiting.");
         }
     }
 }
