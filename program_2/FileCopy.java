@@ -1,6 +1,6 @@
 
 // [CMSC3200] Technical Computing Using Java
-// Program 1: Average
+// Program 2: FileCopy
 //
 //  FileCopy program.
 //  Parse and count the words/digits in an input file, write statistics to an output file.
@@ -174,13 +174,13 @@ class Prompts {
     public static int no_input(IOFileNameState filenames) {
         int quit_states = 0;
         filenames.set_input(catchLine("Please specify an input file (or nothing to quit): "));
-        quit_states = filenames.get_status() & IOFileState.INPUT_NOTGIVEN; // If nothing was given, set INPUT_NOTGIVEN as quit state.
+        quit_states = filenames.get_status() & IOFileNameState.INPUT_NOTGIVEN; // If nothing was given, set INPUT_NOTGIVEN as quit state.
         return quit_states;
     }
     public static int no_output(IOFileNameState filenames) {
         int quit_states = 0;
         filenames.set_output(catchLine("Please specify an output file (or nothing to quit): "));
-        quit_states = filenames.get_status() & IOFileState.OUTPUT_NOTGIVEN;
+        quit_states = filenames.get_status() & IOFileNameState.OUTPUT_NOTGIVEN;
         return quit_states;
     }
 
@@ -190,7 +190,7 @@ class Prompts {
         System.out.println("The input file '" + filenames.get_input() + "' doesn't exist.");
         //filenames.clear_input(); // Resets INPUT_NOEXIST and sets INPUT_NOTGIVEN, allow Prompts.no_input() to handle reentry.
         filenames.set_input(catchLine("Please enter a different one (or nothing to quit): "));
-        quit_states = filenames.get_status() & IOFileState.INPUT_NOTGIVEN;
+        quit_states = filenames.get_status() & IOFileNameState.INPUT_NOTGIVEN;
         return quit_states;
     }
 
@@ -207,7 +207,7 @@ class Prompts {
                     break;
                 case "backup":
                     // Simpler to rename original, rather than copying everything only to overwrite.
-                    FileTools.rename_file(filenames.get_output(), filenames.get_output()+".bak");
+                    FileTools.rename_file(filenames.get_output(), filenames.get_output()+".bak"); // ! what happens if output is set as input? should check that case first
                     filenames.check_output(); // Should clear OUTPUT_DOEXIST
                     break;
                 case "quit":
@@ -221,7 +221,8 @@ class Prompts {
         } 
         return quit_states;
     }
-    
+
+    // Will probably never reach this, since bad_output detects preexisting files and is handled first.    
     public static int io_same(IOFileNameState filenames) {
         int quit_states = 0;
         System.out.println("Your input file and output file are the same ('" + filenames.get_input() + "').");
