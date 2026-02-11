@@ -39,11 +39,25 @@ class FileTools {
     }
     
     public static BufferedReader open_ifstream(String file_name) {
-        return null;
+    BufferedReader inFile = null;
+
+         try {
+            inFile = new BufferedReader(new FileReader(file_name));
+        } catch (IOException e) {
+            System.err.println("Error reading file " + file_name + ": " + e.getMessage());
+        }
+        return inFile;
     }
-    
+
     public static PrintWriter open_ofstream(String file_name) {
-        return null;
+        PrintWriter outFile = null;
+
+        try {
+            outFile = new PrintWriter(file_name);
+        } catch (FileNotFoundException e) {
+            System.err.println("Error file not found");
+        }
+        return outFile;
     }
 }
 
@@ -68,6 +82,10 @@ class WordTools {
             is = false;
         }
         return is;
+    }
+
+    public static String token_line(String line) {
+        return null;
     }
 }
 
@@ -146,7 +164,7 @@ class IOFileNameState {
 }
 
 
-// ============
+// ====================================================================================================
 // Prompts
 //
 //  Collection of static procedures for fixing IOFileNameState errors with command line prompts.
@@ -155,7 +173,7 @@ class IOFileNameState {
 //   - Typically being the state which they're fixing (and the user chose to quit instead), but
 //     can be a different state for more complex prompts like bad_output().
 //
-// ============
+// ======================================================================================================
 class Prompts {
     private static BufferedReader stdin = null;
     
@@ -293,6 +311,22 @@ public class FileCopy {
         // Proceed if filenames nominal
         if (fn_status == 0) {
             System.out.println("Le program is running");
+
+            //  open buffered reader ADD HANDLING IF NULL
+            BufferedReader inFile = FileTools.open_ifstream(filenames.get_input());
+
+            //  open file writer
+            PrintWriter outFile = FileTools.open_ofstream(filenames.get_output());
+
+            //  tokenize line by line
+            try {
+                WordTools.token_line(inFile.readLine());
+            } catch(IOException e) {
+                System.err.println("error at line 310 someone should fix this");        //  IF ANYONE SEES THIS FIX IT, IT SHOULD BE FIXED BEFORE ITS SEEN BUT I HAVE BEEN KNOWN TO FORGET THINGS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            }
+            
+            //  write to output file
+
         } else if ((fn_status & fn_quit_states) != 0) {
             System.out.println("Quitting, goodbye!");
         } else {
