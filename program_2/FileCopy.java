@@ -46,7 +46,10 @@ class FileTools {
         try {
             inFile = new BufferedReader(new FileReader(file_name));
         } catch (IOException e) {
-            System.err.println("Error reading file " + file_name + ": " + e.getMessage());
+            System.err.println("Error creating BufferedReader for '" + file_name + "': " + e.getMessage());
+            System.out.print("Couldn't open input file for reading, ");
+            if (FileTools.file_exists(file_name)) System.out.println("though file exists. Are your permissions correct?");
+            else System.out.println("was the file deleted or moved after selection?");
         }
         return inFile;
     }
@@ -57,7 +60,8 @@ class FileTools {
         try {
             outFile = new PrintWriter(new FileWriter(file_name));
         } catch (IOException e) {
-            System.err.println("Error fix pls line 57");                                            //  FIX THIS
+            System.err.println("Error creating PrintWriter for '" + file_name + "': " + e.getMessage());
+            System.out.println("Couldn't open output file for writing.");
         }
         return outFile;
     }
@@ -415,31 +419,19 @@ public class FileCopy {
                 // Process words/integer sum from input file.
                 FileWordData wordsums = process_input_file(inFile);
                 FileTools.close_ifstream(inFile);
+
                 // Write results to output file.
-                outFile.println("Total Integer Sum: " + wordsums.sum);
-                outFile.println("-----------------------");
+                outFile.println("Total Integer Sum: " + wordsums.sum + "\n-----------------------");
                 for (int i = 0; i < wordsums.word_count; i++) 
                     outFile.println(wordsums.words[i].get_text() + ": " + wordsums.words[i].get_count());
                 FileTools.close_ofstream(outFile);
-            } else {
-                // File opens failed, explain why:
-                System.out.println("An error occured which prevented the tokenization/file copy operation.");
-                if (inFile == null) {
-                    System.out.print("Couldn't open input file for reading, ");
-                    if (FileTools.file_exists(filenames.get_input())) 
-                        System.out.println("though file exists. Are your permissions correct?");
-                    else 
-                        System.out.println("file was deleted or moved after selection.");
-                } else FileTools.close_ifstream(inFile);
-                if (outFile == null) {
-                    System.out.println("Couldn't open output file for writing.");
-                } else FileTools.close_ofstream(outFile); // Remember to close the streams, if opened. Would be best to eliminate the duplicate calls here and if successful, though.
-            }
-        } else if ((fn_status & fn_quit_states) != 0) {
-            System.out.println("Quitting, goodbye!");
+            } else  
+                System.out.println("An error occured which prevented the tokenization/file copy operation. Quitting."); 
         } else {
-            // Filename status that isn't a quit state means an unintentional (bugged) quit. 
-            System.out.println("Err: couldn't recover from filename state '" + fn_status + "'. Exiting.");
+            if ((fn_status & fn_quit_states) != 0) 
+                System.out.println("Quitting, goodbye!");
+            else // Non quit state means unintentional (bugged) quit
+                System.out.println("Err: couldn't recover from filename state '" + fn_status + "'. Exiting.");
         }
     }
 
