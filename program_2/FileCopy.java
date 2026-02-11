@@ -10,6 +10,7 @@
 // SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
 
 import java.io.*;
+import java.util.*;
 
 /* ======================================================================================
  * FileTools
@@ -40,9 +41,9 @@ class FileTools {
     }
     
     public static BufferedReader open_ifstream(String file_name) {
-    BufferedReader inFile = null;
+        BufferedReader inFile = null;
 
-         try {
+        try {
             inFile = new BufferedReader(new FileReader(file_name));
         } catch (IOException e) {
             System.err.println("Error reading file " + file_name + ": " + e.getMessage());
@@ -54,12 +55,36 @@ class FileTools {
         PrintWriter outFile = null;
 
         try {
-            outFile = new PrintWriter(file_name);
+            outFile = new PrintWriter(new FileWriter(file_name));
         } catch (IOException e) {
             System.err.println("Error fix pls line 57");                                            //  FIX THIS
         }
         return outFile;
     }
+
+    public static boolean close_ofstream(PrintWriter ofstream) {
+        boolean closed = false;
+        //try {                     not needed
+            ofstream.close(); 
+            closed = true;
+        //}
+        //catch (IOException e) { 
+        //    System.out.println("Err: IOException during input file close: " + e); // Should we continue?
+        //}
+        return closed;
+    }
+    public static boolean close_ifstream(BufferedReader ifstream) {
+        boolean closed = false;
+        try { 
+            ifstream.close(); 
+            closed = true;
+        }
+        catch (IOException e) { 
+            System.out.println("Err: IOException during output file close: " + e); // Should we continue?
+        }
+        return closed;
+    }
+
 }
 
 /* ======================================================================================
