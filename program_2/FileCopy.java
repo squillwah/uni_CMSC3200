@@ -110,16 +110,34 @@ class WordTools {
         return is;
     }
 
+    // @todo: more processing?
+    public static String normalize_line(String line_dirty) {
+        String line_clean = line_dirty.trim().toLowerCase();
+        return line_clean;
+    }
+
+//    // Safely read line from a BufferedReader, return normalized string.
+//    public static String read_normalized_line(BufferedReader buffer)
+//        safe_buffered_read
+
+    public static int find_word(String word, Word[] words, int words_size) {
+        int index = -1;
+        for (int i = 0; i < words_size && index < 0; i++)
+            if (words[i].get_text().equals(word))
+                index = i;
+        return index;
+    }
+
     public static String token_line(String line) {
         return null;
     }
 }
 
-class WordEntry {
+class Word {
     String word;
     int count;
 
-    public WordEntry(String word){
+    public Word(String word){
         this.word = word;
         this.count = 1;
     }
@@ -127,6 +145,9 @@ class WordEntry {
     public void incriment() {
         count++;
     }
+
+    public String get_text() { return word; }
+    public int get_count() { return count; }
 }
 
 /* ======================================================================================
@@ -303,6 +324,42 @@ class Prompts {
         return line;
     }
 }
+
+// Could have a more complex OOP class
+/*
+class WordsAndSum {
+    public static final int VOCAB_SIZE = 100;
+   
+    private int integer_sum; 
+    private int word_count;
+    private Word words[];
+
+    public WordsAndSum() {
+        integer_sum = 0;
+        word_count = 0;
+        words = new Word[VOCAB_SIZE];
+    }
+
+    public int get_integer_sum() { return integer_sum; }
+    public int get_word_count() { return word_count; }
+
+    public int add_word(
+}*/
+
+// Or simple data container
+class FileWordData {
+    public static final int MAX_WORDS = 100;
+    public int sum;
+    public int word_count;
+    public Word[] words;
+
+    public FileWordData() { 
+        words = new Word[MAX_WORDS]; 
+        word_count = 0; 
+        sum = 0; 
+    }
+}
+
 
 /* ======================================================================================
  * FileCopy
