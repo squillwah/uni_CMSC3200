@@ -34,6 +34,7 @@ class FileTools {
         // rename the file
     }
     
+    //  POTENTIAL MEMORY LEAK IN VERY NEICHE EDGE CASE  
     public static boolean file_exists(String file_name) {
         return (new File(file_name)).exists();
     }
@@ -54,8 +55,8 @@ class FileTools {
 
         try {
             outFile = new PrintWriter(file_name);
-        } catch (FileNotFoundException e) {
-            System.err.println("Error file not found");
+        } catch (IOException e) {
+            System.err.println("Error fix pls line 57");                                            //  FIX THIS
         }
         return outFile;
     }
@@ -86,6 +87,20 @@ class WordTools {
 
     public static String token_line(String line) {
         return null;
+    }
+}
+
+class WordEntry {
+    String word;
+    int count;
+
+    public WordEntry(String word){
+        this.word = word;
+        this.count = 1;
+    }
+
+    public void incriment() {
+        count++;
     }
 }
 
@@ -320,7 +335,7 @@ public class FileCopy {
 
             //  tokenize line by line
             try {
-                WordTools.token_line(inFile.readLine());
+                WordTools.token_line(inFile.readLine().toLowerCase());
             } catch(IOException e) {
                 System.err.println("error at line 310 someone should fix this");        //  IF ANYONE SEES THIS FIX IT, IT SHOULD BE FIXED BEFORE ITS SEEN BUT I HAVE BEEN KNOWN TO FORGET THINGS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             }
