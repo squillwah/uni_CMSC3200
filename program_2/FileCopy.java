@@ -407,28 +407,78 @@ public class FileCopy {
 
         // Proceed if filenames nominal
         if (fn_status == 0) {
-            System.out.println("Le program is running");
-
-            //  open buffered reader ADD HANDLING IF NULL
             BufferedReader inFile = FileTools.open_ifstream(filenames.get_input());
-
-            //  open file writer
             PrintWriter outFile = FileTools.open_ofstream(filenames.get_output());
+            boolean files_ready = inFile != null && outFile != null;
 
+            if (files_ready) {
+                // Process words/integer sum from input file.
+                FileWordData wordsums = process_input_file(inFile);
+                FileTools.close_ifstream(inFile);
+                // Write results to output file.
+                outFile.println("Total Integer Sum: " + wordsums.sum);
+                outFile.println("-----------------------");
+                for (int i = 0; i < wordsums.word_count; i++) 
+                    outFile.println(wordsums.words[i].get_text() + ": " + wordsums.words[i].get_count());
+                FileTools.close_ofstream(outFile);
+            } else {
+                // File opens failed, explain why:
+                System.out.println("An error occured which prevented the tokenization/file copy operation.");
+                if (inFile == null) {
+                    System.out.print("Couldn't open input file for reading, ");
+                    if (FileTools.file_exists(filenames.get_input())) 
+                        System.out.println("though file exists. Are your permissions correct?");
+                    else 
+                        System.out.println("file was deleted or moved after selection.");
+                } else FileTools.close_ifstream(inFile);
+                if (outFile == null) {
+                    System.out.println("Couldn't open output file for writing.");
+                } else FileTools.close_ofstream(outFile); // Remember to close the streams, if opened. Would be best to eliminate the duplicate calls here and if successful, though.
+            }
+        } else if ((fn_status & fn_quit_states) != 0) {
+            System.out.println("Quitting, goodbye!");
+        } else {
+            // Filename status that isn't a quit state means an unintentional (bugged) quit. 
+            System.out.println("Err: couldn't recover from filename state '" + fn_status + "'. Exiting.");
+        }
+    }
+
+    // Parse file, count word tokens and sum all integers. Return results in FileWordData 'struct'.
+    public static FileWordData process_input_file(BufferedReader inFile) {
+        FileWordData wordsums = new FileWordData();
+
+        String line = null;
+        try { line = inFile.readLine(); } 
+        catch (IOException e) { System.out.println("Err: couldn't first line from input file."); }
+
+        while (line != null) {
+            // Debug, just print the line
+            System.out.println(line);
+            try { line = inFile.readLine(); } 
+            catch (IOException e) { System.out.println("Err: couldn't line after '" + line + "' from input file."); }
+            
+            // @todo: the tokenize, parse words from numbers, store in WordsAndSum 
+            /*String delimmiters = "\t\n\r";
+                
+            // Wordify tokens in line, advance to next line and repeat until eof or max words reached. 
+            while (line != null && word_count < VOCAB_SIZE) {
+                StringTokenizer tokens = new StringTokenizer(WordTools.normalize_line(line), delimmiters);
+                while (tokens.hasMoreTokens() && word_count < VOCAB_SIZE) {
+            }*/
+
+            /*
             //  tokenize line by line
             try {
                 WordTools.token_line(inFile.readLine().toLowerCase());
             } catch(IOException e) {
                 System.err.println("error at line 310 someone should fix this");        //  IF ANYONE SEES THIS FIX IT, IT SHOULD BE FIXED BEFORE ITS SEEN BUT I HAVE BEEN KNOWN TO FORGET THINGS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            }
+            }*/
             
             //  write to output file
+            // alternatively, maybe tokenize entire file, remove duplicates, then seperate words/numbers and add?
+        }   
 
-        } else if ((fn_status & fn_quit_states) != 0) {
-            System.out.println("Quitting, goodbye!");
-        } else {
-            System.out.println("Err: couldn't recover from filename state '" + fn_status + "'. Exiting.");
-        }
+        return wordsums;
     }
 }
 
