@@ -109,10 +109,39 @@ class WordTools {
         return is;
     }
 
-    // @todo: more processing?
+    // Lowercase, trim whitespace, remove back to back hyphens/apostrophes, add separation.
     public static String normalize_line(String line_dirty) {
-        String line_clean = line_dirty.trim().toLowerCase();
-        return line_clean;
+        String line = line_dirty.trim().toLowerCase();
+
+        // Delete back to back hyphens and apostrophes
+        String delete_doubles = "'-";
+        int index = 0;
+        while (index < line.length()-1) {
+            char symbol = line.charAt(index);
+            // Delete char if followed by duplicate
+            if (delete_doubles.indexOf(symbol) > -1 && line.charAt(index+1) == symbol)
+                line = line.substring(0, index) + line.substring(index+1);
+            // Advance to next char otherwise
+            else index++;
+        }
+
+        // Insert a space if:
+        //  a number and letter are next to eachother, 
+        //  a hyphen follows a number, 
+        //  a hyphen is followed by a non alphanumeric
+        for (int i = 0; i < line.length()-1; i++) {
+            char at = line.charAt(i);
+            char next = line.charAt(i+1);
+            if ((Character.isAlphabetic(at) && Character.isDigit(next)) || 
+                (Character.isDigit(at) && (Character.isAlphabetic(next) || next == '-')) ||
+                (at == '-' && !(Character.isDigit(next) || Character.isAlphabetic(next)))) {
+
+                line = line.substring(0, i+1) + ' ' + line.substring(i+1);
+                i++;
+            }
+        }
+
+        return line;
     }
 
     // Return index of Word object in words array matching string
