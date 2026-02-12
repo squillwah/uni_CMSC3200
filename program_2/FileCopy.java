@@ -210,13 +210,16 @@ class IOFileNameState {
         status &= ~(INPUT_NOTGIVEN + INPUT_NOEXIST + OUTPUT_IS_INPUT);
         if (input_file.isEmpty()) status |= INPUT_NOTGIVEN;
         else if (!FileTools.file_exists(input_file)) status |= INPUT_NOEXIST;
-        else if (input_file.equals(output_file)) status |= OUTPUT_IS_INPUT; // could comparing against initial null output_file cause issues?
+        //else if (input_file.equals(output_file)) status |= OUTPUT_IS_INPUT; // could comparing against initial null output_file cause issues?
     }
     public void check_output() {
         status &= ~(OUTPUT_NOTGIVEN + OUTPUT_DOEXIST + OUTPUT_IS_INPUT);
         if (output_file.isEmpty()) status |= OUTPUT_NOTGIVEN;
-        else if (FileTools.file_exists(output_file)) status |= OUTPUT_DOEXIST;
-        else if (input_file.equals(output_file)) status |= OUTPUT_IS_INPUT; 
+        else if (FileTools.file_exists(output_file)) {
+            status |= OUTPUT_DOEXIST;
+            if (input_file.equals(output_file)) status |= OUTPUT_IS_INPUT; 
+        }
+        
     }
 
     // More readable method of resetting input/output filenames.
@@ -305,12 +308,11 @@ class Prompts {
         return quit_states;
     }
 
-    // Will probably never reach this, since bad_output detects preexisting files and is handled first.    
     public static int io_same(IOFileNameState filenames) {
         int quit_states = 0;
         System.out.println("Your input file and output file are the same ('" + filenames.get_input() + "').");
-        filenames.clear_input();
-        filenames.clear_output();
+        filenames.set_output(catchLine("Please enter a different output file (or nothing to quit): "));
+        quit_states = filenames.get_status() & IOFileNameState.OUTPUT_NOTGIVEN;
         return quit_states;
     }
    
@@ -397,14 +399,14 @@ public class FileCopy {
         while (fn_status != 0 && (fn_status & fn_quit_states) == 0) {
             if ((fn_status & IOFileNameState.INPUT_NOTGIVEN) != 0)
                 fn_quit_states |= Prompts.no_input(filenames);
-            else if ((fn_status & IOFileNameState.OUTPUT_NOTGIVEN) != 0)
-                fn_quit_states |= Prompts.no_output(filenames);
             else if ((fn_status & IOFileNameState.INPUT_NOEXIST) != 0)
                 fn_quit_states |= Prompts.bad_input(filenames);
-            else if ((fn_status & IOFileNameState.OUTPUT_DOEXIST) != 0)
-                fn_quit_states |= Prompts.bad_output(filenames);
+            else if ((fn_status & IOFileNameState.OUTPUT_NOTGIVEN) != 0)
+                fn_quit_states |= Prompts.no_output(filenames);
             else if ((fn_status & IOFileNameState.OUTPUT_IS_INPUT) != 0)
                 fn_quit_states |= Prompts.io_same(filenames);
+            else if ((fn_status & IOFileNameState.OUTPUT_DOEXIST) != 0)
+                fn_quit_states |= Prompts.bad_output(filenames);
             fn_status = filenames.get_status();
         }
         Prompts.close_stdin();
