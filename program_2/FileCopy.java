@@ -451,9 +451,9 @@ public class FileCopy {
 
                 // Write results to output file.
                 System.out.println("Writing results to output file.");
-                outFile.println("Total Integer Sum: " + wordsums.sum + "\n-----------------------");
+                outFile.println("Total Integer Sum: " + wordsums.sum + "\n-----------------------\n" + "Words:");
                 for (int i = 0; i < wordsums.word_count; i++) 
-                    outFile.println(wordsums.words[i].get_text() + ": " + wordsums.words[i].get_count());
+                    outFile.println(" * " + wordsums.words[i].get_text() + ": " + wordsums.words[i].get_count());
                 System.out.println("Closing output file.");
                 FileTools.close_ofstream(outFile);
             } else  
@@ -473,34 +473,38 @@ public class FileCopy {
         String line = null;
         try { line = inFile.readLine(); } 
         catch (IOException e) { System.out.println("Error reading first line from input file: " + e); }
-
+        
+        String token = null;
+        String delims = "\t\n\r\\\"|~`!@#$%^&*()_+=[]{};:/?.>,< ";
         while (line != null) {
-            // Debug, just print the line
-            System.out.println(line);
+            StringTokenizer tokens = new StringTokenizer(WordTools.normalize_line(line), delims); 
+            while (tokens.hasMoreTokens()) {
+                token = tokens.nextToken();
+
+                // Remove any starting characters which aren't digits, letters, or hyphens.
+                while (token.length() > 0 && !Character.isAlphabetic(token.charAt(0)) && !Character.isDigit(token.charAt(0)) && token.charAt(0) != '-')
+                    token = token.substring(1);
+                // If token isn't empty and isn't just a hyphen.
+                if (token.length() > 0 && !(token.length() == 1 && token.charAt(0) == '-')) {
+                    // Try to add token to sum.
+                    try {
+                        wordsums.sum += Integer.parseInt(token);
+                    // Otherwise, attempt to add as word.
+                    } catch (NumberFormatException e) {
+                        int windex = WordTools.find_word(token, wordsums.words, wordsums.word_count);
+                        if (windex < 0) {
+                            if (wordsums.word_count < wordsums.MAX_WORDS) { // Only add new if space left.
+                                wordsums.words[wordsums.word_count] = new Word(token);
+                                wordsums.word_count++;
+                            }
+                        } else 
+                            wordsums.words[windex].count++; 
+                    }
+                }
+            }
             try { line = inFile.readLine(); } 
             catch (IOException e) { System.out.println("Error reading next line after '" + line + "' from input file: " + e); }
-            
-            // @todo: the tokenize, parse words from numbers, store in WordsAndSum 
-            /*String delimmiters = "\t\n\r";
-                
-            // Wordify tokens in line, advance to next line and repeat until eof or max words reached. 
-            while (line != null && word_count < VOCAB_SIZE) {
-                StringTokenizer tokens = new StringTokenizer(WordTools.normalize_line(line), delimmiters);
-                while (tokens.hasMoreTokens() && word_count < VOCAB_SIZE) {
-            }*/
-
-            /*
-            //  tokenize line by line
-            try {
-                WordTools.token_line(inFile.readLine().toLowerCase());
-            } catch(IOException e) {
-                System.err.println("error at line 310 someone should fix this");        //  IF ANYONE SEES THIS FIX IT, IT SHOULD BE FIXED BEFORE ITS SEEN BUT I HAVE BEEN KNOWN TO FORGET THINGS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            }*/
-            
-            //  write to output file
-            // alternatively, maybe tokenize entire file, remove duplicates, then seperate words/numbers and add?
         }   
-
         return wordsums;
     }
 }
