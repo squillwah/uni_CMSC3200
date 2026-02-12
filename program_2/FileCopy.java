@@ -392,7 +392,7 @@ public class FileCopy {
         System.out.println(fn_status);
         Prompts.open_stdin();
         while (fn_status != 0 && (fn_status & fn_quit_states) == 0) {
-            if ((fn_status & IOFileNameState.INPUT_NOTGIVEN) != 0)
+            if ((fn_status & IOFileNameState.INPUT_NOTGIVEN) != 0)          // Precedence matters, do not reorder.
                 fn_quit_states |= Prompts.no_input(filenames);
             else if ((fn_status & IOFileNameState.INPUT_NOEXIST) != 0)
                 fn_quit_states |= Prompts.bad_input(filenames);
@@ -408,19 +408,24 @@ public class FileCopy {
 
         // Proceed if filenames nominal
         if (fn_status == 0) {
+            System.out.println("Opening file streams.");
             BufferedReader inFile = FileTools.open_ifstream(filenames.get_input());
             PrintWriter outFile = FileTools.open_ofstream(filenames.get_output());
             boolean files_ready = inFile != null && outFile != null;
 
             if (files_ready) {
                 // Process words/integer sum from input file.
+                System.out.println("Processing input file.");
                 FileWordData wordsums = process_input_file(inFile);
+                System.out.println("Closing input file.");
                 FileTools.close_ifstream(inFile);
 
                 // Write results to output file.
+                System.out.println("Writing results to output file.");
                 outFile.println("Total Integer Sum: " + wordsums.sum + "\n-----------------------");
                 for (int i = 0; i < wordsums.word_count; i++) 
                     outFile.println(wordsums.words[i].get_text() + ": " + wordsums.words[i].get_count());
+                System.out.println("Closing output file.");
                 FileTools.close_ofstream(outFile);
             } else  
                 System.out.println("An error occured which prevented the tokenization/file copy operation. Quitting."); 
