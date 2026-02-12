@@ -12,17 +12,17 @@
 import java.io.*;
 import java.util.*;
 
-/* ======================================================================================
- * FileTools
- *
- *  Defines functions for file operations needed in this program.
- *
- *   - rename_file(String, String)
- *   - file_exists(String)
- *   - open_ifstream()/open_ofstream(String)
- *   - close_ifstream(BufferedReader)/close_ofstream(PrintWriter)
- *
- * ====================================================================================== */
+// ======================================================================================
+// FileTools
+//
+//  Defines functions for file operations needed in this program.
+//
+//   - rename_file(String, String)
+//   - file_exists(String)
+//   - open_ifstream()/open_ofstream(String)
+//   - close_ifstream(BufferedReader)/close_ofstream(PrintWriter)
+//
+// ====================================================================================== */
 class FileTools {
     private FileTools() {}
    
@@ -83,7 +83,6 @@ class FileTools {
         }
         return closed;
     }
-
 }
 
 // ======================================================================================
@@ -91,7 +90,6 @@ class FileTools {
 //
 //  Word processing procedures.
 //
-//   - is_int(String)
 //   - normalize_line(String)
 //   - find_word(String, Word[], int)
 //
@@ -99,20 +97,10 @@ class FileTools {
 class WordTools {
     private WordTools() {}
     
-    public static boolean is_int(String word) {
-        boolean is = true;
-        try {
-            Integer.parseInt(word);
-        } catch (NumberFormatException e) {
-            is = false;
-        }
-        return is;
-    }
-
     // Lowercase, trim whitespace, remove back to back hyphens/apostrophes, add separation.
     public static String normalize_line(String line_dirty) {
         String line = line_dirty.trim().toLowerCase();
-
+        
         // Delete back to back hyphens and apostrophes
         String delete_doubles = "'-";
         int index = 0;
@@ -124,7 +112,7 @@ class WordTools {
             // Advance to next char otherwise
             else index++;
         }
-
+        
         // Insert a space if:
         //  a number and letter are next to eachother, 
         //  a hyphen follows a number, 
@@ -140,7 +128,6 @@ class WordTools {
                 i++;
             }
         }
-
         return line;
     }
 
@@ -152,10 +139,6 @@ class WordTools {
                 index = i;
         return index;
     }
-
-    public static String token_line(String line) {
-        return null;
-    }
 }
 
 // ============================================================================
@@ -166,8 +149,8 @@ class WordTools {
 //
 // ============================================================================
 class Word {
-    String word;
-    int count;
+    private String word;
+    private int count;
 
     public Word(String word){
         this.word = word;
@@ -243,7 +226,6 @@ class IOFileNameState {
             status |= OUTPUT_DOEXIST;
             if (output_file.equals(input_file)) status |= OUTPUT_IS_INPUT; 
         }
-        
     }
 
     // More readable method of resetting input/output filenames.
@@ -254,7 +236,6 @@ class IOFileNameState {
     public String get_input() { return input_file; }
     public String get_output() { return output_file; }
 }
-
 
 // ====================================================================================================
 // Prompts
@@ -326,7 +307,7 @@ class Prompts {
                 case "replace":
                 case "backup":
                     // Simpler to rename original, rather than copying everything only to overwrite.
-                    FileTools.rename_file(filenames.get_output(), filenames.get_output()+".bak"); // ! what happens if output is set as input? should check that case first
+                    FileTools.rename_file(filenames.get_output(), filenames.get_output()+".bak");
                     filenames.check_output(); // Should clear OUTPUT_DOEXIST
                     break;
                 case "3":
@@ -451,7 +432,8 @@ public class FileCopy {
 
                 // Write results to output file.
                 System.out.println("Writing results to output file.");
-                outFile.println("Total Integer Sum: " + wordsums.sum + "\n-----------------------\n" + "Words:");
+                outFile.println("Total Integer Sum: " + wordsums.sum + "\n----------------------------");
+                outFile.println("Parsed Words: " + wordsums.word_count + '/' + wordsums.MAX_WORDS + "\n----------------------------");
                 for (int i = 0; i < wordsums.word_count; i++) 
                     outFile.println(" * " + wordsums.words[i].get_text() + ": " + wordsums.words[i].get_count());
                 System.out.println("Closing output file.");
@@ -498,7 +480,7 @@ public class FileCopy {
                                 wordsums.word_count++;
                             }
                         } else 
-                            wordsums.words[windex].count++; 
+                            wordsums.words[windex].incriment(); 
                     }
                 }
             }
@@ -508,8 +490,4 @@ public class FileCopy {
         return wordsums;
     }
 }
-
-
-
-
 
