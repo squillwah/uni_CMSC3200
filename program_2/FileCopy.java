@@ -26,14 +26,14 @@ import java.util.*;
 class FileTools {
     private FileTools() {}
    
-    // Rename files given name and new name strings. Recursively appends .bak to new_names which exist. 
+    // Rename files given name and new name strings. Appends .bak to new_names which exist. 
     public static void rename_file(String old_name, String new_name) {
+        System.out.println("Renaming '" + old_name + "' to '" + new_name + "'.");
         if (file_exists(new_name)) {
             System.out.println("File '" + new_name + "' already exists, backing up to '" + new_name + ".bak'.");
             rename_file(new_name, new_name+".bak");
         }
-
-        // rename the file
+        (new File(old_name)).renameTo(new File(new_name));
     }
    
     // Return true if file corresponding to file_name exists, false if not. 
@@ -289,14 +289,19 @@ class Prompts {
         boolean choosing = true;
         while (choosing) {
             switch (choice) {
+                case "1":
                 case "pick":
                     filenames.clear_output(); // Clear output, allow no_output() to handle reentry.
                     break;
+                case "2":
+                case "replace":
                 case "backup":
                     // Simpler to rename original, rather than copying everything only to overwrite.
                     FileTools.rename_file(filenames.get_output(), filenames.get_output()+".bak"); // ! what happens if output is set as input? should check that case first
                     filenames.check_output(); // Should clear OUTPUT_DOEXIST
                     break;
+                case "3":
+                case "":
                 case "quit":
                     quit_states |= IOFileNameState.OUTPUT_DOEXIST;
                     break;
