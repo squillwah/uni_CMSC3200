@@ -392,14 +392,12 @@ public class FileCopy {
                 break;
             default:
                 filenames = new IOFileNameState(args[0], args[1]);
-                System.out.println("hello");
                 break;
         }
        
         // If filename errors present, fix with interactive prompts
         int fn_status = filenames.get_status(); 
         int fn_quit_states = 0; // Allow for quitting by signaling an error state as a 'quit state'.
-        System.out.println(fn_status);
         Prompts.open_stdin();
         while (fn_status != 0 && (fn_status & fn_quit_states) == 0) {
             if ((fn_status & IOFileNameState.INPUT_NOTGIVEN) != 0)          // Precedence matters, do not reorder.
