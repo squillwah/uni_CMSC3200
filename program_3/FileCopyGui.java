@@ -12,18 +12,24 @@ public class FileCopyGui {
 }
 
 //  handles all GUI init and updates
-class Window extends Frame implements WindowListener {
+class Window extends Frame implements WindowListener, ActionListener {
 
-    Label title = new Label("test");
+    //  layout
+    GridBagConstraints gbc = new GridBagConstraints();
+    GridBagLayout gbl = new GridBagLayout();
+
+    //  buttons
+    Button target;
+    Button confirm;
+
+    //  labels
+    Label title;    //  POORLY NAMED RN IS NOT THE TITLE
 
     public Window() {
-        
-        GridBagConstraints gbc = new GridBagConstraints();
-        GridBagLayout gbl = new GridBagLayout();
 
         //  establishing how buttons and labels go onto the screen
-        double colWeight[] = {1};
-        double rowWeight[] = {1};
+        double colWeight[] = {1};   //  MESSING WITH THESE, DONT HAVE AN
+        double rowWeight[] = {1};   //  INTUITIVE FEEL FOR EM
         int colWidth[] = {1};
         int rowHeight[] = {1};
 
@@ -33,10 +39,9 @@ class Window extends Frame implements WindowListener {
         gbl.columnWeights = colWeight;
 
         //  setting up frame settings
-        this.setBounds(20,20,200,100);
+        initFrame();
+        this.setBounds(20,20,500,500);
         this.setLayout(gbl);
-        gbl.setConstraints(title, gbc);
-        this.add(title);
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);
         this.setVisible(true);
@@ -59,6 +64,26 @@ class Window extends Frame implements WindowListener {
     //  init window when opened
     public void windowOpened(WindowEvent e) {
 
+        initFrame();
+    }
+
+    public void initFrame() {
+
+        //  buttons
+        target = new Button("Target: ");
+        target.addActionListener(this);
+        confirm = new Button("Confirm");
+        confirm.addActionListener(this);
+
+        //  labels
+        title = new Label("Test");
+
+        //  setup window
+        gbl.setConstraints(title, gbc);
+        this.add(title);
+    }
+
+    public void actionPerformed(ActionEvent e) {
 
     }
 }
