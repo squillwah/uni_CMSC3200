@@ -34,7 +34,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         double colWeight[] = {1,10,1};   //  MESSING WITH THESE, DONT HAVE AN
         double rowWeight[] = {12,1,1,1};   //  INTUITIVE FEEL FOR EM
         int colWidth[] = {1,10,1};
-        int rowHeight[] = {12,1,1,1};
+        int rowHeight[] = {12,1,1,1,};
 
         gbl.rowHeights = rowHeight;
         gbl.columnWidths = colWidth;
@@ -75,46 +75,50 @@ class Window extends Frame implements WindowListener, ActionListener {
 
         initFrame();
     }
+    
+    public void actionPerformed(ActionEvent e) {
+
+    }
 
     public void initFrame() {
 
         //  buttons
         target = new Button("Target: ");
         target.addActionListener(this);
-        gbc.gridx = 1;
-        gbc.gridy = 3;
+        gbc.gridx = 0;
+        gbc.gridy = 2;
         gbl.setConstraints(target, gbc);
         this.add(target);
 
         confirm = new Button("Confirm");
         confirm.addActionListener(this);
-        gbc.gridx = 3;
-        gbc.gridy = 4;
+        gbc.gridx = 2;
+        gbc.gridy = 3;
         gbl.setConstraints(confirm, gbc);
         this.add(confirm);
 
         //  labels
         source = new Label("Source: ");
-        gbc.gridx = 1;
-        gbc.gridy = 2;
+        gbc.gridx = 0;
+        gbc.gridy = 1;
         gbl.setConstraints(source, gbc);
         this.add(source);
 
         currSource = new Label("THIS IS A TEST OF THE CURRENT SOURCE LABEL");
-        gbc.gridx = 2;
-        gbc.gridy = 2;
+        gbc.gridx = 1;
+        gbc.gridy = 1;
         gbl.setConstraints(currSource, gbc);
         this.add(currSource);
 
         currTarget = new Label("THIS IS A TEST OF THE CURRENT TARGET LABEL");
-        gbc.gridx = 2;
-        gbc.gridy = 3;
+        gbc.gridx = 1;
+        gbc.gridy = 2;
         gbl.setConstraints(currTarget, gbc);
         this.add(currTarget);
 
         fileName = new Label("File Name: ");
-        gbc.gridx = 1;
-        gbc.gridy = 4;
+        gbc.gridx = 0;
+        gbc.gridy = 3;
         gbl.setConstraints(fileName, gbc);
         this.add(fileName);
         
@@ -122,10 +126,6 @@ class Window extends Frame implements WindowListener, ActionListener {
 
     //  update labels to reflect current selections
     public void updateLabels() {
-
-    }
-
-    public void actionPerformed(ActionEvent e) {
 
     }
 }
