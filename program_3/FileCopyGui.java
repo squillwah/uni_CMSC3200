@@ -14,13 +14,14 @@ public class FileCopyGui {
 //  handles all GUI init and updates
 class Window extends Frame implements WindowListener {
 
-    Label title = new Label("Test");
+    Label title = new Label("test");
 
     public Window() {
         
         GridBagConstraints gbc = new GridBagConstraints();
         GridBagLayout gbl = new GridBagLayout();
 
+        //  establishing how buttons and labels go onto the screen
         double colWeight[] = {1};
         double rowWeight[] = {1};
         int colWidth[] = {1};
@@ -31,11 +32,13 @@ class Window extends Frame implements WindowListener {
         gbl.rowWeights = rowWeight;
         gbl.columnWeights = colWeight;
 
+        //  setting up frame settings
         this.setBounds(20,20,200,100);
         this.setLayout(gbl);
         gbl.setConstraints(title, gbc);
         this.add(title);
         this.addWindowListener(this);
+        this.setLocationRelativeTo(null);
         this.setVisible(true);
 
     }
@@ -52,5 +55,10 @@ class Window extends Frame implements WindowListener {
     public void windowDeactivated(WindowEvent e) {}
     public void windowDeiconified(WindowEvent e) {}
     public void windowIconified(WindowEvent e) {}
-    public void windowOpened(WindowEvent e) {}
+
+    //  init window when opened
+    public void windowOpened(WindowEvent e) {
+
+
+    }
 }
