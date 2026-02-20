@@ -31,10 +31,10 @@ class Window extends Frame implements WindowListener, ActionListener {
     public Window() {
 
         //  establishing how buttons and labels go onto the screen
-        double colWeight[] = {1,10,1};   //  MESSING WITH THESE, DONT HAVE AN
-        double rowWeight[] = {12,1,1,1};   //  INTUITIVE FEEL FOR EM
-        int colWidth[] = {1,10,1};
-        int rowHeight[] = {12,1,1,1,};
+        double colWeight[] = {2,4,4,15,1,3,1};   //  MESSING WITH THESE, DONT HAVE AN
+        double rowWeight[] = {25,1,1,1};   //  INTUITIVE FEEL FOR EM
+        int colWidth[] = {2,4,4,15,1,3,1};
+        int rowHeight[] = {25,1,1,1,};
 
         gbl.rowHeights = rowHeight;
         gbl.columnWidths = colWidth;
@@ -75,7 +75,7 @@ class Window extends Frame implements WindowListener, ActionListener {
 
         initFrame();
     }
-    
+
     public void actionPerformed(ActionEvent e) {
 
     }
@@ -85,39 +85,39 @@ class Window extends Frame implements WindowListener, ActionListener {
         //  buttons
         target = new Button("Target: ");
         target.addActionListener(this);
-        gbc.gridx = 0;
+        gbc.gridx = 1;
         gbc.gridy = 2;
         gbl.setConstraints(target, gbc);
         this.add(target);
 
         confirm = new Button("Confirm");
         confirm.addActionListener(this);
-        gbc.gridx = 2;
+        gbc.gridx = 6;
         gbc.gridy = 3;
         gbl.setConstraints(confirm, gbc);
         this.add(confirm);
 
         //  labels
         source = new Label("Source: ");
-        gbc.gridx = 0;
+        gbc.gridx = 1;
         gbc.gridy = 1;
         gbl.setConstraints(source, gbc);
         this.add(source);
 
         currSource = new Label("THIS IS A TEST OF THE CURRENT SOURCE LABEL");
-        gbc.gridx = 1;
+        gbc.gridx = 3;
         gbc.gridy = 1;
         gbl.setConstraints(currSource, gbc);
         this.add(currSource);
 
         currTarget = new Label("THIS IS A TEST OF THE CURRENT TARGET LABEL");
-        gbc.gridx = 1;
+        gbc.gridx = 3;
         gbc.gridy = 2;
         gbl.setConstraints(currTarget, gbc);
         this.add(currTarget);
 
         fileName = new Label("File Name: ");
-        gbc.gridx = 0;
+        gbc.gridx = 1;
         gbc.gridy = 3;
         gbl.setConstraints(fileName, gbc);
         this.add(fileName);
