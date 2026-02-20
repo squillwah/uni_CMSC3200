@@ -1,8 +1,13 @@
+// For GUI
 import java.awt.*;
 import java.awt.event.*;
+// For testing? Could remove at end, I think.
 import java.io.*;
+// For sorting file lists alphabetically
 import java.util.Arrays;
-
+// For iterating over files within a directory
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 // Might benefit from a stripped down representation of a dirent like this (for list printing?):
 // But then why not just provide the full File object?
@@ -18,9 +23,10 @@ class DirEntInfo {
 //   Holds root directory File and array of Files contained within.
 // 
 // ================
-class FileEnvironment {
+class FileEnvironment implements Iterable<File> {
     private File rootdir;
     private File[] dirents;
+    private int iterator_pos;
 
     public FileEnvironment(File root) {
         rootdir = root.getAbsoluteFile();
@@ -35,6 +41,9 @@ class FileEnvironment {
                 desired = dirents[i];
         return desired;
     }
+
+    // Return the present path of the file environment.
+    public String get_path() { return rootdir.getPath(); }
 
     /*                      May just want to do this with a PrintWriter. Or maybe not.
     // Create a file 
@@ -71,16 +80,21 @@ class FileEnvironment {
 
     private void refresh_dirents() {
         dirents = rootdir.listFiles();
-        Arrays.sort(dirents);
+        // Restricted folders return null
+        if (dirents == null) dirents = new File[0]; // Safer to assign empty array.
+        else Arrays.sort(dirents);
     }
 
-    public void display_dirents() {     // Will want to replace this with something else to work with GUI. 
-                                        // Or maybe abandon the concept of keeping dirents private in the first place.
-        System.out.println(rootdir.getPath());
-        for (File ent : dirents) {
-            System.out.print(" * " + ent.getPath());
-            if (ent.isDirectory()) { System.out.println(" +"); }
-            else { System.out.println(); }
+    // Minimal iterator implementation.
+    public FileEnvIterator iterator() { return new FileEnvIterator(); }
+    private class FileEnvIterator implements Iterator<File> {
+        private int pos;
+        public FileEnvIterator() { pos = 0; }
+        
+        public boolean hasNext() { return pos < dirents.length; }
+        public File next() { 
+            if (!hasNext()) throw new NoSuchElementException("End of directory.");
+            return dirents[pos++];
         }
     }
 }
@@ -131,20 +145,26 @@ public class FileCopyGui {
             System.out.println();
             switch (input) {
                 case "d":
-                    files.display_dirents();    // May want to do this differently. Just hand over the file list instead of obfuscating.
                     break;
                 case "u":
                     files.cd_up();
-                    files.display_dirents();
                     break;
                 case "q":
                     running = false;
-                    break;
+                    continue;
                 default:
-                    if (!files.cd_down(input))
+                    if (!files.cd_down(input)) {
                         System.out.println("dir '" + input + "' does not exist.\n");
-                    files.display_dirents();
+                        continue;
+                    }
                     break;
+            }
+            // Display, now with iterator instead of method.
+            System.out.println(files.get_path());
+            for (File ent : files) {
+                System.out.print(" * " + ent.getPath());
+                if (ent.isDirectory()) { System.out.println(" +"); }
+                else { System.out.println(); }
             }
         }
         stdin.close();
