@@ -53,6 +53,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.setLayout(gbl);
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);   //  setting starting pos to center screen, likes to start on my left monitor and the fix isnt universal so did this
+        this.setTitle("IF YOU SEE THIS SOMETHING FUCKED UP!");
         this.setVisible(true);
 
     }
@@ -124,8 +125,20 @@ class Window extends Frame implements WindowListener, ActionListener {
         
     }
 
-    //  update labels to reflect current selections
-    public void updateLabels() {
+    //  update the window to display correctly from backend
+    public void updateTitle(String s) {
+        this.setTitle(s);
+    }
 
+    public void updateTarget(String s) {
+        currTarget.setText(s);
+    }
+
+    public void updateSource(String s) {
+        currSource.setText(s);
+    }
+
+    public void updateList() {
+        //  depending on backend format might just have to update, or make this an itteritive loop
     }
 }
