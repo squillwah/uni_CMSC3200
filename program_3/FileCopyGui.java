@@ -9,18 +9,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-// Might benefit from a stripped down representation of a dirent like this (for list printing?):
-// But then why not just provide the full File object?
-class DirEntInfo {
-    public String path;
-    public boolean is_dir;
-}
-
 // ================
 //  FileEnvironment
 //  
 //   Represents the current folder.
 //   Holds root directory File and array of Files contained within.
+//   Implements an iterator for traversal of Files within directory.
 // 
 // ================
 class FileEnvironment implements Iterable<File> {
@@ -32,29 +26,25 @@ class FileEnvironment implements Iterable<File> {
         rootdir = root.getAbsoluteFile();
         refresh_dirents();
     }
-
-    // Return the file object in the current directory by relative name.
-    public File get_file(String filename) {
-        File desired = null;
-        for (int i = 0; i < dirents.length && desired == null; i++) 
-            if (dirents[i].getName().equals(filename))
-                desired = dirents[i];
-        return desired;
-    }
-
+    
     // Return the present path of the file environment.
     public String get_path() { return rootdir.getPath(); }
-
-    /*                      May just want to do this with a PrintWriter. Or maybe not.
-    // Create a file 
-    public boolean make_file(String filename) {
-
-    }
-    */
-
+    
     // Check if at file system root.
     public boolean at_root() { return rootdir.getParent() == null; }
+
+    // Check if directory entry exists within directory, given name.
+    public boolean dirent_exists(String filename) { return !(get_dirent(filename) == null); }
    
+    // Find and return first dirent with matching filename. 
+    public File get_dirent(String filename) {
+        File dirent = null;
+        for (int i = 0; i < dirents.length && dirent == null; i++) 
+            if (dirents[i].getName().equals(filename))
+                dirent = dirents[i];
+        return dirent;
+    }
+
     // Move the file environment up a directory. 
     public boolean cd_up() {
         boolean dir_changed = false;
@@ -66,10 +56,10 @@ class FileEnvironment implements Iterable<File> {
         return dir_changed;
     }
 
-    // Move the file environment down into a subdirectory.
+    // Move the file environment into a subdirectory, given its name.
     public boolean cd_down(String filename) {              // Should this take filename string or file object?
         boolean dir_changed = false;
-        File new_dir = get_file(filename);
+        File new_dir = get_dirent(filename);
         if (new_dir != null && new_dir.isDirectory()) {
             rootdir = new_dir;
             refresh_dirents();
@@ -78,6 +68,7 @@ class FileEnvironment implements Iterable<File> {
         return dir_changed;
     }
 
+    // Refresh the file list.
     private void refresh_dirents() {
         dirents = rootdir.listFiles();
         // Restricted folders return null
@@ -100,23 +91,38 @@ class FileEnvironment implements Iterable<File> {
 }
 
 // ===============
-// CopyFileStatus
+// CopyStatus
 //
-//  Runs checks between the target/source file object and returns a code
-//  describing any issues which should preventing prevent the file copy.
+//  Runs checks between target/source files and returns status code.
+//  Code describes any issues which should prevent a source->target file copy.
 //
 // ===============
-class CopyFileStatus {
-    private CopyFileStatus() {}
+class CopyStatus {
+    private CopyStatus() {}
      
-    public static final int SOURCE_NOTGIVEN  = 0b00001;
-    public static final int SOURCE_NOEXIST   = 0b00010;
-    public static final int TARGET_NOTGIVEN  = 0b00100;
-    public static final int TARGET_DOEXIST   = 0b01000;
-    public static final int TARGET_IS_SOURCE = 0b10000;
-    
-    public static int check(File source, File target) {
+    public static final int SOURCE_NOTGIVEN  = 0b000001;
+    public static final int SOURCE_NOEXIST   = 0b000010;
+    public static final int SOURCE_ISDIR     = 0b000100;
+    public static final int TARGET_NOTGIVEN  = 0b001000;
+    public static final int TARGET_DOEXIST   = 0b010000;
+    public static final int TARGET_IS_SOURCE = 0b100000;
+    // should we check if target is directory too? probably, if we support target backup like program 2.
+   
+    // Takes two source/target filename Strings and a FileEnvironment object.
+    // Compares filenames and runs checks within file environment to determine copy status. 
+    public static int check(String source_fn, String target_fn, FileEnvironment env) {
         int status = 0;
+        if (source_fn == null || source_fn.equals(""))      status |= SOURCE_NOTGIVEN;
+        else {
+            File source_file = env.get_dirent(source_fn);
+            if (source_file == null)                        status |= SOURCE_NOEXIST;
+            else if (source_file.isDirectory())             status |= SOURCE_ISDIR;
+        }
+        if (target_fn == null || target_fn.equals(""))      status |= TARGET_NOTGIVEN;
+        else {
+            if (env.dirent_exists(target_fn))               status |= TARGET_DOEXIST;
+            if (target_fn.equals(source_fn))                status |= TARGET_IS_SOURCE;
+        }
         return status;
     }
 }
@@ -166,7 +172,20 @@ public class FileCopyGui {
                 if (ent.isDirectory()) { System.out.println(" +"); }
                 else { System.out.println(); }
             }
+
+            String source = stdin.readLine();
+            String target = stdin.readLine();
+            int status = CopyStatus.check(source, target, files);
+            System.out.println(status);
+    
+            if ((status & CopyStatus.SOURCE_NOTGIVEN) > 0)  System.out.println("src not given");
+            if ((status & CopyStatus.SOURCE_NOEXIST) > 0)   System.out.println("src no exist");
+            if ((status & CopyStatus.SOURCE_ISDIR) > 0)     System.out.println("src is dir");
+            if ((status & CopyStatus.TARGET_NOTGIVEN) > 0)  System.out.println("tgt not given");
+            if ((status & CopyStatus.TARGET_DOEXIST) > 0)   System.out.println("tgt already exists");
+            if ((status & CopyStatus.TARGET_IS_SOURCE) > 0) System.out.println("tgt is source");
         }
+
         stdin.close();
 
         //Window w = new Window();
