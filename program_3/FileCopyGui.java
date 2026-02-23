@@ -128,7 +128,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.add(fileName);
 
         //  list
-        List list = new List();
+        list = new List();
         list.setSize(400,600);
         gbc.gridwidth = 8;
         gbc.gridheight = 1;
