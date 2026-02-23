@@ -58,7 +58,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.setLayout(gbl);
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);   //  setting starting pos to center screen, likes to start on my left monitor and the fix isnt universal so did this
-        this.setTitle("IF YOU SEE THIS SOMETHING FUCKED UP!");          
+        this.setTitle("ERROR: title not specified!");          
         this.setVisible(true);
 
     }
@@ -109,13 +109,13 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbl.setConstraints(source, gbc);
         this.add(source);
 
-        currSource = new Label("THIS IS A TEST OF THE CURRENT SOURCE LABEL");
+        currSource = new Label("Source not specified");
         gbc.gridx = 3;
         gbc.gridy = 1;
         gbl.setConstraints(currSource, gbc);
         this.add(currSource);
 
-        currTarget = new Label("THIS IS A TEST OF THE CURRENT TARGET LABEL");
+        currTarget = new Label("Target not specified");
         gbc.gridx = 3;
         gbc.gridy = 2;
         gbl.setConstraints(currTarget, gbc);
@@ -155,6 +155,8 @@ class Window extends Frame implements WindowListener, ActionListener {
 
     public void updateList() {
         //  depending on backend format might just have to update, or make this an itteritive loop
+        fileList.removeAll();
+
         File directory = new File(".");
         File[] files = directory.listFiles();
         if (files != null) {
