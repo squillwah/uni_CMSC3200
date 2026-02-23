@@ -20,7 +20,6 @@ import java.util.NoSuchElementException;
 class FileEnvironment implements Iterable<File> {
     private File rootdir;
     private File[] dirents;
-    private int iterator_pos;
 
     public FileEnvironment(File root) {
         rootdir = root.getAbsoluteFile();
@@ -47,14 +46,16 @@ class FileEnvironment implements Iterable<File> {
  *  public boolean dirent_exists(File file) { return file.exists(); }
  */
    
-    // Find and return first dirent with matching filename. 
-    // Returns null if not found.
+//    // Find and return first dirent with matching filename. 
+//    // Returns nonexistent File if not found.
+    // Returns a File object with the given relative name within the present FileEnvironment path.
     public File get_dirent(String filename) {
-        File dirent = null;
-        for (int i = 0; i < dirents.length && dirent == null; i++) 
-            if (dirents[i].getName().equals(filename))
-                dirent = dirents[i];
-        return dirent;
+//        File dirent = null;
+//        for (int i = 0; i < dirents.length && dirent == null; i++) 
+//            if (dirents[i].getName().equals(filename))
+//                dirent = dirents[i];
+//        return dirent;
+        return new File(get_path()+filename);
     }
 
     // ---------------------------
@@ -98,43 +99,45 @@ class FileEnvironment implements Iterable<File> {
     // File operations within the environment
     // --------------------------------------
 
-    // Find file by filename within current directory, rename to new filename.
-    // Returns true if file renamed successfully. Will not rename directories, or overwrite files.
-    public boolean rename_file(String original_fn, String new_fn) {
-        boolean renamed = false;
-        File file = get_dirent(original_fn);
-        if (file != null && !file.isDirectory() && get_dirent(new_fn) == null)
-            file.renameTo(new File(new_fn));
-        refresh_dirents();  // Might not be needed.
-        return renamed;
-    } // !! Just realized that the ruberic doesn't actually ask for this.
-
-    // Open a BufferedReader for a file.
-    // Returns null if it cannot be opened (any IOException).
-    public static BufferedReader open_ifstream(File file) {
-        BufferedReader ifstream = null;
-        try { ifstream = new BufferedReader(new FileReader(file.getPath())); }
-        catch (IOException e) {} // Do nothing, allow caller to handle the null. 
-        return ifstream;
-    }
-
-    // alternatively, this restricts opening files to current directory and matches usage with open_ofstream
-    //    public static BufferedReader open_ifstream(String filename) {
-    //        BufferedReader ifstream = null;
-    //        try { ifstream = new BufferedReader(new FileReader(get_path()+filename)); }
-    //        catch (IOException e) {} // Do nothing, allow caller to handle the null. 
-    //        return ifstream;
-    //    }
-
-    // Open a PrintWriter to a file in the current directory, given relative filename.
-    // Will create the file if no matching file exists, or overwrite if one does.
-    // Returns null if the PrintWriter cannot be opened (any IOException).
-    public PrintWriter open_ofstream(String filename) {
-        PrintWriter ofstream = null;
-        try { ofstream = new PrintWriter(new FileWriter(get_path()+filename)); }
-        catch (IOException e) {} // Could add flag or dump exception to a log file if this becomes inconvenient.
-        return ofstream;
-    }
+//      decouple FileCopier from FileEnvironment 1/3
+//
+//    // Find file by filename within current directory, rename to new filename.
+//    // Returns true if file renamed successfully. Will not rename directories, or overwrite files.
+//    public boolean rename_file(String original_fn, String new_fn) {
+//        boolean renamed = false;
+//        File file = get_dirent(original_fn);
+//        if (file != null && !file.isDirectory() && get_dirent(new_fn) == null)
+//            file.renameTo(new File(new_fn));
+//        refresh_dirents();  // Might not be needed.
+//        return renamed;
+//    } // !! Just realized that the ruberic doesn't actually ask for this.
+//
+//    // Open a BufferedReader for a file.
+//    // Returns null if it cannot be opened (any IOException).
+//    public static BufferedReader open_ifstream(File file) {
+//        BufferedReader ifstream = null;
+//        try { ifstream = new BufferedReader(new FileReader(file.getPath())); }
+//        catch (IOException e) {} // Do nothing, allow caller to handle the null. 
+//        return ifstream;
+//    }
+//
+//    // alternatively, this restricts opening files to current directory and matches usage with open_ofstream
+//    //    public static BufferedReader open_ifstream(String filename) {
+//    //        BufferedReader ifstream = null;
+//    //        try { ifstream = new BufferedReader(new FileReader(get_path()+filename)); }
+//    //        catch (IOException e) {} // Do nothing, allow caller to handle the null. 
+//    //        return ifstream;
+//    //    }
+//
+//    // Open a PrintWriter to a file in the current directory, given relative filename.
+//    // Will create the file if no matching file exists, or overwrite if one does.
+//    // Returns null if the PrintWriter cannot be opened (any IOException).
+//    public PrintWriter open_ofstream(String filename) {
+//        PrintWriter ofstream = null;
+//        try { ofstream = new PrintWriter(new FileWriter(get_path()+filename)); } // This caused issues since get_path() didn't add the trailing slash. Might be better to use a method on the root File instead to create a new file first and then write into that.
+//        catch (IOException e) {} // Could add flag or dump exception to a log file if this becomes inconvenient.
+//        return ofstream;
+//    }
 
     // -------------
     // File iterator
@@ -161,7 +164,7 @@ class FileEnvironment implements Iterable<File> {
 // FileCopier
 //  
 //  File copying utility.
-//  Creates copies of files given the file environment, source filename, and target filename.
+//  Creates copies of files given a source File object and target File object.
 //  Runs checks between target/source files and returns status code. 
 //  Will not copy files unless all checks pass.
 //
@@ -174,7 +177,7 @@ class FileCopier {
     public static final int CHCK_SOURCE_ISDIR     = 0b0000100;
     public static final int CHCK_TARGET_NOTGIVEN  = 0b0001000;
     public static final int CHCK_TARGET_EXISTS    = 0b0010000;
-    public static final int CHCK_TARGET_ISSOURCE  = 0b0100000;  // Ruberic said this should be allowed? It's already implemented, we should email Pyzdrowski.
+    public static final int CHCK_TARGET_ISSOURCE  = 0b0100000;  // Ruberic said this should be allowed? It's already implemented, we should email Pyzdrowski. If we must disable it, just turning this const to a zero might work. Not sure if I checked this anywhere else.
     public static final int CHCK_TARGET_ISDIR     = 0b1000000;
 
     public static final int COPY_CHECK_FAIL       = 0b00001;
@@ -183,57 +186,101 @@ class FileCopier {
     public static final int COPY_READLINE_FAIL    = 0b01000;
     public static final int COPY_READ_CLOSEERR    = 0b10000;
    
-    // Takes two source/target filename Strings and a FileEnvironment object.
+    // Takes two source/target filenames.
     // Compares filenames and runs checks within file environment to determine copy status. 
     // Returns a check status code describing the result of all checks.
-    public static int check(String source_fn, String target_fn, FileEnvironment env) {
+    //
+    // !!!!!!! @todo: many of these are redundant, will never be triggered, and need to be removed.         maybe not
+    //
+    public static int check(File source, File target) {
         int check_status = 0;
-        if (source_fn == null || source_fn.equals(""))      
+        if (source == null || source.getName().equals(""))  // No need to compare against null anymore, since get_dirent returns a File always now (even if it doesn't exist).
             check_status |= CHCK_SOURCE_NOTGIVEN;
-        else {
-            File source_file = env.get_dirent(source_fn);
-            if (source_file == null)                        
-                check_status |= CHCK_SOURCE_NOEXIST;
-            else if (source_file.isDirectory())             
-                check_status |= CHCK_SOURCE_ISDIR;
-        }
-        if (target_fn == null || target_fn.equals(""))      
+        else if (!source.exists())
+            check_status |= CHCK_SOURCE_NOEXIST;
+        else if (source.isDirectory()) 
+            check_status |= CHCK_SOURCE_ISDIR;
+        if (target == null || target.getName().equals(""))
             check_status |= CHCK_TARGET_NOTGIVEN;
         else {
-            if (target_fn.equals(source_fn)) 
+            if ((check_status & CHCK_SOURCE_NOEXIST) == 0 && target.getAbsolutePath().equals(source.getAbsolutePath())) // Might need to use canonical path if issues occur.
                 check_status |= CHCK_TARGET_ISSOURCE;
-            File target_file = env.get_dirent(target_fn);
-            if (target_file != null) {
+            if (target.exists()) {
                 check_status |= CHCK_TARGET_EXISTS;
-                if (target_file.isDirectory()) 
+                if (target.isDirectory()) 
                     check_status |= CHCK_TARGET_ISDIR;
             }
         }
+        
+        // decouple FileCopier from FileEnvironment 2/3
+        //
+        //if (source_fn == null || source_fn.equals(""))      
+        //    check_status |= CHCK_SOURCE_NOTGIVEN;
+        //else {
+        //    File source_file = env.get_dirent(source_fn);
+        //    if (source_file == null)                        
+        //        check_status |= CHCK_SOURCE_NOEXIST;
+        //    else if (source_file.isDirectory())             
+        //        check_status |= CHCK_SOURCE_ISDIR;
+        //}
+        //if (target_fn == null || target_fn.equals(""))      
+        //    check_status |= CHCK_TARGET_NOTGIVEN;
+        //else {
+        //    if (target_fn.equals(source_fn)) 
+        //        check_status |= CHCK_TARGET_ISSOURCE;
+        //    File target_file = env.get_dirent(target_fn);
+        //    if (target_file != null) {
+        //        check_status |= CHCK_TARGET_EXISTS;
+        //        if (target_file.isDirectory()) 
+        //            check_status |= CHCK_TARGET_ISDIR;
+        //    }
+        //}
         return check_status;
     }
 
     // Finds source file in file environment, creates target file and copies all lines.
     // First runs a check, will not copy source to target if check doesn't pass.
     // Returns a copy status code describing the success of the copy operation.
-    public static int copy(String source_fn, String target_fn, FileEnvironment env) {
+    public static int copy(File source, File target) {
         int copy_status = 0;
-        if (check(source_fn, target_fn, env) == 0) {
-            BufferedReader source = env.open_ifstream((env.get_dirent(source_fn))); // Are we sure this should take a File, not another filename? Does open possibility of copying from outside directory into current, which could be good or bad.
-            PrintWriter target = env.open_ofstream(target_fn);
-            if (source == null) copy_status |= COPY_READ_OPENERR;
-            if (target == null) copy_status |= COPY_WRITE_OPENERR;
-            if (copy_status == 0) 
-                try {
-                    String line;
-                    while ((line = source.readLine()) != null) 
-                        target.println(line);
-                } catch (IOException e) { copy_status |= COPY_READLINE_FAIL; }
-            target.close();
-            try { source.close(); } // Do we need to check this exception? Why doesn't closing PrintWriter throw anything?
+        BufferedReader ifstream = null;
+        PrintWriter ofstream = null;
+        try { ifstream = new BufferedReader(new FileReader(source)); }
+        catch (IOException e) { copy_status |= COPY_READ_OPENERR; }
+        try { ofstream = new PrintWriter(new FileWriter(target)); }
+        catch (IOException e) { copy_status |= COPY_WRITE_OPENERR; }
+        if (copy_status == 0) {
+            try {
+                String line;
+                while ((line = ifstream.readLine()) != null)
+                    ofstream.println(line);
+            } catch (IOException e) { copy_status |= COPY_READLINE_FAIL; }
+            try { ifstream.close(); }
             catch (IOException e) { copy_status |= COPY_READ_CLOSEERR; }
-        } else
-            copy_status |= COPY_CHECK_FAIL;
+            ofstream.close();
+        } 
         return copy_status;
+        
+
+        // decouple FileCopier from FileEnvironment 3/3
+        //
+        //if (check(source_fn, target_fn, env) == 0) {
+        //    BufferedReader source = env.open_ifstream((env.get_dirent(source_fn))); // Are we sure this should take a File, not another filename? Does open possibility of copying from outside directory into current, which could be good or bad.
+        //    PrintWriter target = env.open_ofstream(target_fn);
+        //    if (source == null) copy_status |= COPY_READ_OPENERR;
+        //    if (target == null) copy_status |= COPY_WRITE_OPENERR;
+        //    if (copy_status == 0) 
+        //        try {
+        //            String line;
+        //            while ((line = source.readLine()) != null) 
+        //                target.println(line);
+        //        } catch (IOException e) { copy_status |= COPY_READLINE_FAIL; }
+        //    target.close();
+        //    try { source.close(); } // Do we need to check this exception? Why doesn't closing PrintWriter throw anything?
+        //    catch (IOException e) { copy_status |= COPY_READ_CLOSEERR; }
+        //} else
+        //    copy_status |= COPY_CHECK_FAIL;
+        //return copy_status;
     }
 }
 
@@ -286,11 +333,11 @@ public class FileCopyGui {
             // Check the file copier
             String source = stdin.readLine();
             String target = stdin.readLine();
-            int status = FileCopier.check(source, target, files);
+            int status = FileCopier.check(files.get_dirent(source), files.get_dirent(target));
             System.out.println(status);
             if (status == 0) {
                 System.out.println("Copying contents of '" + source + "' to '" + target + "'.");
-                System.out.println(FileCopier.copy(source, target, files));
+                System.out.println(FileCopier.copy(files.get_dirent(source), files.get_dirent(target)));
             } else {
                 if ((status & FileCopier.CHCK_SOURCE_NOTGIVEN) > 0)  System.out.println("src not given");
                 if ((status & FileCopier.CHCK_SOURCE_NOEXIST) > 0)   System.out.println("src no exist");
@@ -303,6 +350,24 @@ public class FileCopyGui {
         }
 
         stdin.close();
+
+        // Note
+        //
+        //  The entire FileEnvironment/FileCopier structure needs a rework.
+        //
+        //  FileEnvironment represents the location, and merely provides functionality to 
+        //  change that location and grab information about the files/dirs within it.
+        //
+        //  FileCopier should copy contents of source files into target files.
+        //  It should support a system to make checks on those files like program 2. Though,
+        //  the raw copy operation should be seperate from the checks and allow for overwrite.
+        //
+        //  The GUI should allow the user to pick source and target files by filename, irrespective
+        //  of the current FileEnvironment (be able to copy trans directory). We need to be able to
+        //  "lock" a source File (found using FileEnvironment) and "lock" a target File (whose location 
+        //  was also selected in part using FileEnvironment). These source/target Files shouldn't be a 
+        //  part of the FileEnvironment class, though it may make sense to turn FileCopier into an 
+        //  instantable class which can hold a state (which then might include the source/target Files).
 
         //Window w = new Window();
     }
