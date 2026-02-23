@@ -58,7 +58,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.setLayout(gbl);
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);   //  setting starting pos to center screen, likes to start on my left monitor and the fix isnt universal so did this
-        this.setTitle("IF YOU SEE THIS SOMETHING FUCKED UP!");
+        this.setTitle("IF YOU SEE THIS SOMETHING FUCKED UP!");          
         this.setVisible(true);
 
     }
@@ -83,7 +83,6 @@ class Window extends Frame implements WindowListener, ActionListener {
     }
 
     public void actionPerformed(ActionEvent e) {
-
     }
 
     public void initFrame() {
@@ -128,20 +127,17 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbl.setConstraints(fileName, gbc);
         this.add(fileName);
 
-        // list
+        //  list
         List list = new List();
         list.setSize(400,600);
         gbc.gridwidth = 8;
-        gbc.gridheight = 13;
+        gbc.gridheight = 1;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbl.setConstraints(list, gbc);
         this.add(list);
-        list.addActionListener(this);
-
-
-        
+        list.addActionListener(this);        
     }
 
     //  update the window to display correctly from backend
