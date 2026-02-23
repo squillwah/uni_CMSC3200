@@ -37,9 +37,9 @@ class Window extends Frame implements WindowListener, ActionListener {
 
         //  establishing how buttons and labels go onto the screen
         double colWeight[] = {2,4,4,15,1,3,1};   //  MESSING WITH THESE, DONT HAVE AN
-        double rowWeight[] = {25,1,1,1};   //  INTUITIVE FEEL FOR EM
+        double rowWeight[] = {25,1,1,1,1 };   //  INTUITIVE FEEL FOR EM
         int colWidth[] = {2,4,4,15,1,3,1};
-        int rowHeight[] = {25,1,1,1,};
+        int rowHeight[] = {25,1,1,1};
 
         gbl.rowHeights = rowHeight;
         gbl.columnWidths = colWidth;
