@@ -15,21 +15,21 @@ public class FileCopyGui {
 class Window extends Frame implements WindowListener, ActionListener {
 
     //  layout
-    GridBagConstraints gbc = new GridBagConstraints();
-    GridBagLayout gbl = new GridBagLayout();
+    private GridBagConstraints gbc = new GridBagConstraints();
+    private GridBagLayout gbl = new GridBagLayout();
 
     //  buttons
-    Button target;
-    Button confirm;
+    private Button target;
+    private Button confirm;
 
     //  labels
-    Label source;
-    Label currSource;
-    Label currTarget;
-    Label fileName;
+    private Label source;
+    private Label currSource;
+    private Label currTarget;
+    private Label fileName;
 
     // list 
-    List list;
+    private List fileList;
 
 
 
@@ -128,16 +128,16 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.add(fileName);
 
         //  list
-        list = new List();
-        list.setSize(400,600);
+        fileList = new List();
+        fileList.setSize(400,600);
         gbc.gridwidth = 8;
         gbc.gridheight = 1;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.gridx = 0;
         gbc.gridy = 0;
-        gbl.setConstraints(list, gbc);
-        this.add(list);
-        list.addActionListener(this);        
+        gbl.setConstraints(fileList, gbc);
+        this.add(fileList);
+        fileList.addActionListener(this);        
     }
 
     //  update the window to display correctly from backend
@@ -159,7 +159,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         File[] files = directory.listFiles();
         if (files != null) {
             for (int i = 0; i < files.length; i++) {
-                list.add(files[i].getName());
+                fileList.add(files[i].getName());
             }
         }
     }
