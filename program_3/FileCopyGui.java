@@ -105,7 +105,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         }
 
         if(e.getSource() == confirm) {          //  MAKE SURE TEXT BOX ISNT BLANK TO ENABLE CONFIRM
-            
+            copyFile = new File(copyTo.getText());
         }
     }
 
