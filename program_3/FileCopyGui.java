@@ -174,6 +174,21 @@ class FileCopier {
     public File get_source_file() { return source_file; }
     public File get_target_file() { return target_file; }
     public File get_target_dir() { return target_dir; }
+
+    public void clear_source_file() { 
+        source_file = null;
+        status |= STAT_SOURCE_EMPTY;
+        status &= ~STAT_SOURCE_ISDIR;
+    }
+    public void clear_target_file() {
+        input_file = null;
+        status |= STAT_TARGET_EMPTY;
+        status &= ~(STAT_TARGET_ISDIR | STAT_TARGET_ISSRC | STAT_TARGET_EXIST);
+    }
+    public void clear_target_dir() {
+        input_dir = null;
+        status |= STAT_TGTDIR_EMPTY;
+    }
 }
 
 public class FileCopyGui {
