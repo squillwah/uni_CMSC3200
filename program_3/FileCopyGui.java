@@ -288,6 +288,11 @@ public class FileCopyGui {
 //  handles all GUI init and updates
 class Window extends Frame implements WindowListener, ActionListener {
 
+    //  files
+    File targetFile;
+    File copyFile;
+    File testFile = new File("/home/jstaffen/School/java/uni_CMSC3200/test");
+
     //  layout
     private GridBagConstraints gbc = new GridBagConstraints();
     private GridBagLayout gbl = new GridBagLayout();
@@ -302,8 +307,11 @@ class Window extends Frame implements WindowListener, ActionListener {
     private Label currTarget;
     private Label fileName;
 
-    // list 
+    //  list 
     private List fileList;
+
+    //  textFild
+    private TextField copyTo;
 
 
 
@@ -333,6 +341,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);   //  setting starting pos to center screen, likes to start on my left monitor and the fix isnt universal so did this
         this.setTitle("ERROR: title not specified!");          
+        initFrame();
         this.setVisible(true);
 
     }
@@ -349,14 +358,27 @@ class Window extends Frame implements WindowListener, ActionListener {
     public void windowDeactivated(WindowEvent e) {}
     public void windowDeiconified(WindowEvent e) {}
     public void windowIconified(WindowEvent e) {}
-
-    //  init window when opened
-    public void windowOpened(WindowEvent e) {
-
-        initFrame();
-    }
+    public void windowOpened(WindowEvent e) {}
 
     public void actionPerformed(ActionEvent e) {
+
+        if(e.getSource() == fileList) {
+            if(fileList.getSelectedItem() != "...") {
+                currSource.setText(fileList.getSelectedItem());
+            } else {
+                //cd_up();
+                //updateList(get_dir);
+            }
+        }
+
+        if(e.getSource() == target) {           //  MAKE SURE A SOURCE IS SELECTED TO ENABLE BUTTON
+            currTarget.setText(fileList.getSelectedItem());
+            targetFile = new File(fileList.getSelectedItem());
+        }
+
+        if(e.getSource() == confirm) {          //  MAKE SURE TEXT BOX ISNT BLANK TO ENABLE CONFIRM
+            copyFile = new File(copyTo.getText());
+        }
     }
 
     public void initFrame() {
@@ -414,7 +436,21 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbc.gridy = 0;
         gbl.setConstraints(fileList, gbc);
         this.add(fileList);
-        fileList.addActionListener(this);        
+        fileList.addActionListener(this);
+        fileList.add("...");
+        fileList.add("Test1");
+        fileList.add("Test2");
+
+        
+        //  textfield
+        copyTo = new TextField();
+        gbc.gridx = 3;
+        gbc.gridy = 3;
+        gbl.setConstraints(copyTo, gbc);
+        this.add(copyTo);
+
+        updateTitle(testFile.getAbsolutePath());
+        updateList(testFile);
     }
 
     //  update the window to display correctly from backend
@@ -431,13 +467,20 @@ class Window extends Frame implements WindowListener, ActionListener {
     }
 
     public void updateList(File currDir) {
-        //  depending on backend format might just have to update, or make this an itteritive loop
+
         fileList.removeAll();
+        fileList.add("..");
+
 
         File[] files = currDir.listFiles();
+
         if (files != null) {
             for (int i = 0; i < files.length; i++) {
-                fileList.add(files[i].getName());
+                if (files[i].isDirectory()) {
+                    fileList.add(files[i].getName() + "+");
+               } else {
+                    fileList.add(files[i].getName());
+                }
             }
         }
     }
