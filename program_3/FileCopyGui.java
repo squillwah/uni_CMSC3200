@@ -16,7 +16,7 @@ class Window extends Frame implements WindowListener, ActionListener {
 
     //  files
     File targetFile;
-    File sourcFile;
+    File copyFile;
 
     //  layout
     private GridBagConstraints gbc = new GridBagConstraints();
@@ -91,12 +91,20 @@ class Window extends Frame implements WindowListener, ActionListener {
 
     public void actionPerformed(ActionEvent e) {
 
-        if(e.getSource() == fileList) {currSource.setText(fileList.getSelectedItem());}
-        if(e.getSource() == target) {currTarget.setText(fileList.getSelectedItem());}
+        if(e.getSource() == fileList) {
+            if(fileList.getSelectedItem() != "...") {
+                currSource.setText(fileList.getSelectedItem());
+            } else {
+                //cd_up();
+            }
+        }
 
+        if(e.getSource() == target) {           //  MAKE SURE A SOURCE IS SELECTED TO ENABLE BUTTON
+            currTarget.setText(fileList.getSelectedItem());
+            targetFile = new File(fileList.getSelectedItem());
+        }
 
-
-        if(e.getSource() == confirm) {
+        if(e.getSource() == confirm) {          //  MAKE SURE TEXT BOX ISNT BLANK TO ENABLE CONFIRM
             
         }
     }
@@ -157,7 +165,10 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbl.setConstraints(fileList, gbc);
         this.add(fileList);
         fileList.addActionListener(this);
-        fileList.add("test");
+        fileList.add("...");
+        fileList.add("Test1");
+        fileList.add("Test2");
+
         
         //  textfield
         copyTo = new TextField();
@@ -183,6 +194,7 @@ class Window extends Frame implements WindowListener, ActionListener {
     public void updateList(File currDir) {
         //  depending on backend format might just have to update, or make this an itteritive loop
         fileList.removeAll();
+        fileList.add("...");
 
         File[] files = currDir.listFiles();
         if (files != null) {
