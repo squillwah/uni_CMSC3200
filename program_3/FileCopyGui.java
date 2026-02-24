@@ -369,7 +369,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     public void initFrame() {
 
         //  title
-        //this.setTitle(get_dir().getPath());                   UNCOMMENT WHEN MERGED WITH MAIN
+        this.setTitle(files.get_dir().getPath());            
 
         //  buttons
         target = new Button("Target: ");
@@ -383,6 +383,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         confirm.addActionListener(this);
         gbc.gridx = 6;
         gbc.gridy = 3;
+        confirm.setEnabled(false);
         gbl.setConstraints(confirm, gbc);
         this.add(confirm);
 
@@ -393,13 +394,13 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         gbl.setConstraints(source, gbc);
         this.add(source);
 
-        currSource = new Label("Source not specified");
+        currSource = new Label("test ");
         gbc.gridx = 3;
         gbc.gridy = 1;
         gbl.setConstraints(currSource, gbc);
         this.add(currSource);
 
-        currTarget = new Label("Target not specified");
+        currTarget = new Label(" ");
         gbc.gridx = 3;
         gbc.gridy = 2;
         gbl.setConstraints(currTarget, gbc);
