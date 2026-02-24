@@ -140,10 +140,14 @@ class FileCopier {
         status &= ~(STAT_TGTDIR_EMPTY);
         if (!dir.isDirectory()) 
             status |= STAT_TGTDIR_EMPTY;    // We should never reach a state where target_dir isn't a dir, but I'm setting something just in case.
+        else if (target_file != null) {
+            // Update target_file to this directory
+            set_target_name(get_target_file().getName());
+        }
     }
     
-    // Set the target file, by filename. 
-    public void set_target_file(String filename) { 
+    // Set the target filenamee. 
+    public void set_target_name(String filename) { 
         target_file = null;
         status |= STAT_TARGET_EMPTY;
         status &= ~(STAT_TARGET_ISDIR | STAT_TARGET_EXIST | STAT_TARGET_ISSRC);
@@ -217,6 +221,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     private static Label currSource;
     private static Label currTarget;
     private static Label fileName;
+    private static Label status_label;
     //  list 
     private static List fileList;
     //  textFild
@@ -266,7 +271,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         gbc.fill = GridBagConstraints.BOTH;
 
         //  setting up frame settings
-        this.setBounds(20,20,500,500);
+        this.setBounds(20,20,1000,500);
         this.setLayout(gbl);
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);   //  setting starting pos to center screen, likes to start on my left monitor and the fix isnt universal so did this
@@ -276,6 +281,42 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
 
         // Start in source select mode.
         target_mode = false;
+    }
+
+    // Refresh every element of the window with present state of files and copier.
+    public void update_window() {
+        set_errmsg("");
+        updateList();
+        updateTitle(files.get_dir().getPath());
+                    
+
+        if (!target_mode) {
+            if (copier.get_source_file() != null)
+                currSource.setText(copier.get_source_file().getPath());
+
+            if ((copier.get_status() & FileCopier.STAT_SOURCE_EMPTY) != 0)
+                set_errmsg("Please select a source file") ;
+            if ((copier.get_status() & FileCopier.STAT_SOURCE_ISDIR) != 0)
+                set_errmsg("Err: source is directory");
+        } else {
+            if (copier.get_target_file() != null) {
+                copyTo.setText(copier.get_target_file().getPath());
+                currTarget.setText(copier.get_target_file().getPath());
+            } else 
+                copyTo.setText(copier.get_target_dir().getPath());
+            
+            if ((copier.get_status() & FileCopier.STAT_TARGET_EXIST) != 0)
+                set_errmsg("Warn: target exists, will be overwritten.");
+
+            if ((copier.get_status() & FileCopier.STAT_TGTDIR_EMPTY) != 0)
+                set_errmsg("Err: No directory for target file set");
+            if ((copier.get_status() & FileCopier.STAT_TARGET_EMPTY) != 0)
+                set_errmsg("Please select a target file");
+            if ((copier.get_status() & FileCopier.STAT_TARGET_ISDIR) != 0)
+                set_errmsg("Err: target is a directory");
+            if ((copier.get_status() & FileCopier.STAT_TARGET_ISSRC) != 0)
+                set_errmsg("Err: target cannot be source");
+        }
     }
 
     //  window listeners
@@ -294,22 +335,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     public void windowIconified(WindowEvent e) {}
     public void windowOpened(WindowEvent e) {}
 
-    // Refresh file list, title name, copier root and text fields if applicable.
-    private void update_dir_window() {
-        updateTitle(files.get_dir().getPath());
-        updateList();
-        if (target_mode) {
-            copier.set_target_dir(files.get_dir());
-            if (copier.get_target_file() != null) { // Preserve typed target file name between dirs
-                copier.set_target_file(copier.get_target_file().getName());
-                copyTo.setText(copier.get_target_file().getPath());
-            } else
-                copyTo.setText(copier.get_target_dir().getPath());
-        }
-    }
-
     public void actionPerformed(ActionEvent e) {
-        System.out.println(copier.get_target_dir());
         
         if (e.getSource() == fileList) {
             String filename = fileList.getSelectedItem();
@@ -319,38 +345,29 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
             if (filename.equals("..")) {
                 // Move up
                 files.cd_up();
-                update_dir_window();
+                if (target_mode) copier.set_target_dir(files.get_dir());
+                update_window();
             } else if (selected_file == null) {
                 // Error
                 set_errmsg("Selected file does not exist within directory...");
-                updateList();
+                update_window();
             } else if (selected_file.isDirectory()) {
                 // Move down
                 files.cd(selected_file);
-                update_dir_window();
+                if (target_mode) copier.set_target_dir(files.get_dir());
+                update_window();
             } else {
                 if (target_mode) {
                     copier.set_target_dir(files.get_dir());
-                    copier.set_target_file(filename);
-                    copyTo.setText(copier.get_target_file().getPath());
-                    currTarget.setText(filename);
-                    confirm.setEnabled(false);
-                    if ((copier.get_status() & FileCopier.STAT_TGTDIR_EMPTY) != 0)
-                        set_errmsg("Err: target directory not set");
-                    else if ((copier.get_status() & FileCopier.STAT_TARGET_EMPTY) != 0)
-                        set_errmsg("Err: target name not given");
-                    else if ((copier.get_status() & FileCopier.STAT_TARGET_ISDIR) != 0)
-                        set_errmsg("Err: target is a directory");
-                    else if ((copier.get_status() & FileCopier.STAT_TARGET_ISSRC) != 0)
-                        set_errmsg("Err: target is source");
-                    else {
-                        if ((copier.get_status() & FileCopier.STAT_TARGET_EXIST) != 0)
-                            set_errmsg("Warn: target exists, copy will overwrite");
+                    copier.set_target_name(filename);
+                    // Enable confirmable copy if no bad states except allowed target overwrite
+                    if ((copier.get_status() & ~FileCopier.STAT_TARGET_EXIST) == 0)
                         confirm.setEnabled(true);
-                    }
+                    else
+                        confirm.setEnabled(false);
+                    update_window();
                 } else {
                     copier.set_source_file(selected_file); // This one is a File.
-                    currSource.setText(filename);
                     if ((copier.get_status() & FileCopier.STAT_SOURCE_EMPTY) != 0) {
                         target.setEnabled(false);
                         set_errmsg("No source file selected"); // Can we even trigger these states in the GUI?
@@ -359,6 +376,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
                         set_errmsg("Source file can't be a directory.");
                     } else
                         target.setEnabled(true); // Valid source file, enable target button.
+                    update_window();
                 }
             }
         } else if (e.getSource() == target) {
@@ -368,11 +386,13 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
                 target.setEnabled(false); // Are we going to allow switching out of target mode? (to allow selecting a different source)
                 target_mode = true;
                 copier.set_target_dir(files.get_dir());
+                update_window();
             }
         } else if (e.getSource() == confirm) {
         
         }
 
+        System.out.println(copier.get_target_dir());
 //        // this is terrible
 //            // Pull the filename from selected item, trim the " +" if present.
 //            String filename = fileList.getSelectedItem();
@@ -494,11 +514,16 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         gbl.setConstraints(copyTo, gbc);
         this.add(copyTo);
 
+        status_label = new Label();
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbl.setConstraints(status_label, gbc);
+        this.add(status_label);
+
         target.setEnabled(false);
         confirm.setEnabled(false);
-
-        updateTitle(files.get_dir().getPath());
-        updateList(); 
+        
+        update_window();
     }
 
     //  update the window to display correctly from backend
@@ -527,6 +552,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     }
 
     public static void set_errmsg(String msg) {
+        status_label.setText(msg);
         System.out.println(msg);
     }
 }
