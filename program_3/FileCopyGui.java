@@ -92,10 +92,10 @@ class FileCopier {
     public static final int STAT_TGTDIR_EMPTY = 0b0000100;
     public static final int STAT_TARGET_EMPTY = 0b0001000;
     public static final int STAT_TARGET_ISDIR = 0b0010000;
+    public static final int STAT_TARGET_ISSRC = 0b1000000;
 
     // Possible copy error, could allow copy.
     public static final int STAT_TARGET_EXIST = 0b0100000; // Will allow this to bypass with a popup.
-    public static final int STAT_TARGET_ISSRC = 0b1000000; // Will allow this to bypass with a popup, consider merging with EXIST.
 
     private int status;
     private File source_file;
@@ -153,8 +153,8 @@ class FileCopier {
     // Returns true if copy succeeded, false otherwise (null source/target files)
     public boolean copy() throws IOException {
         boolean copied = false;
-        // Copy is impossible if source or target files are null or are directories.
-        if ((status & (STAT_SOURCE_EMPTY | STAT_SOURCE_ISDIR | STAT_TARGET_EMPTY | STAT_TARGET_ISDIR)) == 0) {
+        // Copy is impossible if source or target files are null or are directories, or if target is source.
+        if ((status & (STAT_SOURCE_EMPTY | STAT_SOURCE_ISDIR | STAT_TARGET_EMPTY | STAT_TARGET_ISDIR | STAT_TARGET_ISSRC)) == 0) {
             BufferedReader ifstream = null;
             PrintWriter ofstream = null;
             ifstream = new BufferedReader(new FileReader(source_file));
@@ -164,6 +164,7 @@ class FileCopier {
                 ofstream.println(line);
             ifstream.close();
             ofstream.close();
+            status |= STAT_TARGET_EXIST;    // Target file now definitely exists.
             copied = true;
         }
         return copied;
@@ -258,9 +259,9 @@ public class FileCopyGui {
             System.out.println(" STAT_TGTDIR_EMPTY = " + (status & FileCopier.STAT_TGTDIR_EMPTY));
             System.out.println(" STAT_TARGET_EMPTY = " + (status & FileCopier.STAT_TARGET_EMPTY));
             System.out.println(" STAT_TARGET_ISDIR = " + (status & FileCopier.STAT_TARGET_ISDIR));
+            System.out.println(" STAT_TARGET_ISSRC = " + (status & FileCopier.STAT_TARGET_ISSRC));
 
             System.out.println("\n STAT_TARGET_EXIST = " + (status & FileCopier.STAT_TARGET_EXIST));
-            System.out.println(" STAT_TARGET_ISSRC = "  + (status & FileCopier.STAT_TARGET_ISSRC));
         }
 
         stdin.close();
