@@ -181,12 +181,12 @@ class FileCopier {
         status &= ~STAT_SOURCE_ISDIR;
     }
     public void clear_target_file() {
-        input_file = null;
+        target_file = null;
         status |= STAT_TARGET_EMPTY;
         status &= ~(STAT_TARGET_ISDIR | STAT_TARGET_ISSRC | STAT_TARGET_EXIST);
     }
     public void clear_target_dir() {
-        input_dir = null;
+        target_dir = null;
         status |= STAT_TGTDIR_EMPTY;
     }
 }
