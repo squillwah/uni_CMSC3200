@@ -222,6 +222,9 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     //  textFild
     private static TextField copyTo;
 
+    // False in source select mode, true in target select.
+    private static boolean target_mode;
+
     public static void main(String[] args) throws IOException {
         // Initialize DirMover to execution directory or first argument.
         File root = null; 
@@ -244,7 +247,6 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     }
 
     public FileCopyGui() {
-
         //  establishing how buttons and labels go onto the screen
         double colWeight[] = {2,4,4,15,1,3,1};   //  MESSING WITH THESE, DONT HAVE AN
         double rowWeight[] = {25,1,1,1,1 };   //  INTUITIVE FEEL FOR EM
@@ -272,6 +274,8 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         initFrame();
         this.setVisible(true);
 
+        // Start in source select mode.
+        target_mode = false;
     }
 
     //  window listeners
@@ -291,45 +295,75 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     public void windowOpened(WindowEvent e) {}
 
     public void actionPerformed(ActionEvent e) {
-
-        if(e.getSource() == fileList) {
-            System.out.println(fileList.getSelectedItem());
-            if(fileList.getSelectedItem() != "..") {
-                // Trim the "+", if added.
-                String filename = fileList.getSelectedItem();
-                if (filename.endsWith(" +")) 
-                    filename = filename.substring(0,filename.length()-2); 
-               
-                // Get file, cd if directory or set source file if file.
+        if (e.getSource() == fileList) {
+            // Pull the filename from selected item, trim the " +" if present.
+            String filename = fileList.getSelectedItem();
+            if (filename.endsWith(" +")) filename = filename.substring(0,filename.length()-2); 
+            
+            // "..", change dir to parent.
+            if (filename.equals("..")) {
+                files.cd_up();
+                updateTitle(files.get_dir().getPath());
+                updateList();
+            } else {
+                // Grab file
                 File selected_file = files.get_file(filename);
                 if (selected_file == null) {
                     set_errmsg("Selected file does not exist within directory...");
                     updateList();
                 } else {
+                    // Move into if directory
                     if (selected_file.isDirectory()) {
                         files.cd(selected_file);
                         updateTitle(files.get_dir().getPath());
                         updateList();
                     } else {
-                        currSource.setText(fileList.getSelectedItem());
-                        // Update FileCopier source/target here
+                        // Otherwise set as source/target, depending on mode.
+                        if (target_mode) {
+                            copier.set_target_file(filename);   // Should this be a File instead of filename String?
+                            currTarget.setText(filename);
+                            // Update entry label text with target_file dir + target_file name
+                            //copyTo.
+                        } else {
+                            copier.set_source_file(selected_file); // This one is a File.
+                            currSource.setText(filename);
+                        }
                     }
                 }
-            } else {
-                files.cd_up();
-                updateTitle(files.get_dir().getPath());
-                updateList();
             }
-        }
+        } else if (e.getSource() == target) {
+            // Only switch to target mode if source file isn't empty and not a directory
+            if ((copier.get_status() & (FileCopier.STAT_SOURCE_EMPTY | FileCopier.STAT_SOURCE_ISDIR)) == 0) {
+                confirm.setEnabled(true);
+                target.setEnabled(false); // Are we going to allow switching out of target mode? (to allow selecting a different source)
+                target_mode = true;
+            }
+        } else if (e.getSource() == confirm) {
 
-        if(e.getSource() == target) {           //  MAKE SURE A SOURCE IS SELECTED TO ENABLE BUTTON
-            currTarget.setText(fileList.getSelectedItem());
-            //targetFile = new File(fileList.getSelectedItem());    // Will change these to use the DirMover [ravi]
         }
+                    
 
-        if(e.getSource() == confirm) {          //  MAKE SURE TEXT BOX ISNT BLANK TO ENABLE CONFIRM
-            //copyFile = new File(copyTo.getText());
-        }
+//        if(e.getSource() == fileList) {
+//            if(fileList.getSelectedItem() != "..") {
+//                String filename = fileList.getSelectedItem();
+//                if (filename.endsWith(" +")) filename = filename.substring(0,filename.length()-2); 
+//               
+//                // Get file, cd if directory or set source file if file.
+//            } else {
+//                files.cd_up();
+//                updateTitle(files.get_dir().getPath());
+//                updateList();
+//            }
+//        }
+//
+//        if(e.getSource() == target) {           //  MAKE SURE A SOURCE IS SELECTED TO ENABLE BUTTON
+//            currTarget.setText(fileList.getSelectedItem());
+//            //targetFile = new File(fileList.getSelectedItem());    // Will change these to use the DirMover [ravi]
+//        }
+//
+//        if(e.getSource() == confirm) {          //  MAKE SURE TEXT BOX ISNT BLANK TO ENABLE CONFIRM
+//            //copyFile = new File(copyTo.getText());
+//        }
     }
 
     public void initFrame() {
