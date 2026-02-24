@@ -17,6 +17,7 @@ class Window extends Frame implements WindowListener, ActionListener {
     //  files
     File targetFile;
     File copyFile;
+    File testFile = new File("/home/jstaffen/School/java/uni_CMSC3200/test");
 
     //  layout
     private GridBagConstraints gbc = new GridBagConstraints();
@@ -66,6 +67,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);   //  setting starting pos to center screen, likes to start on my left monitor and the fix isnt universal so did this
         this.setTitle("ERROR: title not specified!");          
+        initFrame();
         this.setVisible(true);
 
     }
@@ -82,12 +84,7 @@ class Window extends Frame implements WindowListener, ActionListener {
     public void windowDeactivated(WindowEvent e) {}
     public void windowDeiconified(WindowEvent e) {}
     public void windowIconified(WindowEvent e) {}
-
-    //  init window when opened
-    public void windowOpened(WindowEvent e) {
-
-        initFrame();
-    }
+    public void windowOpened(WindowEvent e) {}
 
     public void actionPerformed(ActionEvent e) {
 
@@ -176,6 +173,9 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbc.gridy = 3;
         gbl.setConstraints(copyTo, gbc);
         this.add(copyTo);
+
+        updateTitle(testFile.getAbsolutePath());
+        updateList(testFile);
     }
 
     //  update the window to display correctly from backend
@@ -192,14 +192,19 @@ class Window extends Frame implements WindowListener, ActionListener {
     }
 
     public void updateList(File currDir) {
-        //  depending on backend format might just have to update, or make this an itteritive loop
+
         fileList.removeAll();
-        fileList.add("...");
+        fileList.add("..");
 
         File[] files = currDir.listFiles();
+
         if (files != null) {
             for (int i = 0; i < files.length; i++) {
-                fileList.add(files[i].getName());
+                if (files[i].isDirectory()) {
+                    fileList.add(files[i].getName() + "+");
+               } else {
+                    fileList.add(files[i].getName());
+                }
             }
         }
     }
