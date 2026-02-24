@@ -164,6 +164,20 @@ class FileCopier {
         }
     }
 
+    // Set target directory and filename by full path
+    public void set_target_path(String path) {
+        int lastslash = path.lastIndexOf('/');
+        if (lastslash == -1) lastslash = path.lastIndexOf('\\');
+        if (lastslash == -1) {
+            set_target_dir(new File("/"));
+            set_target_name(path);
+            status |= STAT_TGTDIR_EMPTY;
+        } else {
+            set_target_dir(new File(path.substring(0,lastslash)));
+            set_target_name(path.substring(lastslash+1));
+        }
+    }
+
     // Copies source file to target file.
     // Returns true if copy succeeded, false otherwise (null source/target files)
     public boolean copy() throws IOException {
@@ -288,8 +302,8 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         set_errmsg("");
         updateList();
         updateTitle(files.get_dir().getPath());
-                    
-
+        
+        // Bottom status/error message & target/source paths
         if (!target_mode) {
             if (copier.get_source_file() != null)
                 currSource.setText(copier.get_source_file().getPath());
@@ -324,6 +338,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         fileList.removeActionListener(this);
         target.removeActionListener(this);
         confirm.removeActionListener(this);
+        copyTo.removeActionListener(this);
         this.removeWindowListener(this);
         this.dispose();
     }
@@ -389,7 +404,23 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
                 update_window();
             }
         } else if (e.getSource() == confirm) {
-        
+            // Copy and reset everything, if not in bad state
+            if ((copier.get_status() & ~FileCopier.STAT_TARGET_EXIST) == 0) {
+                if (copier.get_status() > 0) 
+                    set_errmsg("Overwriting '" + copier.get_target_file().getName() + "'.");
+                try { copier.copy(); }
+                catch (IOException ioe) { set_errmsg("IOException occured during copy."); }
+                copier.clear_source_file();
+                copier.clear_target_file();
+                copier.clear_target_dir();
+                target_mode = false;
+                update_window();
+            }
+        } else if (e.getSource() == copyTo) {
+            // Set target path with text box
+            System.out.println(copyTo.getText());
+            copier.set_target_path(copyTo.getText());
+            update_window();
         }
 
         System.out.println(copier.get_target_dir());
@@ -512,6 +543,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         gbc.gridx = 3;
         gbc.gridy = 3;
         gbl.setConstraints(copyTo, gbc);
+        copyTo.addActionListener(this);
         this.add(copyTo);
 
         status_label = new Label();
