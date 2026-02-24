@@ -52,6 +52,17 @@ class DirMover implements Iterable<File> {
         return dir_changed;
     }
 
+    public File get_file(String filename) {
+        File file = null;
+        Iterator<File> it = iterator();
+        while (it.hasNext()) {
+            File search = it.next();
+            if (search.getName().equals(filename)) 
+                file = search;
+        }
+        return file;
+    }
+
     // Minimal implementation, disallow modification of file array.
     public DirIterator iterator() { return new DirIterator(); }
     private class DirIterator implements Iterator<File> {
@@ -280,11 +291,32 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
     public void actionPerformed(ActionEvent e) {
 
         if(e.getSource() == fileList) {
-            if(fileList.getSelectedItem() != "...") {
-                currSource.setText(fileList.getSelectedItem());
+            System.out.println(fileList.getSelectedItem());
+            if(fileList.getSelectedItem() != "..") {
+                // Trim the "+", if added.
+                String filename = fileList.getSelectedItem();
+                if (filename.endsWith(" +")) 
+                    filename = filename.substring(0,filename.length()-2); 
+               
+                // Get file, cd if directory or set source file if file.
+                File selected_file = files.get_file(filename);
+                if (selected_file == null) {
+                    set_errmsg("Selected file does not exist within directory...");
+                    updateList();
+                } else {
+                    if (selected_file.isDirectory()) {
+                        files.cd(selected_file);
+                        updateTitle(files.get_dir().getPath());
+                        updateList();
+                    } else {
+                        currSource.setText(fileList.getSelectedItem());
+                        // Update FileCopier source/target here
+                    }
+                }
             } else {
-                //cd_up();
-                //updateList(get_dir);
+                files.cd_up();
+                updateTitle(files.get_dir().getPath());
+                updateList();
             }
         }
 
@@ -366,7 +398,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         this.add(copyTo);
 
         updateTitle(files.get_dir().getPath());
-        updateList(files.get_dir());   // Will update to fix [ravi] 
+        updateList(); 
     }
 
     //  update the window to display correctly from backend
@@ -382,10 +414,9 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         currSource.setText(s);
     }
 
-    public void updateList(File currDir) {
-
+    public void updateList() {
         fileList.removeAll();
-        fileList.add("..");
+        if (!files.at_root()) fileList.add("..");
 
         for (File file : files) {
             if (file.isDirectory() && file.list() != null && file.list().length > 0)
@@ -394,4 +425,6 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
                 fileList.add(file.getName());
         }
     }
+
+    public static void set_errmsg(String msg) {}
 }
