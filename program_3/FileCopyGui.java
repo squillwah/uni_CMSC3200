@@ -191,9 +191,28 @@ class FileCopier {
     }
 }
 
-public class FileCopyGui {
+public class FileCopyGui extends Frame implements WindowListener, ActionListener{
+    // File and directory management tools. 
+    private static DirMover files;
+    private static FileCopier copier;
+    //  layout
+    private static GridBagConstraints gbc = new GridBagConstraints();
+    private static GridBagLayout gbl = new GridBagLayout();
+    //  buttons
+    private static Button target;
+    private static Button confirm;
+    //  labels
+    private static Label source;
+    private static Label currSource;
+    private static Label currTarget;
+    private static Label fileName;
+    //  list 
+    private static List fileList;
+    //  textFild
+    private static TextField copyTo;
+
     public static void main(String[] args) throws IOException {
-        // Create file environment
+        // Initialize DirMover to execution directory or first argument.
         File root = null; 
         switch (args.length) {
             case 0:
@@ -204,44 +223,16 @@ public class FileCopyGui {
                 if (!root.isDirectory()) root = new File("");
                 break;
         }
-        DirMover files = new DirMover(root); 
-        FileCopier copier = new FileCopier();
+        files = new DirMover(root); 
+        
+        // Instantiate FileCopier utility.
+        copier = new FileCopier();
 
-        Window w = new Window();
+        // Create the window.
+        new FileCopyGui();
     }
-}
 
-//  handles all GUI init and updates
-class Window extends Frame implements WindowListener, ActionListener {
-
-    //  files
-    File targetFile;
-    File copyFile;
-    File testFile = new File("/home/jstaffen/School/java/uni_CMSC3200/test");
-
-    //  layout
-    private GridBagConstraints gbc = new GridBagConstraints();
-    private GridBagLayout gbl = new GridBagLayout();
-
-    //  buttons
-    private Button target;
-    private Button confirm;
-
-    //  labels
-    private Label source;
-    private Label currSource;
-    private Label currTarget;
-    private Label fileName;
-
-    //  list 
-    private List fileList;
-
-    //  textFild
-    private TextField copyTo;
-
-
-
-    public Window() {
+    public FileCopyGui() {
 
         //  establishing how buttons and labels go onto the screen
         double colWeight[] = {2,4,4,15,1,3,1};   //  MESSING WITH THESE, DONT HAVE AN
@@ -299,11 +290,11 @@ class Window extends Frame implements WindowListener, ActionListener {
 
         if(e.getSource() == target) {           //  MAKE SURE A SOURCE IS SELECTED TO ENABLE BUTTON
             currTarget.setText(fileList.getSelectedItem());
-            targetFile = new File(fileList.getSelectedItem());
+            //targetFile = new File(fileList.getSelectedItem());    // Will change these to use the DirMover [ravi]
         }
 
         if(e.getSource() == confirm) {          //  MAKE SURE TEXT BOX ISNT BLANK TO ENABLE CONFIRM
-            copyFile = new File(copyTo.getText());
+            //copyFile = new File(copyTo.getText());
         }
     }
 
@@ -367,7 +358,6 @@ class Window extends Frame implements WindowListener, ActionListener {
         fileList.add("Test1");
         fileList.add("Test2");
 
-        
         //  textfield
         copyTo = new TextField();
         gbc.gridx = 3;
@@ -375,8 +365,8 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbl.setConstraints(copyTo, gbc);
         this.add(copyTo);
 
-        updateTitle(testFile.getAbsolutePath());
-        updateList(testFile);
+        updateTitle(files.get_dir().getPath());
+        updateList(files.get_dir());   // Will update to fix [ravi] 
     }
 
     //  update the window to display correctly from backend
@@ -397,17 +387,11 @@ class Window extends Frame implements WindowListener, ActionListener {
         fileList.removeAll();
         fileList.add("..");
 
-
-        File[] files = currDir.listFiles();
-
-        if (files != null) {
-            for (int i = 0; i < files.length; i++) {
-                if (files[i].isDirectory()) {
-                    fileList.add(files[i].getName() + "+");
-               } else {
-                    fileList.add(files[i].getName());
-                }
-            }
+        for (File file : files) {
+            if (file.isDirectory() && file.list() != null && file.list().length > 0)
+                fileList.add(file.getName() + " +");
+            else
+                fileList.add(file.getName());
         }
     }
 }
