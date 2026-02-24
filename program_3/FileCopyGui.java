@@ -14,6 +14,10 @@ public class FileCopyGui {
 //  handles all GUI init and updates
 class Window extends Frame implements WindowListener, ActionListener {
 
+    //  files
+    File targetFile;
+    File sourcFile;
+
     //  layout
     private GridBagConstraints gbc = new GridBagConstraints();
     private GridBagLayout gbl = new GridBagLayout();
@@ -28,8 +32,11 @@ class Window extends Frame implements WindowListener, ActionListener {
     private Label currTarget;
     private Label fileName;
 
-    // list 
+    //  list 
     private List fileList;
+
+    //  textFild
+    private TextField copyTo;
 
 
 
@@ -83,6 +90,15 @@ class Window extends Frame implements WindowListener, ActionListener {
     }
 
     public void actionPerformed(ActionEvent e) {
+
+        if(e.getSource() == fileList) {currSource.setText(fileList.getSelectedItem());}
+        if(e.getSource() == target) {currTarget.setText(fileList.getSelectedItem());}
+
+
+
+        if(e.getSource() == confirm) {
+            
+        }
     }
 
     public void initFrame() {
@@ -140,7 +156,15 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbc.gridy = 0;
         gbl.setConstraints(fileList, gbc);
         this.add(fileList);
-        fileList.addActionListener(this);        
+        fileList.addActionListener(this);
+        fileList.add("test");
+        
+        //  textfield
+        copyTo = new TextField();
+        gbc.gridx = 3;
+        gbc.gridy = 3;
+        gbl.setConstraints(copyTo, gbc);
+        this.add(copyTo);
     }
 
     //  update the window to display correctly from backend
