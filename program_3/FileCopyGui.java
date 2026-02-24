@@ -13,149 +13,61 @@ import java.util.NoSuchElementException;
 //  FileEnvironment
 //  
 //   Represents the current folder.
-//   Holds root directory File and array of Files contained within.
+//   Supports changing directory (up to parent and given as argument).
 //   Implements an iterator for traversal of Files within directory.
 // 
 // ================
-class FileEnvironment implements Iterable<File> {
-    private File rootdir;
-    private File[] dirents;
+class DirMover implements Iterable<File> {
+    private File dir;
 
-    public FileEnvironment(File root) {
-        rootdir = root.getAbsoluteFile();
-        refresh_dirents();
+    public DirMover(File root) {
+        dir = root.getAbsoluteFile();
     }
 
-    // ---------------
-    // Checks and gets
-    // ---------------
-    
-    // Return the present path of the file environment.
-    public String get_path() { return rootdir.getPath()+'/'; } // !!! This slash might cause issues on windows. Added because of open_ofstream opening files in the dir above.
+    // Return the current directory File object. 
+    public File get_dir() { return dir; }
     
     // Check if at system root.
-    public boolean at_root() { return rootdir.getParent() == null; }
+    public boolean at_root() { return dir.getParent() == null; }
 
-/*  Is any of this really needed if get_dirent returns null & File.exists() exists?
- *
- *  // Check if entry exists within directory, given filename string or file object.
- *  public boolean dirent_exists(String filename) { 
- *      File dirent = get_dirent(filename);
- *      return !(dirent == null) && dirent_exists(dirent); 
- *  }
- *  public boolean dirent_exists(File file) { return file.exists(); }
- */
-   
-//    // Find and return first dirent with matching filename. 
-//    // Returns nonexistent File if not found.
-    // Returns a File object with the given relative name within the present FileEnvironment path.
-    public File get_dirent(String filename) {
-//        File dirent = null;
-//        for (int i = 0; i < dirents.length && dirent == null; i++) 
-//            if (dirents[i].getName().equals(filename))
-//                dirent = dirents[i];
-//        return dirent;
-        return new File(get_path()+filename);
-    }
-
-    // ---------------------------
-    // Modify the file environment
-    // ---------------------------
-
-    // Move the file environment up a directory. 
+    // Move to up into parent directory. 
     // Returns true if directory changed successfully.
     public boolean cd_up() {
         boolean dir_changed = false;
         if (!at_root()) {
-            rootdir = rootdir.getParentFile();
-            refresh_dirents();
+            dir = dir.getParentFile();
             dir_changed = true;
         }
         return dir_changed;
     }
 
-    // Move the file environment into a subdirectory, given its name.
+    // Change directory to different directory.
     // Returns true if directory changed successfully.
-    public boolean cd_down(String filename) {              // Should this take filename string or file object?
+    public boolean cd(File new_dir) {              // Should this take filename string or file object?
         boolean dir_changed = false;
-        File new_dir = get_dirent(filename);
         if (new_dir != null && new_dir.isDirectory()) {
-            rootdir = new_dir;
-            refresh_dirents();
+            dir = new_dir;
             dir_changed = true;
         }
         return dir_changed;
     }
 
-    // Refresh the file list.
-    private void refresh_dirents() {
-        dirents = rootdir.listFiles();
-        // Restricted folders return null
-        if (dirents == null) dirents = new File[0]; // Safer to assign empty array.
-        else Arrays.sort(dirents);
-    }
-
-    // --------------------------------------
-    // File operations within the environment
-    // --------------------------------------
-
-//      decouple FileCopier from FileEnvironment 1/3
-//
-//    // Find file by filename within current directory, rename to new filename.
-//    // Returns true if file renamed successfully. Will not rename directories, or overwrite files.
-//    public boolean rename_file(String original_fn, String new_fn) {
-//        boolean renamed = false;
-//        File file = get_dirent(original_fn);
-//        if (file != null && !file.isDirectory() && get_dirent(new_fn) == null)
-//            file.renameTo(new File(new_fn));
-//        refresh_dirents();  // Might not be needed.
-//        return renamed;
-//    } // !! Just realized that the ruberic doesn't actually ask for this.
-//
-//    // Open a BufferedReader for a file.
-//    // Returns null if it cannot be opened (any IOException).
-//    public static BufferedReader open_ifstream(File file) {
-//        BufferedReader ifstream = null;
-//        try { ifstream = new BufferedReader(new FileReader(file.getPath())); }
-//        catch (IOException e) {} // Do nothing, allow caller to handle the null. 
-//        return ifstream;
-//    }
-//
-//    // alternatively, this restricts opening files to current directory and matches usage with open_ofstream
-//    //    public static BufferedReader open_ifstream(String filename) {
-//    //        BufferedReader ifstream = null;
-//    //        try { ifstream = new BufferedReader(new FileReader(get_path()+filename)); }
-//    //        catch (IOException e) {} // Do nothing, allow caller to handle the null. 
-//    //        return ifstream;
-//    //    }
-//
-//    // Open a PrintWriter to a file in the current directory, given relative filename.
-//    // Will create the file if no matching file exists, or overwrite if one does.
-//    // Returns null if the PrintWriter cannot be opened (any IOException).
-//    public PrintWriter open_ofstream(String filename) {
-//        PrintWriter ofstream = null;
-//        try { ofstream = new PrintWriter(new FileWriter(get_path()+filename)); } // This caused issues since get_path() didn't add the trailing slash. Might be better to use a method on the root File instead to create a new file first and then write into that.
-//        catch (IOException e) {} // Could add flag or dump exception to a log file if this becomes inconvenient.
-//        return ofstream;
-//    }
-
-    // -------------
-    // File iterator
-    // -------------
-
-    // Minimal implementation, disallow modification of dirent array.
-    public FileEnvIterator iterator() { return new FileEnvIterator(); }
-    private class FileEnvIterator implements Iterator<File> {
+    // Minimal implementation, disallow modification of file array.
+    public DirIterator iterator() { return new DirIterator(); }
+    private class DirIterator implements Iterator<File> {
         private int pos;
-        public FileEnvIterator() { 
-            refresh_dirents(); // Is it really a good idea to update the dirents here? Added because new files (copied files) don't show up, obviously.
+        private File[] files;
+        public DirIterator() { 
             pos = 0; 
+            files = dir.listFiles();
+            // Restricted folders return null, safer to assign empty array.
+            if (files == null) files = new File[0];
+            else Arrays.sort(files); // Sort files by filename in alphabetical order.
         }
-        
-        public boolean hasNext() { return pos < dirents.length; }
+        public boolean hasNext() { return pos < files.length; }
         public File next() { 
             if (!hasNext()) throw new NoSuchElementException("End of directory.");
-            return dirents[pos++];
+            return files[pos++];
         }
     }
 }
@@ -164,27 +76,141 @@ class FileEnvironment implements Iterable<File> {
 // FileCopier
 //  
 //  File copying utility.
-//  Creates copies of files given a source File object and target File object.
-//  Runs checks between target/source files and returns status code. 
-//  Will not copy files unless all checks pass.
+//  Stores source and target Files, and implements the copy procedure.
+//  Runs checks on source and target files similar to program 2, though not
+//  all checks need be passed for the copy procedure to proceed.
+//  Status code describes status of all checks on currently set source/target Files.
 //
 // ===============
 class FileCopier {
-    private FileCopier() {}
-     
-    public static final int CHCK_SOURCE_NOTGIVEN  = 0b0000001;
-    public static final int CHCK_SOURCE_NOEXIST   = 0b0000010;
-    public static final int CHCK_SOURCE_ISDIR     = 0b0000100;
+
+    // Codes for possible bad states.
+    
+    // Prevent a copy, impossible copy.
+    public static final int STAT_SOURCE_EMPTY = 0b0000001;
+    public static final int STAT_SOURCE_ISDIR = 0b0000010;
+    public static final int STAT_TGTDIR_EMPTY = 0b0000100;
+    public static final int STAT_TARGET_EMPTY = 0b0001000;
+    public static final int STAT_TARGET_ISDIR = 0b0010000;
+
+    // Possible copy error, could allow copy.
+    public static final int STAT_TARGET_EXIST = 0b0100000; // Will allow this to bypass with a popup.
+    public static final int STAT_TARGET_ISSRC = 0b1000000; // Will allow this to bypass with a popup, consider merging with EXIST.
+
+    private int status;
+    private File source_file;
+    private File target_file;
+    private File target_dir;
+
+    public FileCopier() { 
+        source_file = null; 
+        target_file = null;
+        target_dir = null;
+        status = 0 | (STAT_SOURCE_EMPTY | STAT_TGTDIR_EMPTY | STAT_TARGET_EMPTY);
+    }
+
+    // Set the source file.
+    public void set_source_file(File source) {
+        source_file = source;
+        status &= ~(STAT_SOURCE_EMPTY | STAT_SOURCE_ISDIR);
+        if (source == null || source.getName().isEmpty())
+            status |= STAT_SOURCE_EMPTY;
+        else {
+            if (source.isDirectory())
+                status |= STAT_SOURCE_ISDIR;
+            if (target_file != null && source_file.getAbsolutePath().equals(target_file.getAbsolutePath())) // Might not need the null check here, or in set_target_file.
+                status |= STAT_TARGET_ISSRC;
+        }
+    }
+   
+    // Set target file directory. 
+    public void set_target_dir(File dir) { 
+        target_dir = dir; 
+        status &= ~(STAT_TGTDIR_EMPTY);
+        if (!dir.isDirectory())
+            status |= STAT_TGTDIR_EMPTY;    // We should never reach a state where target_dir isn't a dir, but I'm setting something just in case.
+    }
+    
+    // Set the target file, by filename. 
+    public void set_target_file(String filename) { 
+        target_file = null;
+        status |= STAT_TARGET_EMPTY;
+        status &= ~(STAT_TARGET_ISDIR | STAT_TARGET_EXIST | STAT_TARGET_ISSRC);
+        if (!filename.isEmpty() && (status & STAT_TGTDIR_EMPTY) == 0) {
+            target_file = new File(target_dir.getPath()+'/'+filename);
+            status &= ~STAT_TARGET_EMPTY;
+            if (target_file.exists()) {
+                status |= STAT_TARGET_EXIST;
+                if (source_file != null && target_file.getAbsolutePath().equals(source_file.getAbsolutePath()))
+                    status |= STAT_TARGET_ISSRC;
+                if (target_file.isDirectory())
+                    status |= STAT_TARGET_ISDIR;
+            }
+        }
+    }
+
+    // Copies source file to target file.
+    // Returns true if copy succeeded, false otherwise (null source/target files)
+    public boolean copy() throws IOException {
+        boolean copied = false;
+        // Copy is impossible if source or target files are null or are directories.
+        if ((status & (STAT_SOURCE_EMPTY | STAT_SOURCE_ISDIR | STAT_TARGET_EMPTY | STAT_TARGET_ISDIR)) == 0) {
+            BufferedReader ifstream = null;
+            PrintWriter ofstream = null;
+            ifstream = new BufferedReader(new FileReader(source_file));
+            ofstream = new PrintWriter(new FileWriter(target_file));
+            String line;
+            while ((line = ifstream.readLine()) != null)
+                ofstream.println(line);
+            ifstream.close();
+            ofstream.close();
+            copied = true;
+        }
+        return copied;
+    }
+
+    public int get_status() { return status; }
+    public File get_source_file() { return source_file; }
+    public File get_target_file() { return target_file; }
+    public File get_target_dir() { return target_dir; }
+}
+
+/*  ignore
+
+    // Status codes for source/target file states.
+    public static final int CHCK_SOURCE_NOTGIVEN  = 0b0000001;  // File name is empty
+    public static final int CHCK_SOURCE_NOEXIST   = 0b0000010;  // File doesn't exist
+    public static final int CHCK_SOURCE_ISDIR     = 0b0000100;  // File refers to a directory
     public static final int CHCK_TARGET_NOTGIVEN  = 0b0001000;
     public static final int CHCK_TARGET_EXISTS    = 0b0010000;
-    public static final int CHCK_TARGET_ISSOURCE  = 0b0100000;  // Ruberic said this should be allowed? It's already implemented, we should email Pyzdrowski. If we must disable it, just turning this const to a zero might work. Not sure if I checked this anywhere else.
-    public static final int CHCK_TARGET_ISDIR     = 0b1000000;
+    public static final int CHCK_TARGET_ISDIR     = 0b0100000;
+    public static final int CHCK_TARGET_ISSOURCE  = 0b1000000;  // Target/source absolute paths are equal.
 
-    public static final int COPY_CHECK_FAIL       = 0b00001;
+    // Error codes for the copy operation.
+    public static final int COPY_CHECK_FAIL       = 0b00001;    // 
     public static final int COPY_READ_OPENERR     = 0b00010;
     public static final int COPY_WRITE_OPENERR    = 0b00100;
     public static final int COPY_READLINE_FAIL    = 0b01000;
     public static final int COPY_READ_CLOSEERR    = 0b10000;
+
+    private int status;
+    private File source;
+    private File target;
+    
+    public FileCopier() {
+        status = 0;
+        source = null;
+        target = null;
+    }
+
+    // Set the source file, given it's filename and directory.
+    public void set_source(String filename, FileEnvironment env) {
+        source = null;
+        if (filename.isEmpty())
+            status |= CHCK_SOURCE_NOTGIVEN;
+        else {
+
+
    
     // Takes two source/target filenames.
     // Compares filenames and runs checks within file environment to determine copy status. 
@@ -282,7 +308,7 @@ class FileCopier {
         //    copy_status |= COPY_CHECK_FAIL;
         //return copy_status;
     }
-}
+}*/
 
 public class FileCopyGui {
     public static void main(String[] args) throws IOException {
@@ -297,13 +323,15 @@ public class FileCopyGui {
                 if (!root.isDirectory()) root = new File("");
                 break;
         }
-        FileEnvironment files = new FileEnvironment(root); 
+        DirMover files = new DirMover(root); 
+
+        FileCopier copier = new FileCopier();
 
         // Simple test
         BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
         boolean running = true;
         while (running) {
-            System.out.println("\nd: show files, u: move up, 'dirname': move into, q: quit");
+            System.out.println("\nd: show files, u: move up, 'dirname': move into, q: quit, s: set source, t: set target, c: try a copy");
             String input = stdin.readLine();
             System.out.println();
             switch (input) {
@@ -315,15 +343,38 @@ public class FileCopyGui {
                 case "q":
                     running = false;
                     continue;
+                case "s":
+                    String fn = stdin.readLine();
+                    for (File file : files) {
+                        if (file.getName().equals(fn)) {
+                            copier.set_source_file(file);
+                            break;
+                        }
+                    }
+                    break;
+                case "t":
+                    copier.set_target_dir(files.get_dir());
+                    copier.set_target_file(stdin.readLine());
+                    break;
+                case "c":
+                    System.out.println("copy success: " + copier.copy());
+                    break;
                 default:
-                    if (!files.cd_down(input)) {
+                    File moveinto = null;
+                    for (File file : files) {
+                        if (file.getName().equals(input)) {
+                            moveinto = file;
+                            break;
+                        }
+                    }
+                    if (!files.cd(moveinto)) {
                         System.out.println("dir '" + input + "' does not exist.\n");
                         continue;
                     }
                     break;
             }
             // Display, now with iterator instead of method.
-            System.out.println(files.get_path());
+            System.out.println(files.get_dir().getPath());
             for (File ent : files) {
                 System.out.print(" * " + ent.getPath());
                 if (ent.isDirectory() && ent.list() != null && ent.list().length > 0) { System.out.println(" +"); }
@@ -331,22 +382,38 @@ public class FileCopyGui {
             }
 
             // Check the file copier
-            String source = stdin.readLine();
-            String target = stdin.readLine();
-            int status = FileCopier.check(files.get_dirent(source), files.get_dirent(target));
-            System.out.println(status);
-            if (status == 0) {
-                System.out.println("Copying contents of '" + source + "' to '" + target + "'.");
-                System.out.println(FileCopier.copy(files.get_dirent(source), files.get_dirent(target)));
-            } else {
-                if ((status & FileCopier.CHCK_SOURCE_NOTGIVEN) > 0)  System.out.println("src not given");
-                if ((status & FileCopier.CHCK_SOURCE_NOEXIST) > 0)   System.out.println("src no exist");
-                if ((status & FileCopier.CHCK_SOURCE_ISDIR) > 0)     System.out.println("src is dir");
-                if ((status & FileCopier.CHCK_TARGET_NOTGIVEN) > 0)  System.out.println("tgt not given");
-                if ((status & FileCopier.CHCK_TARGET_EXISTS) > 0)    System.out.println("tgt already exists");
-                if ((status & FileCopier.CHCK_TARGET_ISSOURCE) > 0)  System.out.println("tgt is source");
-                if ((status & FileCopier.CHCK_TARGET_ISDIR) > 0)     System.out.println("tgt is dir");
-            }
+
+            System.out.println("source: " + copier.get_source_file());
+            System.out.println("target: " + copier.get_target_file());
+            System.out.println("target_dir: " + copier.get_target_dir());
+
+            int status = copier.get_status();
+            System.out.println("status: " + status);
+            System.out.println(" STAT_SOURCE_EMPTY = " + (status & FileCopier.STAT_SOURCE_EMPTY));
+            System.out.println(" STAT_SOURCE_ISDIR = " + (status & FileCopier.STAT_SOURCE_ISDIR));
+            System.out.println(" STAT_TGTDIR_EMPTY = " + (status & FileCopier.STAT_TGTDIR_EMPTY));
+            System.out.println(" STAT_TARGET_EMPTY = " + (status & FileCopier.STAT_TARGET_EMPTY));
+            System.out.println(" STAT_TARGET_ISDIR = " + (status & FileCopier.STAT_TARGET_ISDIR));
+
+            System.out.println("\n STAT_TARGET_EXIST = " + (status & FileCopier.STAT_TARGET_EXIST));
+            System.out.println(" STAT_TARGET_ISSRC = "  + (status & FileCopier.STAT_TARGET_ISSRC));
+
+            //String source = stdin.readLine();
+            //String target = stdin.readLine();
+            //int status = FileCopier.check(files.get_dirent(source), files.get_dirent(target));
+            //System.out.println(status);
+            //if (status == 0) {
+            //    System.out.println("Copying contents of '" + source + "' to '" + target + "'.");
+            //    System.out.println(FileCopier.copy(files.get_dirent(source), files.get_dirent(target)));
+            //} else {
+                //if ((status & FileCopier.CHCK_SOURCE_NOTGIVEN) > 0)  System.out.println("src not given");
+                //if ((status & FileCopier.CHCK_SOURCE_NOEXIST) > 0)   System.out.println("src no exist");
+                //if ((status & FileCopier.CHCK_SOURCE_ISDIR) > 0)     System.out.println("src is dir");
+                //if ((status & FileCopier.CHCK_TARGET_NOTGIVEN) > 0)  System.out.println("tgt not given");
+                //if ((status & FileCopier.CHCK_TARGET_EXISTS) > 0)    System.out.println("tgt already exists");
+                //if ((status & FileCopier.CHCK_TARGET_ISSOURCE) > 0)  System.out.println("tgt is source");
+                //if ((status & FileCopier.CHCK_TARGET_ISDIR) > 0)     System.out.println("tgt is dir");
+            //}
         }
 
         stdin.close();
