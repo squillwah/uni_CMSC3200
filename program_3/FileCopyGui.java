@@ -1,3 +1,14 @@
+
+// [CMSC3200] Technical Computing Using Java
+// Program 3: GUI FileCopy
+//
+//  GUI FileCopy and browser program.
+//
+// Group 2
+// Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
+// SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
+
+
 // For GUI
 import java.awt.*;
 import java.awt.event.*;
@@ -462,7 +473,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         gbl.setConstraints(source, gbc);
         this.add(source);
 
-        currSource = new Label("test ");
+        currSource = new Label(" ");
         gbc.gridx = 3;
         gbc.gridy = 1;
         gbl.setConstraints(currSource, gbc);
