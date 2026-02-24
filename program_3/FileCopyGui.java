@@ -276,7 +276,9 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
 
     //  window listeners
     public void windowClosing(WindowEvent e) {
-
+        fileList.removeActionListener(this);
+        target.removeActionListener(this);
+        confirm.removeActionListener(this);
         this.removeWindowListener(this);
         this.dispose();
     }
