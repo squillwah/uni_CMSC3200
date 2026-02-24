@@ -87,6 +87,9 @@ class Window extends Frame implements WindowListener, ActionListener {
 
     public void initFrame() {
 
+        //  title
+        //this.setTitle(get_dir().getPath());                   UNCOMMENT WHEN MERGED WITH MAIN
+
         //  buttons
         target = new Button("Target: ");
         target.addActionListener(this);
@@ -153,12 +156,11 @@ class Window extends Frame implements WindowListener, ActionListener {
         currSource.setText(s);
     }
 
-    public void updateList() {
+    public void updateList(File currDir) {
         //  depending on backend format might just have to update, or make this an itteritive loop
         fileList.removeAll();
 
-        File directory = new File(".");
-        File[] files = directory.listFiles();
+        File[] files = currDir.listFiles();
         if (files != null) {
             for (int i = 0; i < files.length; i++) {
                 fileList.add(files[i].getName());
