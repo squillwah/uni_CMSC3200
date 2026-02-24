@@ -15,26 +15,31 @@ public class FileCopyGui {
 class Window extends Frame implements WindowListener, ActionListener {
 
     //  layout
-    GridBagConstraints gbc = new GridBagConstraints();
-    GridBagLayout gbl = new GridBagLayout();
+    private GridBagConstraints gbc = new GridBagConstraints();
+    private GridBagLayout gbl = new GridBagLayout();
 
     //  buttons
-    Button target;
-    Button confirm;
+    private Button target;
+    private Button confirm;
 
     //  labels
-    Label source;
-    Label currSource;
-    Label currTarget;
-    Label fileName;
+    private Label source;
+    private Label currSource;
+    private Label currTarget;
+    private Label fileName;
+
+    // list 
+    private List fileList;
+
+
 
     public Window() {
 
         //  establishing how buttons and labels go onto the screen
         double colWeight[] = {2,4,4,15,1,3,1};   //  MESSING WITH THESE, DONT HAVE AN
-        double rowWeight[] = {25,1,1,1};   //  INTUITIVE FEEL FOR EM
+        double rowWeight[] = {25,1,1,1,1 };   //  INTUITIVE FEEL FOR EM
         int colWidth[] = {2,4,4,15,1,3,1};
-        int rowHeight[] = {25,1,1,1,};
+        int rowHeight[] = {25,1,1,1};
 
         gbl.rowHeights = rowHeight;
         gbl.columnWidths = colWidth;
@@ -53,7 +58,7 @@ class Window extends Frame implements WindowListener, ActionListener {
         this.setLayout(gbl);
         this.addWindowListener(this);
         this.setLocationRelativeTo(null);   //  setting starting pos to center screen, likes to start on my left monitor and the fix isnt universal so did this
-        this.setTitle("IF YOU SEE THIS SOMETHING FUCKED UP!");
+        this.setTitle("ERROR: title not specified!");          
         this.setVisible(true);
 
     }
@@ -78,10 +83,12 @@ class Window extends Frame implements WindowListener, ActionListener {
     }
 
     public void actionPerformed(ActionEvent e) {
-
     }
 
     public void initFrame() {
+
+        //  title
+        //this.setTitle(get_dir().getPath());                   UNCOMMENT WHEN MERGED WITH MAIN
 
         //  buttons
         target = new Button("Target: ");
@@ -105,13 +112,13 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbl.setConstraints(source, gbc);
         this.add(source);
 
-        currSource = new Label("THIS IS A TEST OF THE CURRENT SOURCE LABEL");
+        currSource = new Label("Source not specified");
         gbc.gridx = 3;
         gbc.gridy = 1;
         gbl.setConstraints(currSource, gbc);
         this.add(currSource);
 
-        currTarget = new Label("THIS IS A TEST OF THE CURRENT TARGET LABEL");
+        currTarget = new Label("Target not specified");
         gbc.gridx = 3;
         gbc.gridy = 2;
         gbl.setConstraints(currTarget, gbc);
@@ -122,7 +129,18 @@ class Window extends Frame implements WindowListener, ActionListener {
         gbc.gridy = 3;
         gbl.setConstraints(fileName, gbc);
         this.add(fileName);
-        
+
+        //  list
+        fileList = new List();
+        fileList.setSize(400,600);
+        gbc.gridwidth = 8;
+        gbc.gridheight = 1;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbl.setConstraints(fileList, gbc);
+        this.add(fileList);
+        fileList.addActionListener(this);        
     }
 
     //  update the window to display correctly from backend
@@ -138,7 +156,15 @@ class Window extends Frame implements WindowListener, ActionListener {
         currSource.setText(s);
     }
 
-    public void updateList() {
+    public void updateList(File currDir) {
         //  depending on backend format might just have to update, or make this an itteritive loop
+        fileList.removeAll();
+
+        File[] files = currDir.listFiles();
+        if (files != null) {
+            for (int i = 0; i < files.length; i++) {
+                fileList.add(files[i].getName());
+            }
+        }
     }
 }
