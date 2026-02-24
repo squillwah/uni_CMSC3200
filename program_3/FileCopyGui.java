@@ -93,6 +93,7 @@ class Window extends Frame implements WindowListener, ActionListener {
                 currSource.setText(fileList.getSelectedItem());
             } else {
                 //cd_up();
+                //updateList(get_dir);
             }
         }
 
@@ -195,6 +196,7 @@ class Window extends Frame implements WindowListener, ActionListener {
 
         fileList.removeAll();
         fileList.add("..");
+
 
         File[] files = currDir.listFiles();
 
