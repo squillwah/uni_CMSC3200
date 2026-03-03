@@ -10,33 +10,28 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
  
     // Dimension/sizing values. 
     private Insets margins;
-    private int window_width ;// = 640;  // Window dimensions, entire frame.
-    private int window_height;// = 400;
-    private int conpan_size  ;// = 100;//window_width/12;   // Vertical pixels allocated to bottom control panel. Viewscreen fills rest above.
-    private int conpan_sepa  ;// = window_width/48;   // Horizontal pixel separation of each control panel element.
+    private int window_width;   // Window dimensions, entire frame.
+    private int window_height;
+    private int conpan_size;    // Vertical pixels allocated to bottom control panel. Viewscreen fills rest above.
+    private int conpan_sepa;    // Horizontal pixel separation of each control panel element.
     
-    private int dim_button_w ;// = window_width/12;   // Dimensions of buttons
-    private int dim_button_h ;// = 20;
-    private int dim_scroll_w ;// = window_width/6;    // Dimensions of scrollbars
-    private int dim_scroll_h ;// = 20;
+    private int dim_button_w;   // Dimensions of buttons
+    private int dim_button_h;
+    private int dim_scroll_w;   // Dimensions of scrollbars
+    private int dim_scroll_h;
 
     // Control panel components.
     private Button bt_start, bt_shape, bt_clear, bt_tail, bt_quit;
     private Scrollbar sb_speed, sb_size;
     private Label sb_speed_lbl, sb_size_lbl;
-    //enum Butt {start 0, shape 1, clear 2, tail 3, quit 4}
-    //Button butts[];
 
     public Bounce(int w, int h) {
         setLayout(null);
 
-        // Set dimension variables relative to given window size.
-        set_dimensions(w, h);   
-        // Initialize and add all components to the window.
-        try { init_components(); }
+        set_dimensions(w, h);       // Set dimension variables relative to given window size.
+        try { init_components(); }  // Initialize and add all components to the window.
         catch (Exception e) { e.printStackTrace(); }
-        // Adjust component sizes/positions on screen according to dimension variables. 
-        size_components();
+        size_components();          // Adjust component sizes/positions on screen according to dimension variables. 
        
         // Set visible, after all components are initialized and sized. 
         // Doing so beforehand risks null exceptions (undefined getWidth/getHeight in errant componentResized events).
@@ -49,12 +44,16 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
         window_width  = w;
         window_height = h;
-        conpan_size   = 55; // Control panel height is static.
-        conpan_sepa   = window_width/60;   
-        
-        dim_button_w  = window_width/11; 
-        dim_button_h  = 20; // Button and scroll heights are static.
-        dim_scroll_w  = window_width/5; 
+
+        // Get true window width (minus margins) for accurate button/scroll width calculations.
+        int marginalized_w = window_width - margins.left - margins.right;
+
+        conpan_size   = 55; //+ margins.bottom;    // Add bottom margin for true conpan height.
+        conpan_sepa   = marginalized_w/60;   
+
+        dim_button_w  = marginalized_w/11; 
+        dim_button_h  = 20;                     // Button and scroll heights are static.
+        dim_scroll_w  = marginalized_w/5; 
         dim_scroll_h  = 20;
     }
 
@@ -66,7 +65,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         // Configure frame, set size to match dimension variables.
         setPreferredSize(new Dimension(window_width, window_height));
         setMinimumSize(getPreferredSize());
-        setBounds(10, 10, window_width, window_height);  // @? What does this one do?
+        setBounds(100, 100, window_width, window_height);  // @? What does this one do?
         setBackground(Color.lightGray);
         
         // Create buttons, add to frame, attach action listeners:
@@ -89,20 +88,19 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             bar.setVisibleAmount(10);
             bar.setBackground(Color.gray);
         }
-        // Scrollbar labels: 
-        sb_speed_lbl = new Label(("Speed (" + sb_speed.getValue() + "%)"), Label.CENTER);    add(sb_speed_lbl);
-        sb_size_lbl = new Label(("Size (" + sb_size.getValue() + "%)"), Label.CENTER);      add(sb_size_lbl);
+        // Scrollbar labels, update with current value: 
+        sb_speed_lbl = new Label((""), Label.CENTER);   add(sb_speed_lbl);  update_speed_label();
+        sb_size_lbl = new Label((""), Label.CENTER);    add(sb_size_lbl);   update_size_label();
 
         validate();
     }
 
     public void size_components() {
-        // ! these calculations do not account for insets, @todo
-
-        int conpan_y = window_height - (conpan_size - conpan_size/8);  // All controls in line at above center control panel height.
-        int conpan_x = window_width/2 - (dim_button_w*5 + dim_scroll_w*2 + conpan_sepa*6)/2;  // Start at left end of control panel, centered along window width.
-
-        // Set scroll and button sizes, from left to right:
+        // Place control row slightly above center of control panel height, accounting for the bottom margin.
+        int conpan_y = window_height - (conpan_size+margins.bottom - conpan_size/8); 
+        // Begin row at left of center (center being calculated with margins subtracted for true area). Left starting position 
+        // is center subtracted by half of the combined widths of all buttons and scrollbars, plus the left margin, for accurate centering.
+        int conpan_x = ((window_width-margins.left-margins.right)/2)+margins.left - (dim_button_w*5 + dim_scroll_w*2 + conpan_sepa*6)/2; 
 
         // Speed bar        
         sb_speed.setLocation(conpan_x, conpan_y);
@@ -182,15 +180,28 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void adjustmentValueChanged(AdjustmentEvent e) {
         Scrollbar bar = (Scrollbar)e.getSource();
         if (bar == sb_speed) {
-            sb_speed_lbl.setText(("Speed (" + sb_speed.getValue() + "%)"));
+            update_speed_label();
         } else
         if (bar == sb_size) {
-            sb_size_lbl.setText(("Size (" + sb_size.getValue() + "%)"));
+            update_size_label();
         }
     }
 
     public static void main(String args[]) {
         new Bounce(640, 400);
+    }
+
+    private void update_speed_label() {
+        int val = sb_speed.getValue();
+        if (val == 100) sb_speed_lbl.setText(("Speed (MAX%)"));
+        else if (val == 1) sb_speed_lbl.setText(("Speed (MIN%)"));
+        else sb_speed_lbl.setText(("Speed (" + val + "%)"));
+    }
+    private void update_size_label() {
+        int val = sb_size.getValue();
+        if (val == 100) sb_size_lbl.setText(("Size (MAX%)"));
+        else if (val == 1) sb_size_lbl.setText(("Size (MIN%)"));
+        else sb_size_lbl.setText(("Size (" + val + "%)"));
     }
     
     public void windowClosed(WindowEvent e) {}
