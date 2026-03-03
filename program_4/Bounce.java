@@ -90,8 +90,8 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             bar.setBackground(Color.gray);
         }
         // Scrollbar labels: 
-        sb_speed_lbl = new Label("Speed", Label.CENTER);    add(sb_speed_lbl);
-        sb_size_lbl = new Label("Size", Label.CENTER);      add(sb_size_lbl);
+        sb_speed_lbl = new Label(("Speed (" + sb_speed.getValue() + "%)"), Label.CENTER);    add(sb_speed_lbl);
+        sb_size_lbl = new Label(("Size (" + sb_size.getValue() + "%)"), Label.CENTER);      add(sb_size_lbl);
 
         validate();
     }
@@ -99,8 +99,10 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void size_components() {
         // ! these calculations do not account for insets, @todo
 
-        int conpan_y = window_height - (conpan_size - conpan_size/8);  // All controls in line at center control panel height.
-        int conpan_x = window_width/2 - (dim_button_w*5 + dim_scroll_w*2 + conpan_sepa*6)/2;  // Start at left end of control panel width, centered along window width.
+        int conpan_y = window_height - (conpan_size - conpan_size/8);  // All controls in line at above center control panel height.
+        int conpan_x = window_width/2 - (dim_button_w*5 + dim_scroll_w*2 + conpan_sepa*6)/2;  // Start at left end of control panel, centered along window width.
+
+        // Set scroll and button sizes, from left to right:
 
         // Speed bar        
         sb_speed.setLocation(conpan_x, conpan_y);
@@ -108,29 +110,20 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_speed_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
         sb_speed_lbl.setSize(dim_scroll_w, dim_scroll_h);
         conpan_x += dim_scroll_w + conpan_sepa;
-        // Start button
-        bt_start.setLocation(conpan_x, conpan_y);
-        bt_start.setSize(dim_button_w, dim_button_h);
-        conpan_x += dim_button_w + conpan_sepa;
-        // Shape button
-        bt_shape.setLocation(conpan_x, conpan_y);
-        bt_shape.setSize(dim_button_w, dim_button_h);
-        conpan_x += dim_button_w + conpan_sepa;
-        // Tail button 
-        bt_tail.setLocation(conpan_x, conpan_y);
-        bt_tail.setSize(dim_button_w, dim_button_h);
-        conpan_x += dim_button_w + conpan_sepa;
-        // Clear button
-        bt_clear.setLocation(conpan_x, conpan_y);
-        bt_clear.setSize(dim_button_w, dim_button_h);
-        conpan_x += dim_button_w + conpan_sepa;
-        // Quit button 
-        bt_quit.setLocation(conpan_x, conpan_y);
-        bt_quit.setSize(dim_button_w, dim_button_h);
-        conpan_x += dim_button_w + conpan_sepa;
+
+        // Buttons
+        Button[] butts = {bt_start, bt_shape, bt_tail, bt_clear, bt_quit};
+        for (Button butt : butts) {
+            butt.setLocation(conpan_x, conpan_y);
+            butt.setSize(dim_button_w, dim_button_h);
+            conpan_x += dim_button_w + conpan_sepa;
+        }
+        
         // Size bar 
         sb_size.setLocation(conpan_x, conpan_y);
         sb_size.setSize(dim_scroll_w, dim_scroll_h);
+        sb_size_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
+        sb_size_lbl.setSize(dim_scroll_w, dim_scroll_h);
         
         System.out.println("hello");
     }
@@ -153,28 +146,62 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void windowClosing(WindowEvent e) {
         stop();
     }
+
+
+    public void componentResized(ComponentEvent e) {
+        set_dimensions(getWidth(), getHeight());
+        size_components();
+    }
+
+    public void actionPerformed(ActionEvent e) { 
+        // scrollbar.value = ball.set_value(scrollbar.value) [should return best it could do, percentage]
+        
+        Object source = e.getSource(); 
+
+        if (source == bt_start) {
+            // This should be done a different way. Using the text itself feels wrong.
+            if (bt_start.getLabel() == "Pause") bt_start.setLabel("Run");    
+            else bt_start.setLabel("Pause");
+        } else 
+        if (source == bt_shape) {
+            if (bt_shape.getLabel() == "Circle") bt_shape.setLabel("Square");
+            else bt_shape.setLabel("Circle");
+        } else
+        if (source == bt_tail) {
+            if (bt_tail.getLabel() == "Tail") bt_tail.setLabel("No Tail");
+            else bt_tail.setLabel("Tail");
+        } else
+        if (source == bt_clear) {
+            System.out.println("clear");
+        } else
+        if (source == bt_quit) {
+            stop();
+        }
+    }
+
+    public void adjustmentValueChanged(AdjustmentEvent e) {
+        Scrollbar bar = (Scrollbar)e.getSource();
+        if (bar == sb_speed) {
+            sb_speed_lbl.setText(("Speed (" + sb_speed.getValue() + "%)"));
+        } else
+        if (bar == sb_size) {
+            sb_size_lbl.setText(("Size (" + sb_size.getValue() + "%)"));
+        }
+    }
+
+    public static void main(String args[]) {
+        new Bounce(640, 400);
+    }
+    
     public void windowClosed(WindowEvent e) {}
     public void windowOpened(WindowEvent e) {}
     public void windowActivated(WindowEvent e) {}
     public void windowDeactivated(WindowEvent e) {}
     public void windowIconified(WindowEvent e) {}
     public void windowDeiconified(WindowEvent e) {}
-
-    public void componentResized(ComponentEvent e) {
-        set_dimensions(getWidth(), getHeight());
-        size_components();
-    }
     public void componentHidden(ComponentEvent e) {}
     public void componentShown(ComponentEvent e) {}
     public void componentMoved(ComponentEvent e) {}
-
-    public void actionPerformed(ActionEvent e) {}
-
-    public void adjustmentValueChanged(AdjustmentEvent e) {}
-
-    public static void main(String args[]) {
-        new Bounce(640, 400);
-    }
 }
 
 
