@@ -35,11 +35,9 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         try { init_components(); }  // Initialize and add all components to the window.
         catch (Exception e) { e.printStackTrace(); }
         size_components();          // Adjust component sizes/positions on screen according to dimension variables. 
-       
-        // Set visible, after all components are initialized and sized. 
-        // Doing so beforehand risks null exceptions (undefined getWidth/getHeight in errant componentResized events).
-        setVisible(true); 
 
+        setVisible(true); 
+        
         // Start the graphics.
         start();
     }
@@ -64,9 +62,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     }
 
     public void init_components() {
-        // Add self as component/window event listener
-        this.addComponentListener(this);
-        this.addWindowListener(this);
         
         // Configure frame, set size to match dimension variables.
         setPreferredSize(new Dimension(window_width, window_height));
@@ -98,9 +93,14 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_speed_lbl = new Label((""), Label.CENTER);   add(sb_speed_lbl);  update_speed_label();
         sb_size_lbl = new Label((""), Label.CENTER);    add(sb_size_lbl);   update_size_label();
 
-        // Graphics:
-        screen = new BounceScreen(window_width-margins.left-margins.right, window_height-margins.top-margins.bottom);
+        // Create the graphics, initialize size within margins and above control panel:
+        screen = new BounceScreen(window_width - margins.left - margins.right, window_height - margins.top - margins.bottom - conpan_size);
         screen.setBackground(Color.white);
+        add(screen);
+        
+        // Add self as component/window event listener. Always do this last.
+        this.addComponentListener(this);
+        this.addWindowListener(this);
         
         validate();
     }
@@ -132,12 +132,16 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_size.setSize(dim_scroll_w, dim_scroll_h);
         sb_size_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
         sb_size_lbl.setSize(dim_scroll_w, dim_scroll_h);
+
+        // Size and place the canvas:
+        screen.setLocation(margins.left, margins.top); //margins.top, margins.left);
+        screen.resize_screen(window_width - margins.left - margins.right, window_height - margins.top - margins.bottom - conpan_size);
         
         System.out.println("hello");
     }
 
     public void start() {
-
+        screen.repaint();
     }
 
     public void stop() {
@@ -163,8 +167,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     }
 
     public void actionPerformed(ActionEvent e) { 
-        // scrollbar.value = ball.set_value(scrollbar.value) [should return best it could do, percentage]
-        
         Object source = e.getSource(); 
 
         if (source == bt_start) {
@@ -173,15 +175,20 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             else bt_start.setLabel("Pause");
         } else 
         if (source == bt_shape) {
-            if (bt_shape.getLabel() == "Circle") bt_shape.setLabel("Square");
-            else bt_shape.setLabel("Circle");
+            screen.set_rect(!screen.is_rect());
+            if (screen.is_rect()) bt_shape.setLabel("Circle");
+            else bt_shape.setLabel("Square");
+            screen.repaint();   // Force repaint to update shape.
         } else
         if (source == bt_tail) {
-            if (bt_tail.getLabel() == "Tail") bt_tail.setLabel("No Tail");
+            screen.set_tail(!screen.has_tail());
+            if (screen.has_tail()) bt_tail.setLabel("No Tail");
             else bt_tail.setLabel("Tail");
         } else
         if (source == bt_clear) {
             System.out.println("clear");
+            screen.clear();     // Wipe canvas and redraw.
+            screen.repaint();
         } else
         if (source == bt_quit) {
             stop();
@@ -195,8 +202,10 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             update_speed_label();
         } else
         if (bar == sb_size) {
+            // Updates value within screen, and sets scrollbar to the returned percentage (size may be restricted).
             bar.setValue((int)(screen.gradiate_size(bar.getValue()/100.0)*100));
             update_size_label();
+            screen.repaint();
         }
     }
 
@@ -228,7 +237,9 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     }
 }
 
-class BounceScreen {
+class BounceScreen extends Canvas {
+    private static final long serialVersionUID = 11L;
+
     private final int SPEED_MIN = 1;
     private final int SPEED_MAX = 100;
     private final int SIZE_MIN = 10;
@@ -240,14 +251,75 @@ class BounceScreen {
     private int pos_x, pos_y; 
     private int speed;
 
+    private boolean shape;  // True for rectangle, false for circle.
+    private boolean tail;
+
+    private boolean clear;  // Clear flag. Screen will be wiped on next update if set.
+
     public BounceScreen(int w, int h) {
         width = w; height = h;
         size = 0; size_constraint = SIZE_MAX;
-        pos_x = 0; pos_y = 0;
+        pos_x = w/2; pos_y = h/2;   // Center screen.
         speed = 0; 
+        shape = false;  // Start as circle, no tails.
+        tail = false;
 
         gradiate_speed(.5); // Initialize size and speed to their middle values.
         gradiate_size(.5);
+    }
+
+    public void resize_screen(int w, int h) { 
+        width = w; height = h; 
+        pos_x = w/2; pos_y = h/2;   // Recalculate center pos as well.
+        setSize(w, h);
+    }    
+    public int get_width() { return width; }
+    public int get_height() { return height; }
+
+    public boolean is_rect() { return shape; }  
+    public void set_rect(boolean s) { shape = s; }
+
+    public boolean has_tail() { return tail; }
+    public void set_tail(boolean t) { tail = t; }
+
+    public void clear() { clear = true; }
+
+    //public void update(int NS) {    // stupid
+    //    /*SObj = NS;*/ 
+    //}
+    
+    // Use update to draw graphics instead of paint (remove screen wipes).
+    public void update(Graphics g) {
+        if (clear) {
+            super.paint(g); // Call original paint function, which calls original update which clears the screen. ? maybe, not sure if thats how the stack works.
+            clear = false;  // Clear the clear.
+            g.setColor(Color.red);
+            g.drawRect(0, 0, width-1, height-1);    // Redraw the red boarder.
+        }
+
+        // Top left coordinates from center pixel position
+        int tl_x = pos_x-((size-1)/2);
+        int tl_y = pos_y-((size-1)/2);
+
+        // Draw shape, depending on shape (true is rectangle, false is oval)
+        if (shape) {        // Could call is_rect() instead, would be more readable.
+            g.setColor(Color.lightGray);
+            g.fillRect(tl_x, tl_y, size, size); // Outline
+            g.setColor(Color.black);
+            g.drawRect(tl_x, tl_y, size-1, size-1);
+        } else {
+            g.setColor(Color.lightGray);
+            g.fillOval(tl_x, tl_y, size, size); 
+            g.setColor(Color.black);
+            g.drawOval(tl_x, tl_y, size-1, size-1);
+        }
+    }
+
+    // Override paint to draw the red boarder and call update (os will trigger a paint occasionally).
+    public void paint(Graphics g) {
+        g.setColor(Color.red);
+        g.drawRect(0, 0, width-1, height-1);
+        update(g);
     }
 
     // Adjust speed between SPEED_MIN and SPEED_MAX, given the percentage between them. 
@@ -284,9 +356,7 @@ class BounceScreen {
 }
 
 
-// Use update to draw graphics instead of paint (to remove screen wipes).
 
-// Override paint to call update (os will trigger a paint occasionally).
 
 
 /*
