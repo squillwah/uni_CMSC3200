@@ -25,6 +25,9 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     private Scrollbar sb_speed, sb_size;
     private Label sb_speed_lbl, sb_size_lbl;
 
+    // The bouncing ball canvas
+    private BounceScreen screen;
+
     public Bounce(int w, int h) {
         setLayout(null);
 
@@ -36,6 +39,9 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         // Set visible, after all components are initialized and sized. 
         // Doing so beforehand risks null exceptions (undefined getWidth/getHeight in errant componentResized events).
         setVisible(true); 
+
+        // Start the graphics.
+        start();
     }
 
     // Set dimension variables relative frame width and height.
@@ -48,7 +54,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         // Get true window width (minus margins) for accurate button/scroll width calculations.
         int marginalized_w = window_width - margins.left - margins.right;
 
-        conpan_size   = 55; //+ margins.bottom;    // Add bottom margin for true conpan height.
+        conpan_size   = 55;
         conpan_sepa   = marginalized_w/60;   
 
         dim_button_w  = marginalized_w/11; 
@@ -80,18 +86,22 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_size = new Scrollbar(Scrollbar.HORIZONTAL);      add(sb_size);   sb_size.addAdjustmentListener(this);
         Scrollbar[] bars = {sb_speed, sb_size};
         for (Scrollbar bar : bars) {
-            bar.setMaximum(110);   // Instead of directly relating scrollbar positions to values, use a percentage. (110 to account for thumb)
+            bar.setMaximum(120);   // Instead of directly relating scrollbar positions to values, use a 1->100 percentage. (120 to account for thumb)
             bar.setMinimum(1);
             bar.setUnitIncrement(5);
             bar.setBlockIncrement(10);
             bar.setValue(50);
-            bar.setVisibleAmount(10);
+            bar.setVisibleAmount(20);
             bar.setBackground(Color.gray);
         }
         // Scrollbar labels, update with current value: 
         sb_speed_lbl = new Label((""), Label.CENTER);   add(sb_speed_lbl);  update_speed_label();
         sb_size_lbl = new Label((""), Label.CENTER);    add(sb_size_lbl);   update_size_label();
 
+        // Graphics:
+        screen = new BounceScreen(window_width-margins.left-margins.right, window_height-margins.top-margins.bottom);
+        screen.setBackground(Color.white);
+        
         validate();
     }
 
@@ -126,6 +136,10 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         System.out.println("hello");
     }
 
+    public void start() {
+
+    }
+
     public void stop() {
         // Remove listeners, dispose frame, kill.
         bt_start.removeActionListener(this);
@@ -141,10 +155,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         System.exit(0);
     }
     
-    public void windowClosing(WindowEvent e) {
-        stop();
-    }
-
+    public void windowClosing(WindowEvent e) { stop(); }
 
     public void componentResized(ComponentEvent e) {
         set_dimensions(getWidth(), getHeight());
@@ -180,15 +191,13 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void adjustmentValueChanged(AdjustmentEvent e) {
         Scrollbar bar = (Scrollbar)e.getSource();
         if (bar == sb_speed) {
+            bar.setValue((int)(screen.gradiate_speed(bar.getValue()/100.0)*100));
             update_speed_label();
         } else
         if (bar == sb_size) {
+            bar.setValue((int)(screen.gradiate_size(bar.getValue()/100.0)*100));
             update_size_label();
         }
-    }
-
-    public static void main(String args[]) {
-        new Bounce(640, 400);
     }
 
     private void update_speed_label() {
@@ -213,6 +222,108 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void componentHidden(ComponentEvent e) {}
     public void componentShown(ComponentEvent e) {}
     public void componentMoved(ComponentEvent e) {}
+
+    public static void main(String args[]) {
+        new Bounce(640, 400);
+    }
+}
+
+class BounceScreen {
+    private final int SPEED_MIN = 1;
+    private final int SPEED_MAX = 100;
+    private final int SIZE_MIN = 10;
+    private final int SIZE_MAX = 200;
+
+    int width, height;
+
+    private int size, size_constraint;
+    private int pos_x, pos_y; 
+    private int speed;
+
+    public BounceScreen(int w, int h) {
+        width = w; height = h;
+        size = 0; size_constraint = SIZE_MAX;
+        pos_x = 0; pos_y = 0;
+        speed = 0; 
+
+        gradiate_speed(.5); // Initialize size and speed to their middle values.
+        gradiate_size(.5);
+    }
+
+    // Adjust speed between SPEED_MIN and SPEED_MAX, given the percentage between them. 
+    // Returns the new speed (or should it be the percentage?).
+    //  (0.01 == SPEED_MIN, 1 == SPEED_MAX) 
+    public double gradiate_speed(double percentage) { 
+        if (percentage >= 1) percentage = 1;
+        else if (percentage <= 0.01) percentage = 0.01; 
+        speed = (int)((SPEED_MAX-SPEED_MIN) * percentage + SPEED_MIN);
+
+        System.out.println("Speed: " + speed + " | " + percentage + "%");
+
+        return percentage; // or speed? Could calculate percentage at scrollbar set.
+    }
+    // Adjust size between MIN and MAX, given the percentage between them. 
+    // Restricts size to size_constraint. Returns new size;
+    public double gradiate_size(double percentage) {
+
+        // Could caluclate size constraint here, with ball pos and screen w/h
+        // would be better than storing the variable and updating every move
+
+        if (percentage >= 1) percentage = 1;
+        else if (percentage <= 0.01) percentage = 0.01; 
+        size = (int)((SIZE_MAX-SIZE_MIN) * percentage + SIZE_MIN);
+        if (size > size_constraint) {
+            size = size_constraint;
+            percentage = (double)(size-SIZE_MIN) / (SIZE_MAX-SIZE_MIN);
+        }
+
+        System.out.println("Size: " + size + " | " + percentage + "%");
+
+        return percentage;
+    }
 }
 
 
+// Use update to draw graphics instead of paint (to remove screen wipes).
+
+// Override paint to call update (os will trigger a paint occasionally).
+
+
+/*
+    
+    public static double adjust_percent(double perc) {
+        // Handle oob percentages
+        int MIN = 235;
+        int MAX = 512;
+
+        // Set value to range between min and max:
+        int value;
+        if (perc >= 1) value = MAX;
+        else if (perc <= 0) value = MIN;
+        else value = (int)((MAX-MIN) * perc + MIN);
+
+        // If requested percent is greater than the current constraint, constrain:
+        int constraint = 420;
+        if (value > constraint) {
+            value = constraint;
+            perc = (double)(constraint-MIN) / (MAX-MIN);
+        }
+
+        System.out.println(value);
+        return perc;
+
+        *
+        int value = MIN + (MAX-MIN)/perc;
+
+        int constraint = 420;
+
+        if (value > constraint) {
+            value = constraint;
+            perc = (MAX-MIN)/(constraint-MIN);
+        }
+
+        System.out.println(value);
+        return perc;
+        *
+    
+*/
