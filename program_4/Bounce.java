@@ -243,9 +243,9 @@ class BounceScreen extends Canvas {
     private final int SPEED_MIN = 1;
     private final int SPEED_MAX = 100;
     private final int SIZE_MIN = 10;
-    private final int SIZE_MAX = 200;
+    private final int SIZE_MAX = 250;
 
-    int width, height;
+    private int width, height;
 
     private int size, size_constraint;
     private int pos_x, pos_y; 
@@ -253,7 +253,6 @@ class BounceScreen extends Canvas {
 
     private boolean shape;  // True for rectangle, false for circle.
     private boolean tail;
-
     private boolean clear;  // Clear flag. Screen will be wiped on next update if set.
 
     public BounceScreen(int w, int h) {
@@ -261,8 +260,8 @@ class BounceScreen extends Canvas {
         size = 0; size_constraint = SIZE_MAX;
         pos_x = w/2; pos_y = h/2;   // Center screen.
         speed = 0; 
-        shape = false;  // Start as circle, no tails.
-        tail = false;
+        shape = true;  // Start as rect, with tails.
+        tail = true;
 
         gradiate_speed(.5); // Initialize size and speed to their middle values.
         gradiate_size(.5);
