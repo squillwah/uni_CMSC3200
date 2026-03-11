@@ -8,7 +8,7 @@ import java.io.*;
 // BounceSim should have a set_delay and set_size, which checks the bounds and returns the size it actually set too
 // Bounce should then implement the gradiate_delay and such for the scrolls
 
-public class Bounce extends Frame implements WindowListener, ComponentListener, ActionListener, AdjustmentListener, Runnable {
+public class Bounce extends Frame implements WindowListener, ComponentListener, ActionListener, AdjustmentListener {
     private static final long serialVersionUID = 10L;
  
     // Dimension/sizing values. 
@@ -30,7 +30,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
     // The bouncing body canvas.
     private BounceSim bsim;
-    private Thread tickthread;  // Thread for bouncing simulation.
 
     public Bounce(int w, int h) {
         setLayout(null);
@@ -206,8 +205,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         new Bounce(640, 400);
     }
 
-    public void run() {}
-    
     // Set the simulation delay to the percentange 'p' between SIM_DELAY_MIN and SIM_DELAY_MAX.
     // Returns the percentage achieved, as depending on the body state things might not work out so good.
     public double gradiate_sim_delay(double p) {
@@ -236,7 +233,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     // @todo Make the speedbar adjust body velocity, not the tickrate. Could make sim_delay/tickrate constant, or add a second scroll.
 }
 
-class BounceSim extends Canvas {
+class BounceSim extends Canvas implements Runnable {
     private static final long serialVersionUID = 11L;
 
     public final int SIM_DELAY_MIN = 10;    // 100hz
@@ -244,8 +241,11 @@ class BounceSim extends Canvas {
     public final int BODY_SIZE_MIN = 10;
     public final int BODY_SIZE_MAX = 250;
 
-    private int sim_delay;  // Delay between ticks, milliseconds.
     private int screen_width, screen_height;
+    
+    private Thread sim_thread;  // Thread for bouncing simulation.
+    private boolean sim_paused;
+    private int sim_delay;      // Delay between ticks, milliseconds.
 
     // Render flags: 
     private boolean render_clear;   // Clear the canvas on next draw. Resets self.
@@ -265,15 +265,43 @@ class BounceSim extends Canvas {
         pos = new Vec2(screen_width/2, screen_height/2); 
         vel = new Vec2(1, 1);
         render_circle = false;  // Start as rect, with tails.
-        render_tail = true;
+        render_tail = false;
         render_clear = false;
+        sim_thread = new Thread(this);
+        sim_thread.start();
     }
+
+    public void run() {
+        for (int i = 0; i < 1000; i++) {
+            process_collisions();
+            pos.add(vel);
+            repaint();
+            try { Thread.sleep(10); }
+            catch (InterruptedException e) { System.out.println(e); } // should remove
+        }
+
+        // check_collision();
+        // pos.add(vel);
+        // draw_body();
+    }
+
+    // Checks ball position on next tick. Constraints within bounds, and reflects velocity on collision.
+    public void process_collisions() {
+        Vec2 next_pos = Vec2.add(pos, vel);
+        // If next position outside bounds, move current position within bounds and reflect related velocity component.
+        if (next_pos.x <= 0) { pos.x = 0; vel.x = -vel.x; }
+        else if (next_pos.x >= screen_width-size) { pos.x = screen_width-size; vel.x = -vel.x; } // should find way to make pos.x whatever it's closest too, could use math library
+        if (next_pos.y <= 0) { pos.y = 0; vel.y = -vel.y; }
+        else if (next_pos.y >= screen_height-size) { pos.y = screen_height-size; vel.y = -vel.y; } // should find way to make pos.x whatever it's closest too, could use math library
+    }
+
+
 
     public void resize_screen(int w, int h) { 
         screen_width = w; screen_height = h; 
         setSize(screen_width, screen_height);
-        pos.x = screen_width/2; 
-        pos.y = screen_height/2;   // Recalculate center pos as well.
+        //pos.x = screen_width/2; 
+        //pos.y = screen_height/2;   // Recalculate center pos as well.
     }    
     public int get_width() { return screen_width; }
     public int get_height() { return screen_height; }
