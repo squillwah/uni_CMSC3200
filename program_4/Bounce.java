@@ -25,10 +25,10 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
     // Control panel components.
     private Button bt_start, bt_shape, bt_clear, bt_tail, bt_quit;
-    private Scrollbar sb_speed, sb_size;
+    private Scrollbar sb_tickrate, sb_velocity, sb_size;
     private Label sb_speed_lbl, sb_size_lbl;
 
-    // The bouncing body canvas.
+    // The bouncing body canvas. 
     private BounceSim bsim;
 
     public Bounce(int w, int h) {
@@ -50,10 +50,10 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         // Get true window width (minus margins) for accurate button/scroll width calculations.
         int marginalized_w = window_width - margins.left - margins.right;
         conpan_size   = 55;
-        conpan_sepa   = marginalized_w/60;   
-        dim_button_w  = marginalized_w/11; 
+        conpan_sepa   = marginalized_w/80;   
+        dim_button_w  = marginalized_w/13; 
         dim_button_h  = 20;                     // Button and scroll heights are static.
-        dim_scroll_w  = marginalized_w/5; 
+        dim_scroll_w  = marginalized_w/6; 
         dim_scroll_h  = 20;
     }
 
@@ -73,15 +73,19 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         bt_clear = new Button("Clear");     add(bt_clear);  bt_clear.addActionListener(this);
         bt_tail = new Button("No Toil");    add(bt_tail);   bt_tail.addActionListener(this);
         bt_quit = new Button("Quit");       add(bt_quit);   bt_quit.addActionListener(this);
-        sb_speed = new Scrollbar(Scrollbar.HORIZONTAL); add(sb_speed);  sb_speed.addAdjustmentListener(this);
-        sb_size = new Scrollbar(Scrollbar.HORIZONTAL);  add(sb_size);   sb_size.addAdjustmentListener(this);
+        sb_tickrate = new Scrollbar(Scrollbar.HORIZONTAL);  add(sb_tickrate);   sb_tickrate.addAdjustmentListener(this);
+        sb_velocity = new Scrollbar(Scrollbar.HORIZONTAL);  add(sb_velocity);   sb_velocity.addAdjustmentListener(this);
+        sb_size = new Scrollbar(Scrollbar.HORIZONTAL);      add(sb_size);   sb_size.addAdjustmentListener(this);
+
         // Scrollbar value setting:
-        Scrollbar[] bars = {sb_speed, sb_size};
+        Scrollbar[] bars = {sb_size, sb_tickrate, sb_velocity};
         for (Scrollbar bar : bars) { bar.setMaximum(120); bar.setMinimum(1); bar.setUnitIncrement(5); bar.setBlockIncrement(10); bar.setVisibleAmount(20); bar.setBackground(Color.gray); }
-        sb_speed.setValue((int)(gradiate_sim_delay(.5)*100));    // Attempt to set scrolls at 50%.
+        //sb_speed.setValue((int)(gradiate_sim_delay(.5)*100));    // Attempt to set scrolls at 50%.
+        sb_tickrate.setValue(50);    // Attempt to set scrolls at 50%.
         sb_speed_lbl = new Label((""), Label.CENTER);   add(sb_speed_lbl);  update_speed_label();
         sb_size.setValue((int)(gradiate_body_size(.5)*100));
         sb_size_lbl = new Label((""), Label.CENTER);    add(sb_size_lbl);   update_size_label();
+        sb_velocity.setValue(1);
         // Add self as component/window event listener. Always do this last.
         this.addComponentListener(this);
         this.addWindowListener(this);
@@ -94,13 +98,17 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         int conpan_y = window_height - (conpan_size+margins.bottom - conpan_size/8); 
         // Begin row at left of center (center being calculated with margins subtracted for true area). Left starting position 
         // is center subtracted by half of the combined widths of all buttons and scrollbars, plus the left margin, for accurate centering.
-        int conpan_x = ((window_width-margins.left-margins.right)/2)+margins.left - (dim_button_w*5 + dim_scroll_w*2 + conpan_sepa*6)/2; 
+        int conpan_x = ((window_width-margins.left-margins.right)/2)+margins.left - (dim_button_w*5 + dim_scroll_w*3 + conpan_sepa*7)/2; 
         
-        // Speed bar        
-        sb_speed.setLocation(conpan_x, conpan_y);
-        sb_speed.setSize(dim_scroll_w, dim_scroll_h);
+        // Tickrate bar        
+        sb_tickrate.setLocation(conpan_x, conpan_y);
+        sb_tickrate.setSize(dim_scroll_w, dim_scroll_h);
         sb_speed_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
         sb_speed_lbl.setSize(dim_scroll_w, dim_scroll_h);
+        conpan_x += dim_scroll_w + conpan_sepa;
+        // Velocity bar 
+        sb_velocity.setLocation(conpan_x, conpan_y);
+        sb_velocity.setSize(dim_scroll_w, dim_scroll_h);
         conpan_x += dim_scroll_w + conpan_sepa;
         // Buttons
         Button[] butts = {bt_start, bt_shape, bt_tail, bt_clear, bt_quit};
@@ -133,7 +141,8 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         bt_clear.removeActionListener(this);
         bt_tail.removeActionListener(this);
         bt_quit.removeActionListener(this);
-        sb_speed.removeAdjustmentListener(this);
+        sb_tickrate.removeAdjustmentListener(this);
+        sb_velocity.removeAdjustmentListener(this);
         sb_size.removeAdjustmentListener(this);
         this.removeComponentListener(this);
         this.removeWindowListener(this);
@@ -178,9 +187,13 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
         Scrollbar bar = (Scrollbar)e.getSource();
-        if (bar == sb_speed) {
-            bar.setValue((int)(gradiate_sim_delay(bar.getValue()/100.0)*100));
+        if (bar == sb_tickrate) {
+            //bar.setValue((int)(gradiate_sim_delay(bar.getValue()/100.0)*100));
+            bsim.sim_set_tickrate(bar.getValue());
             update_speed_label();
+        } else
+        if (bar == sb_velocity) {
+
         } else
         if (bar == sb_size) {
             // Updates value within screen, and sets scrollbar to the returned percentage (size may be restricted).
@@ -202,7 +215,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void componentMoved(ComponentEvent e) {}
 
     public static void main(String args[]) {
-        new Bounce(640, 400);
+        new Bounce(800, 600);
     }
 
     // Set the simulation delay to the percentange 'p' between SIM_DELAY_MIN and SIM_DELAY_MAX.
