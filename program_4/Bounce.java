@@ -263,7 +263,7 @@ class BounceSim extends Canvas implements Runnable {
         screen_height = h;
         size = BODY_SIZE_MIN;       //size_constraint = SIZE_MAX; calculate constraint on setting of the size
         pos = new Vec2(screen_width/2, screen_height/2); 
-        vel = new Vec2(1, 1);
+        vel = new Vec2(5, 5);
         render_circle = false;  // Start as rect, with tails.
         render_tail = false;
         render_clear = false;
@@ -273,10 +273,11 @@ class BounceSim extends Canvas implements Runnable {
 
     public void run() {
         for (int i = 0; i < 1000; i++) {
+            pos.add(vel);           // Add velocity, then allow collision detection to restrict bounds. Otherwise, collision frames would not be drawn.
             process_collisions();
-            pos.add(vel);
+            // could have process collisions return the next position
             repaint();
-            try { Thread.sleep(10); }
+            try { Thread.sleep(sim_delay); }
             catch (InterruptedException e) { System.out.println(e); } // should remove
         }
 
@@ -287,12 +288,13 @@ class BounceSim extends Canvas implements Runnable {
 
     // Checks ball position on next tick. Constraints within bounds, and reflects velocity on collision.
     public void process_collisions() {
-        Vec2 next_pos = Vec2.add(pos, vel);
+        //Vec2 next_pos = Vec2.add(pos, vel);
         // If next position outside bounds, move current position within bounds and reflect related velocity component.
-        if (next_pos.x <= 0) { pos.x = 0; vel.x = -vel.x; }
-        else if (next_pos.x >= screen_width-size) { pos.x = screen_width-size; vel.x = -vel.x; } // should find way to make pos.x whatever it's closest too, could use math library
-        if (next_pos.y <= 0) { pos.y = 0; vel.y = -vel.y; }
-        else if (next_pos.y >= screen_height-size) { pos.y = screen_height-size; vel.y = -vel.y; } // should find way to make pos.x whatever it's closest too, could use math library
+        // (minus 1 for boarder width) (should that be its own var?)
+        if (pos.x < 1) { pos.x = 1; vel.x = -vel.x; }
+        else if (pos.x > screen_width-size-1) { pos.x = screen_width-size-1; vel.x = -vel.x; } // should find way to make pos.x whatever it's closest too, could use math library
+        if (pos.y < 1) { pos.y = 1; vel.y = -vel.y; }
+        else if (pos.y > screen_height-size-1) { pos.y = screen_height-size-1; vel.y = -vel.y; } // should find way to make pos.x whatever it's closest too, could use math library
     }
 
 
@@ -323,8 +325,11 @@ class BounceSim extends Canvas implements Runnable {
 
         // Top left coordinates from center pixel position
         
-        int tl_x = (int)Math.round(pos.x-((size-1)/2));
-        int tl_y = (int)Math.round(pos.y-((size-1)/2));
+        //int tl_x = (int)Math.round(pos.x-((size-1)/2));
+        //int tl_y = (int)Math.round(pos.y-((size-1)/2));
+        
+        int tl_x = (int)Math.round(pos.x);
+        int tl_y = (int)Math.round(pos.y);
 
         // Draw shape, depending on shape (true is rectangle, false is oval)
         if (render_circle) {        // Could call is_rect() instead, would be more readable.
