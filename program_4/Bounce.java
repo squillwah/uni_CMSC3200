@@ -239,7 +239,7 @@ class BounceSim extends Canvas implements Runnable {
     public final int SIM_DELAY_MIN = 10;    // 100hz
     public final int SIM_DELAY_MAX = 100;   // 10hz
     public final int BODY_SIZE_MIN = 10;
-    public final int BODY_SIZE_MAX = 250;
+    public final int BODY_SIZE_MAX = 150;
 
     private int screen_width, screen_height;
     
@@ -252,9 +252,9 @@ class BounceSim extends Canvas implements Runnable {
     private boolean render_circle;  // Render the body as a circle. Otherwise drawn as square.
     private boolean render_tail;    // Keep tails (don't erase last frame's shape).
 
-    // State of bouncing body:
-    private int size;   // From top left, width and height.
-    private Vec2 pos;
+    // Bouncing body:
+    private int size;   // Expands outward from center. 
+    private Vec2 pos;   // Relative to center pixel.
     private Vec2 vel;   // Pixels per tick.
 
     public BounceSim(int w, int h) {
@@ -274,37 +274,42 @@ class BounceSim extends Canvas implements Runnable {
     public void run() {
         for (int i = 0; i < 1000; i++) {
             pos.add(vel);           // Add velocity, then allow collision detection to restrict bounds. Otherwise, collision frames would not be drawn.
-            process_collisions();
-            // could have process collisions return the next position
+            process_collisions();   
+            // could have process collisions return the next position   // or could return vector with overstep from bounds, then just use that as the vel shrink and the flag to restrict pos
+            /*Vec2 overstep = process_screen_collisions();
+            if (overstep != null) {
+                double shrink = Math.abs(Math.max(overstep.x/vel.x, overstep.y/vel.y)); // Add velocity to position, shrunk to the maximum magnitude which remains within bounds of the screen.
+                pos.add((new Vec2(vel)).mul(shrink));
+                if (overstep.x != 0) vel.x = -vel.x;
+                if (overstep.y != 0) vel.y = -vel.y;
+            } else { 
+                pos.add(vel);
+            }*/
             repaint();
             try { Thread.sleep(sim_delay); }
             catch (InterruptedException e) { System.out.println(e); } // should remove
         }
-
-        // check_collision();
-        // pos.add(vel);
-        // draw_body();
     }
 
-    // Checks ball position on next tick. Constraints within bounds, and reflects velocity on collision.
+    // Checks next position. 
+    // If collision is detected, current position is moved to the farthest point possible along 
+    // it's velocity vector, and the corresponding velocity components are reflected.
+    // True is returned, to signify that a collision was detected and that the necessary
+    // pos and vel adjustments have been made.
     public void process_collisions() {
-        //Vec2 next_pos = Vec2.add(pos, vel);
-        // If next position outside bounds, move current position within bounds and reflect related velocity component.
-        // (minus 1 for boarder width) (should that be its own var?)
-        if (pos.x < 1) { pos.x = 1; vel.x = -vel.x; }
-        else if (pos.x > screen_width-size-1) { pos.x = screen_width-size-1; vel.x = -vel.x; } // should find way to make pos.x whatever it's closest too, could use math library
-        if (pos.y < 1) { pos.y = 1; vel.y = -vel.y; }
-        else if (pos.y > screen_height-size-1) { pos.y = screen_height-size-1; vel.y = -vel.y; } // should find way to make pos.x whatever it's closest too, could use math library
+        //Vec2 next_pos = Vec2.add(pos, vel);       what problem am I even trying to solve? We want check then move, not move then check.
+        if (pos.x < 1+size+1) { pos.x = 1+size+1; vel.x = -vel.x; }
+        else if (pos.x > screen_width-size-1-1) { pos.x = screen_width-size-1-1; vel.x = -vel.x; }
+
+        if (pos.y < 1+size+1) { pos.y = 1+size+1; vel.y = -vel.y; }
+        else if (pos.y > screen_height-size-1-1) { pos.y = screen_height-size-1-1; vel.y = -vel.y; }
     }
-
-
 
     public void resize_screen(int w, int h) { 
         screen_width = w; screen_height = h; 
         setSize(screen_width, screen_height);
-        //pos.x = screen_width/2; 
-        //pos.y = screen_height/2;   // Recalculate center pos as well.
     }    
+    
     public int get_width() { return screen_width; }
     public int get_height() { return screen_height; }
 
@@ -323,25 +328,18 @@ class BounceSim extends Canvas implements Runnable {
             g.drawRect(0, 0, screen_width-1, screen_height-1);    // Redraw the red boarder.
         }
 
-        // Top left coordinates from center pixel position
-        
-        //int tl_x = (int)Math.round(pos.x-((size-1)/2));
-        //int tl_y = (int)Math.round(pos.y-((size-1)/2));
-        
-        int tl_x = (int)Math.round(pos.x);
-        int tl_y = (int)Math.round(pos.y);
-
-        // Draw shape, depending on shape (true is rectangle, false is oval)
-        if (render_circle) {        // Could call is_rect() instead, would be more readable.
+        int tl_x = (int)Math.round(pos.x-1-size);  // Top left position from center pixel, rounding subpixel to pixel precision. 
+        int tl_y = (int)Math.round(pos.y-1-size);
+        if (render_circle) {       
             g.setColor(Color.lightGray);
-            g.fillOval(tl_x, tl_y, size, size); 
+            g.fillOval(tl_x, tl_y, size*2+1, size*2+1); 
             g.setColor(Color.black);
-            g.drawOval(tl_x, tl_y, size-1, size-1);
+            g.drawOval(tl_x, tl_y, size*2+1, size*2+1);
         } else {
             g.setColor(Color.lightGray);
-            g.fillRect(tl_x, tl_y, size, size); // Outline
+            g.fillRect(tl_x, tl_y, size*2+1, size*2+1);
             g.setColor(Color.black);
-            g.drawRect(tl_x, tl_y, size-1, size-1);
+            g.drawRect(tl_x, tl_y, size*2+1, size*2+1);
         }
     }
 
@@ -352,39 +350,6 @@ class BounceSim extends Canvas implements Runnable {
         update(g);
     }
 
-    /*
-    // Adjust speed between SPEED_MIN and SPEED_MAX, given the percentage between them. 
-    // Returns the new speed (or should it be the percentage?).
-    //  (0.01 == SPEED_MIN, 1 == SPEED_MAX) 
-    public double gradiate_speed(double percentage) { 
-        if (percentage >= 1) percentage = 1;
-        else if (percentage <= 0.01) percentage = 0.01; 
-        speed = (int)((SPEED_MAX-SPEED_MIN) * percentage + SPEED_MIN);
-
-        System.out.println("Speed: " + speed + " | " + percentage + "%");
-
-        return percentage; // or speed? Could calculate percentage at scrollbar set.
-    }
-    // Adjust size between MIN and MAX, given the percentage between them. 
-    // Restricts size to size_constraint. Returns new size;
-    public double gradiate_size(double percentage) {
-
-        // Could caluclate size constraint here, with ball pos and screen w/h
-        // would be better than storing the variable and updating every move
-
-        if (percentage >= 1) percentage = 1;
-        else if (percentage <= 0.01) percentage = 0.01; 
-        size = (int)((SIZE_MAX-SIZE_MIN) * percentage + SIZE_MIN);
-        if (size > size_constraint) {
-            size = size_constraint;
-            percentage = (double)(size-SIZE_MIN) / (SIZE_MAX-SIZE_MIN);
-        }
-
-        System.out.println("Size: " + size + " | " + percentage + "%");
-
-        return percentage;
-    }*/
-
     // Set simulation delay and body size, with bounds checking.
     public void set_sim_delay(int ms) {
         if (ms < SIM_DELAY_MIN) ms = SIM_DELAY_MIN;
@@ -394,10 +359,9 @@ class BounceSim extends Canvas implements Runnable {
     public void set_body_size(int px) {
         if (px < BODY_SIZE_MIN) px = BODY_SIZE_MIN;
         else if (px > BODY_SIZE_MAX) px = BODY_SIZE_MAX;
-        // Disallow expanding outside screen from current position.
-        if ((screen_width-pos.x+px) * (screen_height-pos.y+px) <= 0)
-            px = (int)Math.round(Math.min(screen_width-pos.x-1, screen_height-pos.y-1)); // do we need the safety pixel?
-        size = px;
+        size = px;  
+        // Collision detection in the run thread should catch any boundery breaks.
+        //process_collisions();
     }
     public int get_sim_delay() { return sim_delay; }
     public int get_body_size() { return size; }
@@ -424,45 +388,3 @@ class Vec2 {
 
 }
 
-
-
-
-
-/*
-    
-    public static double adjust_percent(double perc) {
-        // Handle oob percentages
-        int MIN = 235;
-        int MAX = 512;
-
-        // Set value to range between min and max:
-        int value;
-        if (perc >= 1) value = MAX;
-        else if (perc <= 0) value = MIN;
-        else value = (int)((MAX-MIN) * perc + MIN);
-
-        // If requested percent is greater than the current constraint, constrain:
-        int constraint = 420;
-        if (value > constraint) {
-            value = constraint;
-            perc = (double)(constraint-MIN) / (MAX-MIN);
-        }
-
-        System.out.println(value);
-        return perc;
-
-        *
-        int value = MIN + (MAX-MIN)/perc;
-
-        int constraint = 420;
-
-        if (value > constraint) {
-            value = constraint;
-            perc = (MAX-MIN)/(constraint-MIN);
-        }
-
-        System.out.println(value);
-        return perc;
-        *
-    
-*/
