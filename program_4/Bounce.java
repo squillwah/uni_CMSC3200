@@ -199,7 +199,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             // Updates value within screen, and sets scrollbar to the returned percentage (size may be restricted).
             bar.setValue((int)(gradiate_body_size(bar.getValue()/100.0)*100));
             update_size_label();
-            bsim.repaint();
+            //bsim.repaint(); repainting here will cause ghosting in no trail mode
         }
     }
 
@@ -220,18 +220,18 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
     // Set the simulation delay to the percentange 'p' between SIM_DELAY_MIN and SIM_DELAY_MAX.
     // Returns the percentage achieved, as depending on the body state things might not work out so good.
-    public double gradiate_sim_delay(double p) {
+    /*public double gradiate_sim_delay(double p) {
         bsim.set_sim_delay((int)(bsim.SIM_DELAY_MIN+((bsim.SIM_DELAY_MAX-bsim.SIM_DELAY_MIN)*p)));
         System.out.println("Speed: " + bsim.get_sim_delay() + " | " + ((double)(bsim.get_sim_delay()-bsim.SIM_DELAY_MIN) / (bsim.SIM_DELAY_MAX-bsim.SIM_DELAY_MIN)) + "%");
         return (double)(bsim.get_sim_delay()-bsim.SIM_DELAY_MIN) / (bsim.SIM_DELAY_MAX-bsim.SIM_DELAY_MIN);
-    }
+    }*/
     public double gradiate_body_size(double p) {
-        bsim.set_body_size((int)(bsim.BODY_SIZE_MIN+((bsim.BODY_SIZE_MAX-bsim.BODY_SIZE_MIN)*p)));
-        System.out.println("Size: " + bsim.get_body_size() + " | " + ((double)(bsim.get_body_size()-bsim.BODY_SIZE_MIN) / (bsim.BODY_SIZE_MAX-bsim.BODY_SIZE_MIN)) + "%");
-        return (double)(bsim.get_body_size()-bsim.BODY_SIZE_MIN) / (bsim.BODY_SIZE_MAX-bsim.BODY_SIZE_MIN);
+        bsim.body_set_size((int)(bsim.BODY_SIZE_MIN+((bsim.BODY_SIZE_MAX-bsim.BODY_SIZE_MIN)*p)));
+        System.out.println("Size: " + bsim.body_get_size() + " | " + ((double)(bsim.body_get_size()-bsim.BODY_SIZE_MIN) / (bsim.BODY_SIZE_MAX-bsim.BODY_SIZE_MIN)) + "%");
+        return (double)(bsim.body_get_size()-bsim.BODY_SIZE_MIN) / (bsim.BODY_SIZE_MAX-bsim.BODY_SIZE_MIN);
     }
     private void update_speed_label() {
-        int val = sb_speed.getValue();
+        int val = sb_tickrate.getValue();
         if (val == 100) sb_speed_lbl.setText(("Speed (MAX%)"));
         else if (val == 1) sb_speed_lbl.setText(("Speed (MIN%)"));
         else sb_speed_lbl.setText(("Speed (" + val + "%)"));
@@ -249,21 +249,33 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 class BounceSim extends Canvas implements Runnable {
     private static final long serialVersionUID = 11L;
 
-    public final int SIM_DELAY_MIN = 10;    // 100hz
-    public final int SIM_DELAY_MAX = 100;   // 10hz
+    public final int SIM_TICKRATE_MIN = 1;
+    public final int SIM_TICKRATE_MAX = 100;
+    
+    public final Vec2 BODY_VEL_INITIAL = new Vec2(1, 1);
+    public final double BODY_VEL_MULTIPLIER_MIN = 0.01;
+    public final double BODY_VEL_MULTIPLIER_MAX = 50;
+    
     public final int BODY_SIZE_MIN = 10;
     public final int BODY_SIZE_MAX = 150;
 
     private int screen_width, screen_height;
-    
-    private Thread sim_thread;  // Thread for bouncing simulation.
+  
+    // Sim settings: 
+    private int sim_delay;      // Milleseconds delay between ticks, 1000/tickrate.
+    private int sim_tickrate; 
+    private Thread sim_thread;
     private boolean sim_paused;
-    private int sim_delay;      // Delay between ticks, milliseconds.
 
     // Render flags: 
     private boolean render_clear;   // Clear the canvas on next draw. Resets self.
     private boolean render_circle;  // Render the body as a circle. Otherwise drawn as square.
     private boolean render_tail;    // Keep tails (don't erase last frame's shape).
+   
+    // State of previous frame object, for use in tail erasure/shape changes. 
+    private boolean notail_circle;
+    private int notail_x, notail_y; 
+    private int notail_size;    
 
     // Bouncing body:
     private int size;   // Expands outward from center. 
@@ -271,36 +283,69 @@ class BounceSim extends Canvas implements Runnable {
     private Vec2 vel;   // Pixels per tick.
 
     public BounceSim(int w, int h) {
-        sim_delay = SIM_DELAY_MIN;
-        screen_width = w;
-        screen_height = h;
-        size = BODY_SIZE_MIN;       //size_constraint = SIZE_MAX; calculate constraint on setting of the size
-        pos = new Vec2(screen_width/2, screen_height/2); 
-        vel = new Vec2(5, 5);
+        screen_width = w; screen_height = h;
+        
+        sim_tickrate = 10;
+        sim_delay = 1000/sim_tickrate;
+
+        size = BODY_SIZE_MIN;
+        pos = new Vec2(screen_width/4, screen_height/4);
+        vel = new Vec2(BODY_VEL_INITIAL);
+
         render_circle = false;  // Start as rect, with tails.
-        render_tail = false;
+        render_tail = true;
         render_clear = false;
+        notail_x = (int)Math.round(pos.x);
+        notail_y = (int)Math.round(pos.y);
+        notail_size = size;
+        notail_circle = render_circle;
+        
         sim_thread = new Thread(this);
         sim_thread.start();
     }
 
     public void run() {
         for (int i = 0; i < 1000; i++) {
-            pos.add(vel);           // Add velocity, then allow collision detection to restrict bounds. Otherwise, collision frames would not be drawn.
-            process_collisions();   
-            // could have process collisions return the next position   // or could return vector with overstep from bounds, then just use that as the vel shrink and the flag to restrict pos
-            /*Vec2 overstep = process_screen_collisions();
-            if (overstep != null) {
-                double shrink = Math.abs(Math.max(overstep.x/vel.x, overstep.y/vel.y)); // Add velocity to position, shrunk to the maximum magnitude which remains within bounds of the screen.
-                pos.add((new Vec2(vel)).mul(shrink));
-                if (overstep.x != 0) vel.x = -vel.x;
-                if (overstep.y != 0) vel.y = -vel.y;
-            } else { 
-                pos.add(vel);
-            }*/
-            repaint();
+            //last_pos_x = (int)Math.round(pos.x);
+            //last_pos_y = (int)Math.round(pos.y);
+            //Vec2 old_pos = new Vec2(pos); 
+            //if (!render_tail) erase();
+
+            //pos.add(vel);           // Add velocity, then allow collision detection to restrict bounds. Otherwise, collision frames would not be drawn.
+           
+            // Calculate the next position of the body with current velocity. Accomdates collisions, keeping next position in bounds and reflecting velocity components accordingly. 
+            Vec2 next_pos = process_collisions();    // Returns next position, constrained within bounds if current 'vel' made it go over. Also flipps vel component if collision detected.
+            //if (next_pos.equals(pos))   // If next position is same, no collision was detected and no constrainments made. Add velocity (advance position).
+            //    next_pos.add(vel);
+            //if (!next_pos.equals(pos)) { // Only bother drawing if the next position moved between pixels. Don't fucking touch if its only subpixel. Fuck you awt.
+
+            // Draw next position only if it moved beyond the subpixel.
+            if (!((int)next_pos.x == (int)pos.x && (int)next_pos.y == (int)pos.y)) {
+                //if (!render_tail) erase();
+                pos = next_pos;
+                repaint();
+            }
             try { Thread.sleep(sim_delay); }
             catch (InterruptedException e) { System.out.println(e); } // should remove
+
+            //Vec2 new_pos = process_collisions();   
+            //if ((int)new_pos.x == (int)pos.x && (int)new_pos.y == (int)pos.y) // No collison detected.
+            //   new_pos.add(vel);
+            //else 
+            //    if (!render_tail) erase();
+            // could have process collisions return the next position   // or could return vector with overstep from bounds, then just use that as the vel shrink and the flag to restrict pos
+            //*Vec2 overstep = process_screen_collisions();
+            //if (overstep != null) {
+            //    double shrink = Math.abs(Math.max(overstep.x/vel.x, overstep.y/vel.y)); // Add velocity to position, shrunk to the maximum magnitude which remains within bounds of the screen.
+            //    pos.add((new Vec2(vel)).mul(shrink));
+            //    if (overstep.x != 0) vel.x = -vel.x;
+            //    if (overstep.y != 0) vel.y = -vel.y;
+            //} else { 
+            //    pos.add(vel);
+            //}*/
+            //repaint();
+            //try { Thread.sleep(sim_delay); }
+            //catch (InterruptedException e) { System.out.println(e); } // should remove
         }
     }
 
@@ -309,13 +354,13 @@ class BounceSim extends Canvas implements Runnable {
     // it's velocity vector, and the corresponding velocity components are reflected.
     // True is returned, to signify that a collision was detected and that the necessary
     // pos and vel adjustments have been made.
-    public void process_collisions() {
-        //Vec2 next_pos = Vec2.add(pos, vel);       what problem am I even trying to solve? We want check then move, not move then check.
-        if (pos.x < 1+size+1) { pos.x = 1+size+1; vel.x = -vel.x; }
-        else if (pos.x > screen_width-size-1-1) { pos.x = screen_width-size-1-1; vel.x = -vel.x; }
-
-        if (pos.y < 1+size+1) { pos.y = 1+size+1; vel.y = -vel.y; }
-        else if (pos.y > screen_height-size-1-1) { pos.y = screen_height-size-1-1; vel.y = -vel.y; }
+    public Vec2 process_collisions() {
+        Vec2 next_pos = Vec2.add(pos, vel);       //what problem am I even trying to solve? We want check then move, not move then check.
+        if (next_pos.x < 1+size+1) { next_pos.x = 1+size+1; vel.x = -vel.x; }
+        else if (next_pos.x > screen_width-size-1-1) { next_pos.x = screen_width-size-1-1; vel.x = -vel.x; }
+        if (next_pos.y < 1+size+1) { next_pos.y = 1+size+1; vel.y = -vel.y; }
+        else if (next_pos.y > screen_height-size-1-1) { next_pos.y = screen_height-size-1-1; vel.y = -vel.y; }
+        return next_pos;
     }
 
     public void resize_screen(int w, int h) { 
@@ -328,9 +373,18 @@ class BounceSim extends Canvas implements Runnable {
 
     public void clear() { render_clear = true; }
     public boolean is_circle() { return render_circle; }  
-    public void set_circle(boolean c) { render_circle = c; }
+    public void set_circle(boolean c) { notail_circle = render_circle; render_circle = c; }
     public boolean has_tail() { return render_tail; }
     public void set_tail(boolean t) { render_tail = t; }
+
+    public void erase() {
+        //render_erase = true;
+        update(getGraphics()); 
+        //repaint();
+        //g.setColor(Color.white);
+        //if (render_circle) g.fillOval(tl_x, tl_y, size*2+5, size*2+5);
+        //else g.fillRect(tl_x, tl_y, size*2+5, size*2+5);
+    }
 
     // Use update to draw graphics instead of paint (remove screen wipes).
     public void update(Graphics g) {
@@ -341,8 +395,26 @@ class BounceSim extends Canvas implements Runnable {
             g.drawRect(0, 0, screen_width-1, screen_height-1);    // Redraw the red boarder.
         }
 
+        if (!render_tail) {
+            g.setColor(Color.white);//getBackground());
+            if (notail_circle) g.fillOval(notail_x-1-notail_size-1, notail_y-1-notail_size-1, notail_size*2+4, notail_size*2+4);
+            else g.fillRect(notail_x-1-notail_size, notail_y-1-notail_size, notail_size*2+4, notail_size*2+4);
+            System.out.println("HASS");
+        }
+        
         int tl_x = (int)Math.round(pos.x-1-size);  // Top left position from center pixel, rounding subpixel to pixel precision. 
         int tl_y = (int)Math.round(pos.y-1-size);
+        
+        
+        
+        //if (render_erase) {
+        //    g.setColor(Color.white);
+        //    if (render_circle) g.fillOval(tl_x, tl_y, size*2+5, size*2+5);
+        //    else g.fillRect(tl_x, tl_y, size*2+5, size*2+5);
+        //    render_erase = false;
+        //    System.out.println("erasing");
+        //} else {
+        System.out.println("drwaing");
         if (render_circle) {       
             g.setColor(Color.lightGray);
             g.fillOval(tl_x, tl_y, size*2+1, size*2+1); 
@@ -354,7 +426,13 @@ class BounceSim extends Canvas implements Runnable {
             g.setColor(Color.black);
             g.drawRect(tl_x, tl_y, size*2+1, size*2+1);
         }
+        //}
+
+        notail_x = (int)Math.round(pos.x);
+        notail_y = (int)Math.round(pos.y);
+        notail_circle = render_circle;
     }
+
 
     // Override paint to draw the red boarder and call update (os will trigger a paint occasionally).
     public void paint(Graphics g) {
@@ -364,20 +442,41 @@ class BounceSim extends Canvas implements Runnable {
     }
 
     // Set simulation delay and body size, with bounds checking.
-    public void set_sim_delay(int ms) {
+/*    public void set_sim_delay(int ms) {
         if (ms < SIM_DELAY_MIN) ms = SIM_DELAY_MIN;
         else if (ms > SIM_DELAY_MAX) ms = SIM_DELAY_MAX;
         sim_delay = ms;
+    }*/
+    public void sim_set_tickrate(int tps) {
+        if (tps < SIM_TICKRATE_MIN) tps = SIM_TICKRATE_MIN;
+        else if (tps > SIM_TICKRATE_MAX) tps = SIM_TICKRATE_MAX;
+        sim_tickrate = tps;
+        sim_delay = (int)Math.round(1000/tps);
     }
-    public void set_body_size(int px) {
+    public void body_set_size(int px) {
         if (px < BODY_SIZE_MIN) px = BODY_SIZE_MIN;
         else if (px > BODY_SIZE_MAX) px = BODY_SIZE_MAX;
+        //erase();
+        notail_size = size;
         size = px;  
+        repaint();
+        //render_erase = true;
+        //repaint();
         // Collision detection in the run thread should catch any boundery breaks.
         //process_collisions();
     }
-    public int get_sim_delay() { return sim_delay; }
-    public int get_body_size() { return size; }
+//    public void body_set_velocity(double v) {
+//        if (v < BODY_VEL_MIN) v = BODY_VEL_MIN;
+//        else if (v > BODY_VEL_MAX) v = BODY_VEL_MAX;
+//        vel.x = vel.y = v;
+//
+//    }
+//    public double body_set_velocity_multiplier() {}
+//    public double body get_velocity_multiplier() {}
+
+    public int body_get_size() { return size; }
+    public double body_get_velocty() { return vel.x; }
+    public int sim_get_tickrate() { return sim_tickrate; }
 
 }
 
