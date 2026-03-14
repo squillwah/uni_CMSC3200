@@ -210,7 +210,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             //bsim.repaint(); repainting here will cause ghosting in no trail mode
         }
     }
-
     
     public void windowClosed(WindowEvent e) {}
     public void windowOpened(WindowEvent e) {}
@@ -224,6 +223,44 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
     public static void main(String args[]) {
         new Bounce(800, 600);
+    }
+
+    // Set values/scrolls to the given percent along their MINs/MAXs. 
+    public void adjust_tickrate(double percent) {
+        percent = Util.restrict_bounds(percent, 0.01, 1);
+        int new_tickrate = (int)Math.round(Util.relate_bounds(percent, 0.01, 1, bsim.SIM_TICKRATE_MIN, bsim.SIM_TICKRATE_MAX));
+
+        bsim.sim_set_tickrate(new_tickrate);
+        
+        sb_tickrate.setValue(Util.relate_bounds(new_tickrate, bsim.SIM_TICKRATE_MIN, bsim.SIM_TICKRATE_MAX, sb_tickrate.getMinimum(), sb_tickrate.getMaximum()-sb_tickrate.getVisibleAmount()));
+        sb_tickrate_lbl.setText("Tickrate: " + new_tickrate + "t/s");
+    }
+    public void adjust_velocity(double percent) {
+        percent = Util.restrict_bounds(percent, 0.01, 1);
+        double magnitude = Util.relate_bounds(percent, 0.01, 1, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX);
+        
+        // Preserve vector heading.
+        Vec2 new_vel = bsim.body_get_velocity(); 
+        new_vel.x /= Math.abs(new_vel.x); 
+        new_vel.y /= Math.abs(new_vel.y);
+        // Adjust velocity magnitude, given the percentage between VEL_MIN and VEL_MAX.
+        // (equal components, assuming movement is always perfectly diagonal).
+        new_vel.mul(Math.sqrt((magnitude*magnitude/2)));
+        bsim.body_set_velocity(new_vel);
+
+        // Update scrollbar
+        sb_velocity.setValue((int)Math.round(Util.relate_bounds(magnitude, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
+        sb_velocity_lbl.setText("Velocity: " + magnitude + "px/t");
+    }
+    public void adjust_size(double percent) { 
+        percent = Util.restrict_bounds(percent, 0.01, 1);
+        int new_size = (int)Math.round(Util.relate_bounds(percent, 0.01, 1, bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX));
+        
+        bsim.body_set_size(new_size);
+        new_size = bsim.body_get_size(); // Size may have been restricted below SIZE_MAX if object was close to screen edge.
+        
+        sb_size.setValue(Util.relate_bounds(new_size, bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
+        sb_size_lbl.setText("Size: " + new_size*2+1 + "px");
     }
 
     // Set the simulation delay to the percentange 'p' between SIM_DELAY_MIN and SIM_DELAY_MAX.
@@ -246,7 +283,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     }
     private void update_velocity_label() {
         int val = sb_velocity.getValue();
-        sb_velocity_lbl.setText("Velocity: " + bsim.body_get_velocity() + "ppt");
+        sb_velocity_lbl.setText("Velocity: " + bsim.body_get_velocity().x + "ppt");
     }
     private void update_size_label() {
         int val = sb_size.getValue();
@@ -265,9 +302,10 @@ class BounceSim extends Canvas implements Runnable {
     public final int SIM_TICKRATE_MAX = 100;
     
     public final Vec2 BODY_VEL_INITIAL = new Vec2(1, 1);
-    public final double BODY_VEL_MULTIPLIER_MIN = 0.01;
-    public final double BODY_VEL_MULTIPLIER_MAX = 50;
-    
+    public final double BODY_VEL_MIN = 0.01;   // sqrt(x^2 + y^2)
+    public final double BODY_VEL_MAX = 10;
+    //public final double BODY_VEL_MULTIPLIER_MIN = 0.01;
+    //public final double BODY_VEL_MULTIPLIER_MAX = 50;
     public final int BODY_SIZE_MIN = 10;
     public final int BODY_SIZE_MAX = 150;
 
@@ -463,10 +501,10 @@ class BounceSim extends Canvas implements Runnable {
         sim_tickrate = util_restrict_bounds(tps, SIM_TICKRATE_MIN, SIM_TICKRATE_MAX);
         sim_delay = (int)Math.round(1000/sim_tickrate);
     }
-    public void body_set_velocity_multiplier(double v) {
+    public void body_set_velocity_multiplier(double v) {    // deperecated
         //vel.mul(BODY_VEL_INITIAL.x/vel.x*v); // Scale vel to match initial * v
 //        vel.x/BODY_VEL_INITIAL.x
-        vel = Vec2.mul((new Vec2(vel.x/vel.x*BODY_VEL_INITIAL.x, vel.y/vel.y*BODY_VEL_INITIAL.y)), util_restrict_bounds(v, BODY_VEL_MULTIPLIER_MIN, BODY_VEL_MULTIPLIER_MAX));
+        vel = Vec2.mul((new Vec2(vel.x/vel.x*BODY_VEL_INITIAL.x, vel.y/vel.y*BODY_VEL_INITIAL.y)), util_restrict_bounds(v, .1, 10)); //BODY_VEL_MULTIPLIER_MIN, BODY_VEL_MULTIPLIER_MAX));
         // ^ initial velocity, with current direction applied, times the multiplier.
         //Vec2(vel.x/vel.x*BODY_VEL_INITIAL.x, vel.y/vel.y*BODY_VEL_INITIAL.y),)
 
@@ -477,9 +515,13 @@ class BounceSim extends Canvas implements Runnable {
         notail_size = size;
         size = util_restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
     }
+    public void body_set_velocity(Vec2 new_vel) {
+        vel.x = new_vel.x; vel.y = new_vel.y;
+    }
 
     public int sim_get_tickrate() { return sim_tickrate; }
-    public double body_get_velocity() { return Math.round(Math.sqrt(vel.x*vel.x+vel.y+vel.y)*100)/100.0; }
+    //public double body_get_velocity() { return Math.round(Math.sqrt(vel.x*vel.x+vel.y+vel.y)*100)/100.0; }
+    public Vec2 body_get_velocity() { return (new Vec2(vel)); }
     public int body_get_size() { return size; }
 }
 
@@ -506,5 +548,23 @@ class Vec2 {
         return product;
     }
 
+}
+
+class Util {
+    private Util() {}
+
+    // Templates?
+    public static int restrict_bounds(int num, int lower, int upper) {
+        if (num < lower) num = lower; else if (num > upper) num = upper; return num;
+    }
+    public static double restrict_bounds(double num, double lower, double upper) {
+        if (num < lower) num = lower; else if (num > upper) num = upper; return num;
+    }
+    public static int relate_bounds(int num, int low1, int up1, int low2, int up2) {
+        return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
+    }
+    public static double relate_bounds(double num, double low1, double up1, double low2, double up2) {
+        return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
+    }
 }
 
