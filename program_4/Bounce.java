@@ -196,18 +196,21 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         Scrollbar bar = (Scrollbar)e.getSource();
         if (bar == sb_tickrate) {
             //bar.setValue((int)(gradiate_sim_delay(bar.getValue()/100.0)*100));
-            bsim.sim_set_tickrate(bar.getValue());
-            update_tickrate_label();
+//            bsim.sim_set_tickrate(bar.getValue());
+//            update_tickrate_label();
+            adjust_tickrate(bar.getValue()/100.0);
         } else
         if (bar == sb_velocity) {
-            bsim.body_set_velocity_multiplier(bar.getValue()/10.0);       //temp
-            update_velocity_label();
+//            bsim.body_set_velocity_multiplier(bar.getValue()/10.0);       //temp
+//            update_velocity_label();
+            adjust_velocity(bar.getValue()/100.0);
         } else
         if (bar == sb_size) {
             // Updates value within screen, and sets scrollbar to the returned percentage (size may be restricted).
-            bar.setValue((int)(gradiate_body_size(bar.getValue()/100.0)*100));
-            update_size_label();
+//            bar.setValue((int)(gradiate_body_size(bar.getValue()/100.0)*100));
+//            update_size_label();
             //bsim.repaint(); repainting here will cause ghosting in no trail mode
+            adjust_size(bar.getValue()/100.0);
         }
     }
     
@@ -250,7 +253,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
         // Update scrollbar
         sb_velocity.setValue((int)Math.round(Util.relate_bounds(magnitude, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
-        sb_velocity_lbl.setText("Velocity: " + magnitude + "px/t");
+        sb_velocity_lbl.setText("Velocity: " + Math.round(magnitude*100)/100.0 + "px/t");
     }
     public void adjust_size(double percent) { 
         percent = Util.restrict_bounds(percent, 0.01, 1);
@@ -561,10 +564,15 @@ class Util {
         if (num < lower) num = lower; else if (num > upper) num = upper; return num;
     }
     public static int relate_bounds(int num, int low1, int up1, int low2, int up2) {
-        return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
+        return (int)Math.round(relate_bounds((double)num, low1, up1, low2, up2)); // @jank, nuneeded
+        //System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
+        //return low2 + ((up2-low2) * ((num-low1)/(up1-low1))); ! causes issues, always returns 1 because ints, use the double instead.
     }
     public static double relate_bounds(double num, double low1, double up1, double low2, double up2) {
+        System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
         return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
     }
+
+    // might be better to have a seperate relate_bounds_round() or smthn
 }
 
