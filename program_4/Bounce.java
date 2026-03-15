@@ -1,4 +1,10 @@
-
+// // [CMSC3200] Technical Computing Using Java
+// Program 4: Bounce
+// Bounce object application. A body bounces around the screen, off of the walls and itself, with user control over body shape, size, velocity, and simulation tickrate.
+//
+// Group 2
+// Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
+// SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
 package Bounce;
 
 import java.awt.*;
@@ -71,7 +77,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         bt_start = new Button("Run");       add(bt_start);  bt_start.addActionListener(this);
         bt_shape = new Button("Circle");    add(bt_shape);  bt_shape.addActionListener(this);
         bt_clear = new Button("Clear");     add(bt_clear);  bt_clear.addActionListener(this);
-        bt_tail = new Button("No Toil");    add(bt_tail);   bt_tail.addActionListener(this);
+        bt_tail = new Button("Tail");       add(bt_tail);   bt_tail.addActionListener(this);
         bt_quit = new Button("Quit");       add(bt_quit);   bt_quit.addActionListener(this);
         sb_tickrate = new Scrollbar(Scrollbar.HORIZONTAL);  add(sb_tickrate);   sb_tickrate.addAdjustmentListener(this);
         sb_velocity = new Scrollbar(Scrollbar.HORIZONTAL);  add(sb_velocity);   sb_velocity.addAdjustmentListener(this);
@@ -81,16 +87,11 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         Scrollbar[] bars = {sb_size, sb_tickrate, sb_velocity};
         for (Scrollbar bar : bars) { bar.setMaximum(120); bar.setMinimum(1); bar.setUnitIncrement(5); bar.setBlockIncrement(10); bar.setVisibleAmount(20); bar.setBackground(Color.gray); }
         
-        //sb_speed.setValue((int)(gradiate_sim_delay(.5)*100));    // Attempt to set scrolls at 50%.
-        sb_tickrate.setValue(50);    // Attempt to set scrolls at 50%.
-        sb_tickrate_lbl = new Label((""), Label.CENTER);    add(sb_tickrate_lbl);   update_tickrate_label();
-        
-        sb_velocity.setValue(1);
-        sb_velocity_lbl = new Label((""), Label.CENTER);    add(sb_velocity_lbl);   update_velocity_label();
-        
-        sb_size.setValue((int)(gradiate_body_size(.5)*100));
-        sb_size_lbl = new Label((""), Label.CENTER);    add(sb_size_lbl);   update_size_label();
-        
+        //  adjusting scrollbar speed and size to match initial values
+        adjust_tickrate(0.5);
+        adjust_velocity(0.01);
+        adjust_size(0.5);
+
         // Add self as component/window event listener. Always do this last.
         this.addComponentListener(this);
         this.addWindowListener(this);
@@ -134,7 +135,10 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         bsim.setLocation(margins.left, margins.top); //margins.top, margins.left);
         bsim.resize_screen(window_width - margins.left - margins.right, window_height - margins.top - margins.bottom - conpan_size);
         
-        System.out.println("hello");
+
+        int min_width = (dim_button_w *5) + (dim_scroll_w * 3) + (conpan_sepa * 7) + margins.left + margins.right;
+        int min_height = conpan_size + margins.top + margins.bottom;
+        setMinimumsize(new Dimension(min_width, min_height));
     }
 
     public void start() {
@@ -168,8 +172,14 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         Object source = e.getSource(); 
         if (source == bt_start) {
             // This should be done a different way. Using the text itself feels wrong.
-            if (bt_start.getLabel() == "Pause") bt_start.setLabel("Run");    
-            else bt_start.setLabel("Pause");
+            if (bt_start.getLabel().equals("Pause")) {
+             bt_start.setLabel("Run"); 
+             bsim.set_paused(true);
+            }   
+            else {
+                bt_start.setLabel("Pause");
+                bsim.set_paused(false);
+            }
         } else 
         if (source == bt_shape) {
             bsim.set_circle(!bsim.is_circle());
@@ -244,8 +254,8 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         
         // Preserve vector heading.
         Vec2 new_vel = bsim.body_get_velocity(); 
-        new_vel.x /= Math.abs(new_vel.x); 
-        new_vel.y /= Math.abs(new_vel.y);
+        new_vel.x /= Math.signum(new_vel.x); 
+        new_vel.y /= Math.signum(new_vel.y);
         // Adjust velocity magnitude, given the percentage between VEL_MIN and VEL_MAX.
         // (equal components, assuming movement is always perfectly diagonal).
         new_vel.mul(Math.sqrt((magnitude*magnitude/2)));
@@ -301,16 +311,20 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 class BounceSim extends Canvas implements Runnable {
     private static final long serialVersionUID = 11L;
 
-    public final int SIM_TICKRATE_MIN = 1;
-    public final int SIM_TICKRATE_MAX = 100;
+    // set and is paused function, and sim running flag for thread loop control
+    public void set_paused(boolean p) { sim_paused = p; }
+    public boolean is_paused() { return sim_paused; }
+
+    public static int SIM_TICKRATE_MIN = 1;
+    public static int SIM_TICKRATE_MAX = 100;
     
-    public final Vec2 BODY_VEL_INITIAL = new Vec2(1, 1);
-    public final double BODY_VEL_MIN = 0.01;   // sqrt(x^2 + y^2)
-    public final double BODY_VEL_MAX = 10;
+    public static Vec2 BODY_VEL_INITIAL = new Vec2(1, 1);
+    public static double BODY_VEL_MIN = 0.01;   // sqrt(x^2 + y^2)
+    public static double BODY_VEL_MAX = 10;
     //public final double BODY_VEL_MULTIPLIER_MIN = 0.01;
     //public final double BODY_VEL_MULTIPLIER_MAX = 50;
-    public final int BODY_SIZE_MIN = 10;
-    public final int BODY_SIZE_MAX = 150;
+    public static int BODY_SIZE_MIN = 10;
+    public static int BODY_SIZE_MAX = 150;
 
     private int screen_width, screen_height;
   
@@ -362,6 +376,19 @@ class BounceSim extends Canvas implements Runnable {
 
     public void run() {
         while (sim_running) {
+            if (!sim_paused) {
+                Vec2 next_pos = process_collisions();
+                if (!((int)next_pos.x == (int)pos.x && (int)next_pos.y == (int)pos.y)) {
+                //if (!render_tail) erase();
+                pos = next_pos;
+                repaint();
+                }
+            }
+            Thread.sleep(sim_delay);
+            try { Thread.sleep(sim_delay); }
+            catch (InterruptedException e) { System.out.println(e); }
+        }
+    }
             //last_pos_x = (int)Math.round(pos.x);
             //last_pos_y = (int)Math.round(pos.y);
             //Vec2 old_pos = new Vec2(pos); 
@@ -370,19 +397,13 @@ class BounceSim extends Canvas implements Runnable {
             //pos.add(vel);           // Add velocity, then allow collision detection to restrict bounds. Otherwise, collision frames would not be drawn.
            
             // Calculate the next position of the body with current velocity. Accomdates collisions, keeping next position in bounds and reflecting velocity components accordingly. 
-            Vec2 next_pos = process_collisions();    // Returns next position, constrained within bounds if current 'vel' made it go over. Also flipps vel component if collision detected.
+                // Returns next position, constrained within bounds if current 'vel' made it go over. Also flipps vel component if collision detected.
             //if (next_pos.equals(pos))   // If next position is same, no collision was detected and no constrainments made. Add velocity (advance position).
             //    next_pos.add(vel);
             //if (!next_pos.equals(pos)) { // Only bother drawing if the next position moved between pixels. Don't fucking touch if its only subpixel. Fuck you awt.
 
             // Draw next position only if it moved beyond the subpixel.
-            if (!((int)next_pos.x == (int)pos.x && (int)next_pos.y == (int)pos.y)) {
-                //if (!render_tail) erase();
-                pos = next_pos;
-                repaint();
-            }
-            try { Thread.sleep(sim_delay); }
-            catch (InterruptedException e) { System.out.println(e); } // should remove
+         // should remove
 
             //Vec2 new_pos = process_collisions();   
             //if ((int)new_pos.x == (int)pos.x && (int)new_pos.y == (int)pos.y) // No collison detected.
@@ -402,9 +423,7 @@ class BounceSim extends Canvas implements Runnable {
             //repaint();
             //try { Thread.sleep(sim_delay); }
             //catch (InterruptedException e) { System.out.println(e); } // should remove
-        }
-    }
-
+       
     // Checks next position. 
     // If collision is detected, current position is moved to the farthest point possible along 
     // it's velocity vector, and the corresponding velocity components are reflected.
@@ -422,6 +441,8 @@ class BounceSim extends Canvas implements Runnable {
     public void resize_screen(int w, int h) { 
         screen_width = w; screen_height = h; 
         setSize(screen_width, screen_height);
+        pos.x = util_restrict_bounds(pos.x, size+2, screen_width-size-2); 
+        pos.y = util_restrict_bounds(pos.y, size+2, screen_height-size-2); 
     }    
     
     public int get_width() { return screen_width; }
@@ -446,7 +467,7 @@ class BounceSim extends Canvas implements Runnable {
             g.setColor(getBackground());
             if (notail_circle) g.fillOval(notail_x-notail_size-5, notail_y-notail_size-5, notail_size*2+11, notail_size*2+11);
             else g.fillRect(notail_x-1-notail_size-2, notail_y-1-notail_size-2, notail_size*2+4, notail_size*2+4);
-            System.out.println("HASS");
+            
         }
         
         int tl_x = (int)Math.round(pos.x-1-size);  // Top left position from center pixel, rounding subpixel to pixel precision. 
@@ -459,7 +480,6 @@ class BounceSim extends Canvas implements Runnable {
         //    render_erase = false;
         //    System.out.println("erasing");
         //} else {
-        System.out.println("drwaing");
         if (render_circle) {       
             g.setColor(Color.lightGray);
             g.fillOval(tl_x, tl_y, size*2+1, size*2+1); 
@@ -493,21 +513,15 @@ class BounceSim extends Canvas implements Runnable {
     }*/
 
     // Templates?
-    private static int util_restrict_bounds(int num, int lower, int upper) {
-        if (num < lower) num = lower; else if (num > upper) num = upper; return num;
-    }
-    private static double util_restrict_bounds(double num, double lower, double upper) {
-        if (num < lower) num = lower; else if (num > upper) num = upper; return num;
-    }
 
     public void sim_set_tickrate(int tps) {
-        sim_tickrate = util_restrict_bounds(tps, SIM_TICKRATE_MIN, SIM_TICKRATE_MAX);
+        sim_tickrate = Util.restrict_bounds(tps, SIM_TICKRATE_MIN, SIM_TICKRATE_MAX);
         sim_delay = (int)Math.round(1000/sim_tickrate);
     }
     public void body_set_velocity_multiplier(double v) {    // deperecated
         //vel.mul(BODY_VEL_INITIAL.x/vel.x*v); // Scale vel to match initial * v
 //        vel.x/BODY_VEL_INITIAL.x
-        vel = Vec2.mul((new Vec2(vel.x/vel.x*BODY_VEL_INITIAL.x, vel.y/vel.y*BODY_VEL_INITIAL.y)), util_restrict_bounds(v, .1, 10)); //BODY_VEL_MULTIPLIER_MIN, BODY_VEL_MULTIPLIER_MAX));
+        vel = Vec2.mul((new Vec2(vel.x/vel.x*BODY_VEL_INITIAL.x, vel.y/vel.y*BODY_VEL_INITIAL.y)), Util.restrict_bounds(v, .1, 10)); //BODY_VEL_MULTIPLIER_MIN, BODY_VEL_MULTIPLIER_MAX));
         // ^ initial velocity, with current direction applied, times the multiplier.
         //Vec2(vel.x/vel.x*BODY_VEL_INITIAL.x, vel.y/vel.y*BODY_VEL_INITIAL.y),)
 
@@ -516,7 +530,7 @@ class BounceSim extends Canvas implements Runnable {
     }
     public void body_set_size(int px) {
         notail_size = size;
-        size = util_restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
+        size = Util.restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
     }
     public void body_set_velocity(Vec2 new_vel) {
         vel.x = new_vel.x; vel.y = new_vel.y;
@@ -569,7 +583,7 @@ class Util {
         //return low2 + ((up2-low2) * ((num-low1)/(up1-low1))); ! causes issues, always returns 1 because ints, use the double instead.
     }
     public static double relate_bounds(double num, double low1, double up1, double low2, double up2) {
-        System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
+        System.out.print(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
         return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
     }
 
