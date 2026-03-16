@@ -88,8 +88,8 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             bar.setBackground(Color.gray); 
         } 
         adjust_tickrate(.2475);
-        adjust_velocity(.5);
-        adjust_size(.5);
+        adjust_velocity(.35);
+        adjust_size(.25);
         
         // Add self as component/window event listener. Always do this last (avoid null exceptions in premature events).
         this.addComponentListener(this);
@@ -182,13 +182,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         } else 
         if (source == bt_shape) {
             bsim.set_circle(!bsim.is_circle());
-            // Show shape change in paused state, clearing any overdraw from old shape. 
-            if (bsim.is_paused()) {
-                //boolean tail_state = bsim.has_tail();   // Use tailess mode to clear old shape.
-                //bsim.set_tail(false);
-                bsim.repaint();  
-                //bsim.set_tail(tail_state);
-            }
+            if (bsim.is_paused()) bsim.repaint();  // Force repaint if paused.
             if (bsim.is_circle()) bt_shape.setLabel("Square");
             else bt_shape.setLabel("Circle");
         } else
@@ -412,7 +406,6 @@ class BounceSim extends Canvas implements Runnable {
             g.setColor(getBackground());
             if (notail_circle) g.fillOval(notail_x-notail_size-5, notail_y-notail_size-5, notail_size*2+11, notail_size*2+11);
             else g.fillRect(notail_x-1-notail_size-2, notail_y-1-notail_size-2, notail_size*2+4, notail_size*2+4);
-            System.out.println("Clearing tail");
         }
 
         // Top left position from center pixel, rounding subpixel to pixel precision.
