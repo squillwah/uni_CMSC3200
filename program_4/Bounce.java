@@ -25,6 +25,9 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     private Scrollbar sb_speed, sb_size;
     private Label sb_speed_lbl, sb_size_lbl;
 
+    // The bouncing ball canvas
+    private BounceScreen screen;
+
     public Bounce(int w, int h) {
         setLayout(null);
 
@@ -32,10 +35,11 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         try { init_components(); }  // Initialize and add all components to the window.
         catch (Exception e) { e.printStackTrace(); }
         size_components();          // Adjust component sizes/positions on screen according to dimension variables. 
-       
-        // Set visible, after all components are initialized and sized. 
-        // Doing so beforehand risks null exceptions (undefined getWidth/getHeight in errant componentResized events).
+
         setVisible(true); 
+        
+        // Start the graphics.
+        start();
     }
 
     // Set dimension variables relative frame width and height.
@@ -48,7 +52,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         // Get true window width (minus margins) for accurate button/scroll width calculations.
         int marginalized_w = window_width - margins.left - margins.right;
 
-        conpan_size   = 55; //+ margins.bottom;    // Add bottom margin for true conpan height.
+        conpan_size   = 55;
         conpan_sepa   = marginalized_w/60;   
 
         dim_button_w  = marginalized_w/11; 
@@ -58,9 +62,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     }
 
     public void init_components() {
-        // Add self as component/window event listener
-        this.addComponentListener(this);
-        this.addWindowListener(this);
         
         // Configure frame, set size to match dimension variables.
         setPreferredSize(new Dimension(window_width, window_height));
@@ -80,18 +81,27 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_size = new Scrollbar(Scrollbar.HORIZONTAL);      add(sb_size);   sb_size.addAdjustmentListener(this);
         Scrollbar[] bars = {sb_speed, sb_size};
         for (Scrollbar bar : bars) {
-            bar.setMaximum(110);   // Instead of directly relating scrollbar positions to values, use a percentage. (110 to account for thumb)
+            bar.setMaximum(120);   // Instead of directly relating scrollbar positions to values, use a 1->100 percentage. (120 to account for thumb)
             bar.setMinimum(1);
             bar.setUnitIncrement(5);
             bar.setBlockIncrement(10);
             bar.setValue(50);
-            bar.setVisibleAmount(10);
+            bar.setVisibleAmount(20);
             bar.setBackground(Color.gray);
         }
         // Scrollbar labels, update with current value: 
         sb_speed_lbl = new Label((""), Label.CENTER);   add(sb_speed_lbl);  update_speed_label();
         sb_size_lbl = new Label((""), Label.CENTER);    add(sb_size_lbl);   update_size_label();
 
+        // Create the graphics, initialize size within margins and above control panel:
+        screen = new BounceScreen(window_width - margins.left - margins.right, window_height - margins.top - margins.bottom - conpan_size);
+        screen.setBackground(Color.white);
+        add(screen);
+        
+        // Add self as component/window event listener. Always do this last.
+        this.addComponentListener(this);
+        this.addWindowListener(this);
+        
         validate();
     }
 
@@ -122,8 +132,16 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_size.setSize(dim_scroll_w, dim_scroll_h);
         sb_size_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
         sb_size_lbl.setSize(dim_scroll_w, dim_scroll_h);
+
+        // Size and place the canvas:
+        screen.setLocation(margins.left, margins.top); //margins.top, margins.left);
+        screen.resize_screen(window_width - margins.left - margins.right, window_height - margins.top - margins.bottom - conpan_size);
         
         System.out.println("hello");
+    }
+
+    public void start() {
+        screen.repaint();
     }
 
     public void stop() {
@@ -141,10 +159,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         System.exit(0);
     }
     
-    public void windowClosing(WindowEvent e) {
-        stop();
-    }
-
+    public void windowClosing(WindowEvent e) { stop(); }
 
     public void componentResized(ComponentEvent e) {
         set_dimensions(getWidth(), getHeight());
@@ -152,8 +167,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     }
 
     public void actionPerformed(ActionEvent e) { 
-        // scrollbar.value = ball.set_value(scrollbar.value) [should return best it could do, percentage]
-        
         Object source = e.getSource(); 
 
         if (source == bt_start) {
@@ -162,15 +175,20 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             else bt_start.setLabel("Pause");
         } else 
         if (source == bt_shape) {
-            if (bt_shape.getLabel() == "Circle") bt_shape.setLabel("Square");
-            else bt_shape.setLabel("Circle");
+            screen.set_rect(!screen.is_rect());
+            if (screen.is_rect()) bt_shape.setLabel("Circle");
+            else bt_shape.setLabel("Square");
+            screen.repaint();   // Force repaint to update shape.
         } else
         if (source == bt_tail) {
-            if (bt_tail.getLabel() == "Tail") bt_tail.setLabel("No Tail");
+            screen.set_tail(!screen.has_tail());
+            if (screen.has_tail()) bt_tail.setLabel("No Tail");
             else bt_tail.setLabel("Tail");
         } else
         if (source == bt_clear) {
             System.out.println("clear");
+            screen.clear();     // Wipe canvas and redraw.
+            screen.repaint();
         } else
         if (source == bt_quit) {
             stop();
@@ -180,15 +198,15 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void adjustmentValueChanged(AdjustmentEvent e) {
         Scrollbar bar = (Scrollbar)e.getSource();
         if (bar == sb_speed) {
+            bar.setValue((int)(screen.gradiate_speed(bar.getValue()/100.0)*100));
             update_speed_label();
         } else
         if (bar == sb_size) {
+            // Updates value within screen, and sets scrollbar to the returned percentage (size may be restricted).
+            bar.setValue((int)(screen.gradiate_size(bar.getValue()/100.0)*100));
             update_size_label();
+            screen.repaint();
         }
-    }
-
-    public static void main(String args[]) {
-        new Bounce(640, 400);
     }
 
     private void update_speed_label() {
@@ -213,6 +231,168 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
     public void componentHidden(ComponentEvent e) {}
     public void componentShown(ComponentEvent e) {}
     public void componentMoved(ComponentEvent e) {}
+
+    public static void main(String args[]) {
+        new Bounce(640, 400);
+    }
+}
+
+class BounceScreen extends Canvas {
+    private static final long serialVersionUID = 11L;
+
+    private final int SPEED_MIN = 1;
+    private final int SPEED_MAX = 100;
+    private final int SIZE_MIN = 10;
+    private final int SIZE_MAX = 250;
+
+    private int width, height;
+
+    private int size, size_constraint;
+    private int pos_x, pos_y; 
+    private int speed;
+
+    private boolean shape;  // True for rectangle, false for circle.
+    private boolean tail;
+    private boolean clear;  // Clear flag. Screen will be wiped on next update if set.
+
+    public BounceScreen(int w, int h) {
+        width = w; height = h;
+        size = 0; size_constraint = SIZE_MAX;
+        pos_x = w/2; pos_y = h/2;   // Center screen.
+        speed = 0; 
+        shape = true;  // Start as rect, with tails.
+        tail = true;
+
+        gradiate_speed(.5); // Initialize size and speed to their middle values.
+        gradiate_size(.5);
+    }
+
+    public void resize_screen(int w, int h) { 
+        width = w; height = h; 
+        pos_x = w/2; pos_y = h/2;   // Recalculate center pos as well.
+        setSize(w, h);
+    }    
+    public int get_width() { return width; }
+    public int get_height() { return height; }
+
+    public boolean is_rect() { return shape; }  
+    public void set_rect(boolean s) { shape = s; }
+
+    public boolean has_tail() { return tail; }
+    public void set_tail(boolean t) { tail = t; }
+
+    public void clear() { clear = true; }
+
+    //public void update(int NS) {    // stupid
+    //    /*SObj = NS;*/ 
+    //}
+    
+    // Use update to draw graphics instead of paint (remove screen wipes).
+    public void update(Graphics g) {
+        if (clear) {
+            super.paint(g); // Call original paint function, which calls original update which clears the screen. ? maybe, not sure if thats how the stack works.
+            clear = false;  // Clear the clear.
+            g.setColor(Color.red);
+            g.drawRect(0, 0, width-1, height-1);    // Redraw the red boarder.
+        }
+
+        // Top left coordinates from center pixel position
+        int tl_x = pos_x-((size-1)/2);
+        int tl_y = pos_y-((size-1)/2);
+
+        // Draw shape, depending on shape (true is rectangle, false is oval)
+        if (shape) {        // Could call is_rect() instead, would be more readable.
+            g.setColor(Color.lightGray);
+            g.fillRect(tl_x, tl_y, size, size); // Outline
+            g.setColor(Color.black);
+            g.drawRect(tl_x, tl_y, size-1, size-1);
+        } else {
+            g.setColor(Color.lightGray);
+            g.fillOval(tl_x, tl_y, size, size); 
+            g.setColor(Color.black);
+            g.drawOval(tl_x, tl_y, size-1, size-1);
+        }
+    }
+
+    // Override paint to draw the red boarder and call update (os will trigger a paint occasionally).
+    public void paint(Graphics g) {
+        g.setColor(Color.red);
+        g.drawRect(0, 0, width-1, height-1);
+        update(g);
+    }
+
+    // Adjust speed between SPEED_MIN and SPEED_MAX, given the percentage between them. 
+    // Returns the new speed (or should it be the percentage?).
+    //  (0.01 == SPEED_MIN, 1 == SPEED_MAX) 
+    public double gradiate_speed(double percentage) { 
+        if (percentage >= 1) percentage = 1;
+        else if (percentage <= 0.01) percentage = 0.01; 
+        speed = (int)((SPEED_MAX-SPEED_MIN) * percentage + SPEED_MIN);
+
+        System.out.println("Speed: " + speed + " | " + percentage + "%");
+
+        return percentage; // or speed? Could calculate percentage at scrollbar set.
+    }
+    // Adjust size between MIN and MAX, given the percentage between them. 
+    // Restricts size to size_constraint. Returns new size;
+    public double gradiate_size(double percentage) {
+
+        // Could caluclate size constraint here, with ball pos and screen w/h
+        // would be better than storing the variable and updating every move
+
+        if (percentage >= 1) percentage = 1;
+        else if (percentage <= 0.01) percentage = 0.01; 
+        size = (int)((SIZE_MAX-SIZE_MIN) * percentage + SIZE_MIN);
+        if (size > size_constraint) {
+            size = size_constraint;
+            percentage = (double)(size-SIZE_MIN) / (SIZE_MAX-SIZE_MIN);
+        }
+
+        System.out.println("Size: " + size + " | " + percentage + "%");
+
+        return percentage;
+    }
 }
 
 
+
+
+
+/*
+    
+    public static double adjust_percent(double perc) {
+        // Handle oob percentages
+        int MIN = 235;
+        int MAX = 512;
+
+        // Set value to range between min and max:
+        int value;
+        if (perc >= 1) value = MAX;
+        else if (perc <= 0) value = MIN;
+        else value = (int)((MAX-MIN) * perc + MIN);
+
+        // If requested percent is greater than the current constraint, constrain:
+        int constraint = 420;
+        if (value > constraint) {
+            value = constraint;
+            perc = (double)(constraint-MIN) / (MAX-MIN);
+        }
+
+        System.out.println(value);
+        return perc;
+
+        *
+        int value = MIN + (MAX-MIN)/perc;
+
+        int constraint = 420;
+
+        if (value > constraint) {
+            value = constraint;
+            perc = (MAX-MIN)/(constraint-MIN);
+        }
+
+        System.out.println(value);
+        return perc;
+        *
+    
+*/
