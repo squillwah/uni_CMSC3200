@@ -79,17 +79,20 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
         // Scrollbar value setting:
         Scrollbar[] bars = {sb_size, sb_tickrate, sb_velocity};
-        for (Scrollbar bar : bars) { bar.setMaximum(120); bar.setMinimum(1); bar.setUnitIncrement(5); bar.setBlockIncrement(10); bar.setVisibleAmount(20); bar.setBackground(Color.gray); }
+        for (Scrollbar bar : bars) { bar.setMaximum(1200); bar.setMinimum(1); bar.setUnitIncrement(10); bar.setBlockIncrement(100); bar.setVisibleAmount(200); bar.setBackground(Color.gray); }
         
         //sb_speed.setValue((int)(gradiate_sim_delay(.5)*100));    // Attempt to set scrolls at 50%.
         sb_tickrate.setValue(50);    // Attempt to set scrolls at 50%.
         sb_tickrate_lbl = new Label((""), Label.CENTER);    add(sb_tickrate_lbl);   update_tickrate_label();
+        adjust_tickrate(.5);
         
-        sb_velocity.setValue(1);
+        //sb_velocity.setValue(1);
         sb_velocity_lbl = new Label((""), Label.CENTER);    add(sb_velocity_lbl);   update_velocity_label();
+        adjust_velocity(.5);    // May want to do this a different way, getting initials from the BounceSim instead of always .5
         
         sb_size.setValue((int)(gradiate_body_size(.5)*100));
         sb_size_lbl = new Label((""), Label.CENTER);    add(sb_size_lbl);   update_size_label();
+        adjust_size(.5);
         
         // Add self as component/window event listener. Always do this last.
         this.addComponentListener(this);
@@ -198,19 +201,19 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
             //bar.setValue((int)(gradiate_sim_delay(bar.getValue()/100.0)*100));
 //            bsim.sim_set_tickrate(bar.getValue());
 //            update_tickrate_label();
-            adjust_tickrate(bar.getValue()/100.0);
+            adjust_tickrate(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
         } else
         if (bar == sb_velocity) {
 //            bsim.body_set_velocity_multiplier(bar.getValue()/10.0);       //temp
 //            update_velocity_label();
-            adjust_velocity(bar.getValue()/100.0);
+            adjust_velocity(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
         } else
         if (bar == sb_size) {
             // Updates value within screen, and sets scrollbar to the returned percentage (size may be restricted).
 //            bar.setValue((int)(gradiate_body_size(bar.getValue()/100.0)*100));
 //            update_size_label();
             //bsim.repaint(); repainting here will cause ghosting in no trail mode
-            adjust_size(bar.getValue()/100.0);
+            adjust_size(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
         }
     }
     
@@ -253,7 +256,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
 
         // Update scrollbar
         sb_velocity.setValue((int)Math.round(Util.relate_bounds(magnitude, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
-        sb_velocity_lbl.setText("Velocity: " + Math.round(magnitude*100)/100.0 + "px/t");
+        sb_velocity_lbl.setText("Speed: " + Math.round(magnitude*100)/100.0 + "px/t");
     }
     public void adjust_size(double percent) { 
         percent = Util.restrict_bounds(percent, 0.01, 1);
@@ -310,7 +313,7 @@ class BounceSim extends Canvas implements Runnable {
     //public final double BODY_VEL_MULTIPLIER_MIN = 0.01;
     //public final double BODY_VEL_MULTIPLIER_MAX = 50;
     public final int BODY_SIZE_MIN = 10;
-    public final int BODY_SIZE_MAX = 150;
+    public final int BODY_SIZE_MAX = 200;
 
     private int screen_width, screen_height;
   
@@ -326,7 +329,7 @@ class BounceSim extends Canvas implements Runnable {
     private boolean render_circle;  // Render the body as a circle. Otherwise drawn as square.
     private boolean render_tail;    // Keep tails (don't erase last frame's shape).
    
-    // State of previous frame object, for use in tail erasure/shape changes. 
+    // State of previous frame object, for tail erasure/shape changes. 
     private boolean notail_circle;
     private int notail_x, notail_y; 
     private int notail_size;    
@@ -376,11 +379,11 @@ class BounceSim extends Canvas implements Runnable {
             //if (!next_pos.equals(pos)) { // Only bother drawing if the next position moved between pixels. Don't fucking touch if its only subpixel. Fuck you awt.
 
             // Draw next position only if it moved beyond the subpixel.
-            if (!((int)next_pos.x == (int)pos.x && (int)next_pos.y == (int)pos.y)) {
+            //if (!((int)next_pos.x == (int)pos.x && (int)next_pos.y == (int)pos.y)) {
                 //if (!render_tail) erase();
                 pos = next_pos;
                 repaint();
-            }
+            //}
             try { Thread.sleep(sim_delay); }
             catch (InterruptedException e) { System.out.println(e); } // should remove
 
@@ -410,6 +413,7 @@ class BounceSim extends Canvas implements Runnable {
     // it's velocity vector, and the corresponding velocity components are reflected.
     // True is returned, to signify that a collision was detected and that the necessary
     // pos and vel adjustments have been made.
+    // Returns the next position (pos + vel), 
     public Vec2 process_collisions() {
         Vec2 next_pos = Vec2.add(pos, vel);       //what problem am I even trying to solve? We want check then move, not move then check.
         if (next_pos.x < 1+size+1) { next_pos.x = 1+size+1; vel.x = -vel.x; }
@@ -516,7 +520,9 @@ class BounceSim extends Canvas implements Runnable {
     }
     public void body_set_size(int px) {
         notail_size = size;
-        size = util_restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
+        int next_size = util_restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
+        if ((pos.x+next_size+1) >= screen_width) next_size = (int)(screen_width-pos.x);
+        size = next_size;
     }
     public void body_set_velocity(Vec2 new_vel) {
         vel.x = new_vel.x; vel.y = new_vel.y;
@@ -572,6 +578,8 @@ class Util {
         System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
         return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
     }
+    //public static double get_normalized_scroll_value(Scrollbar bar) {
+    //    return
 
     // might be better to have a seperate relate_bounds_round() or smthn
 }
