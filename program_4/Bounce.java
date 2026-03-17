@@ -237,7 +237,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         
         // Update scrollbar.
         sb_tickrate.setValue(Util.relate_bounds(new_tickrate, bsim.SIM_TICKRATE_MIN, bsim.SIM_TICKRATE_MAX, sb_tickrate.getMinimum(), sb_tickrate.getMaximum()-sb_tickrate.getVisibleAmount()));
-        sb_tickrate_lbl.setText("Tickrate: " + new_tickrate + "t/s");
+        sb_tickrate_lbl.setText("Tickrate (speed): " + new_tickrate + "t/s");
     }
     public void adjust_velocity(double percent) {
         percent = Util.restrict_bounds(percent, 0.001, 1);
@@ -253,7 +253,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         bsim.body_set_velocity(new_vel);
 
         sb_velocity.setValue((int)Math.round(Util.relate_bounds(magnitude, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
-        sb_velocity_lbl.setText("Speed: " + Math.round(magnitude*100)/100.0 + "px/t");
+        sb_velocity_lbl.setText("Velocity: " + Math.round(magnitude*100)/100.0 + "px/t");
     }
     public void adjust_size(double percent) { 
         percent = Util.restrict_bounds(percent, 0.001, 1);
@@ -406,8 +406,8 @@ class BounceSim extends Canvas implements Runnable {
         }
         if (!render_tail || sim_paused) {   // Clear previous frame when tails disabled or bouncing paused.
             g.setColor(getBackground());
-            if (notail_circle) g.fillOval(notail_x-notail_size-5, notail_y-notail_size-5, notail_size*2+11, notail_size*2+11);
-            else g.fillRect(notail_x-1-notail_size-2, notail_y-1-notail_size-2, notail_size*2+4, notail_size*2+4);
+            if (notail_circle) g.fillOval(notail_x-notail_size-2, notail_y-notail_size-2, notail_size*2+3, notail_size*2+3);
+            else g.fillRect(notail_x-notail_size-1, notail_y-notail_size-1, notail_size*2+2, notail_size*2+2);
         }
 
         // Top left position from center pixel, rounding subpixel to pixel precision.
@@ -450,10 +450,10 @@ class BounceSim extends Canvas implements Runnable {
         notail_size = size;
         int next_size = Util.restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
         // Restrict within screen bounds from current position:
-        if ((pos.x+next_size+1) >= screen_width) next_size = (int)(screen_width-pos.x);
-        else if ((pos.x-next_size-1) <= 0) next_size = (int)(pos.x);
-        if ((pos.y+next_size+1) >= screen_height) next_size = (int)(screen_height-pos.y);
-        else if ((pos.y-next_size-1) <= 0) next_size = (int)(pos.y);
+        if ((pos.x+next_size+1) >= screen_width-1) next_size = (int)(screen_width-pos.x-2);
+        else if ((pos.x-next_size-1) <= 1) next_size = (int)(pos.x-2);
+        if ((pos.y+next_size+1) >= screen_height-1) next_size = (int)(screen_height-pos.y-2);
+        else if ((pos.y-next_size-1) <= 1) next_size = (int)(pos.y-2);
         size = next_size;
     }
 
@@ -505,7 +505,7 @@ class Util {
         //return low2 + ((up2-low2) * ((num-low1)/(up1-low1))); ! causes issues, always returns 1 because ints, use the double instead.
     }
     public static double relate_bounds(double num, double low1, double up1, double low2, double up2) {
-        System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
+        //System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
         return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
     }
     //public static double get_normalized_scroll_value(Scrollbar bar) {
