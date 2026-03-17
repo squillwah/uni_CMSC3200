@@ -1,4 +1,14 @@
 
+// [CMSC3200] Technical Computing Using Java
+// Program 4: Bounce
+// 
+//  Bouncing object program. 
+//  An object bounces around the screen, with adjustable shape, size, pixel velocity, and animation speed. 
+//
+// Group 2
+// Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
+// SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
+
 package Bounce;
 
 import java.awt.*;
