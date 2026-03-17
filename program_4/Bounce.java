@@ -378,6 +378,8 @@ class BounceSim extends Canvas implements Runnable {
     public int get_height() { return screen_height; }
     public void resize_screen(int w, int h) { 
         screen_width = w; screen_height = h; 
+        pos.x = Util.restrict_bounds(pos.x, size+1, screen_width-size-1);
+        pos.y = Util.restrict_bounds(pos.y, size+1, screen_height-size-1);
         setSize(screen_width, screen_height);
     }    
     
