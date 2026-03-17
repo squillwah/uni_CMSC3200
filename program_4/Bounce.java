@@ -58,7 +58,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         // Configure frame, set size to match dimension variables.
         setPreferredSize(new Dimension(window_width, window_height));
         setMinimumSize(getPreferredSize());
-        setBounds(100, 100, window_width, window_height);  // @? What does this one do?
+        setBounds(10, 10, window_width, window_height);
         setBackground(Color.lightGray);
         // Create the graphics, initialize size within margins and above control panel:
         bsim = new BounceSim(window_width-margins.left-margins.right, window_height-margins.top-margins.bottom-conpan_size);
@@ -81,7 +81,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         for (Scrollbar bar : bars) { 
             bar.setMinimum(1); 
             bar.setValue(1);
-            bar.setMaximum(1200); 
+            bar.setMaximum(1200);           // 1,000 values, .001 normalized precision.
             bar.setVisibleAmount(200); 
             bar.setUnitIncrement(5); 
             bar.setBlockIncrement(50); 
@@ -131,10 +131,8 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_size_lbl.setSize(dim_scroll_w, dim_scroll_h);
 
         // Size and place the canvas:
-        bsim.setLocation(margins.left, margins.top); //margins.top, margins.left);
+        bsim.setLocation(margins.left, margins.top);
         bsim.resize_screen(window_width - margins.left - margins.right, window_height - margins.top - margins.bottom - conpan_size);
-        
-        System.out.println("hello");
     }
 
     public void start() {
@@ -245,7 +243,7 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         
         // Preserve vector heading.
         Vec2 new_vel = bsim.body_get_velocity(); 
-        new_vel.x /= Math.abs(new_vel.x); // May cause issue if vel is ever 0
+        new_vel.x /= Math.abs(new_vel.x); // ! May cause issue if vel is ever 0.
         new_vel.y /= Math.abs(new_vel.y);
         // Adjust velocity magnitude, given the percentage between VEL_MIN and VEL_MAX.
         // (equal components, assuming movement is always perfectly diagonal).
@@ -266,8 +264,6 @@ public class Bounce extends Frame implements WindowListener, ComponentListener, 
         sb_size_lbl.setText("Size: " + new_size*2+1 + "px");
     }
 }
-
-    // @todo Percent util thing should go from 0 not 0.0001 maybe
 
 class BounceSim extends Canvas implements Runnable {
     private static final long serialVersionUID = 11L;
@@ -370,7 +366,6 @@ class BounceSim extends Canvas implements Runnable {
             }
             try { Thread.sleep(1); }    // To update sim_pause on interrupts.
             catch (InterruptedException e) {}   
-
         }
     }
     
@@ -399,10 +394,10 @@ class BounceSim extends Canvas implements Runnable {
     // Use update to draw graphics instead of paint (remove screen wipes).
     public void update(Graphics g) {
         if (render_clear) {
-            super.paint(g); // Call original paint function, which calls original update which clears the screen. ? maybe, not sure if thats how the stack works.
-            render_clear = false;  // Clear the clear.
+            super.paint(g);         // Call original paint function to wipe the screen.
+            render_clear = false;   // Clear the clear.
             g.setColor(Color.red);
-            g.drawRect(0, 0, screen_width-1, screen_height-1);    // Redraw the red boarder.
+            g.drawRect(0, 0, screen_width-1, screen_height-1);      // Redraw the red boarder.
         }
         if (!render_tail || sim_paused) {   // Clear previous frame when tails disabled or bouncing paused.
             g.setColor(getBackground());
@@ -443,7 +438,6 @@ class BounceSim extends Canvas implements Runnable {
         sim_delay = (int)Math.round(1000/sim_tickrate);
     }
     public void body_set_velocity(Vec2 new_vel) {
-        // Restrict bounds? final VEL_COMPONENT_MAX instead of magnitude?
         vel.x = new_vel.x; vel.y = new_vel.y;
     }
     public void body_set_size(int px) {
@@ -460,11 +454,9 @@ class BounceSim extends Canvas implements Runnable {
     public int sim_get_tickrate() { return sim_tickrate; }
     public Vec2 body_get_velocity() { return (new Vec2(vel)); }
     public int body_get_size() { return size; }
-    
-    //public double body_get_velocity() { return Math.round(Math.sqrt(vel.x*vel.x+vel.y+vel.y)*100)/100.0; }
 }
 
-// Two dimensional vector, for velocity and position data.  Should this be doubles (do we want subpixel movement?)
+// Two dimensional vector, for velocity and position data.
 // Doubles (instead of ints) to support pixel movement slower than the tickrate.
 class Vec2 {
     public double x;
@@ -486,7 +478,6 @@ class Vec2 {
         product.mul(multiplier);
         return product;
     }
-
 }
 
 class Util {
@@ -500,17 +491,10 @@ class Util {
         if (num < lower) num = lower; else if (num > upper) num = upper; return num;
     }
     public static int relate_bounds(int num, int low1, int up1, int low2, int up2) {
-        return (int)Math.round(relate_bounds((double)num, low1, up1, low2, up2)); // @jank, nuneeded
-        //System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
-        //return low2 + ((up2-low2) * ((num-low1)/(up1-low1))); ! causes issues, always returns 1 because ints, use the double instead.
+        return (int)Math.round(relate_bounds((double)num, low1, up1, low2, up2));   // Requires floating point calculation, will return 1 otherwise.
     }
     public static double relate_bounds(double num, double low1, double up1, double low2, double up2) {
-        //System.out.println(num + "|" + low1 + "," + up1 + "|" + low2 + "," + up2 + "\n" + (low2 + ((up2-low2) * ((num-low1)/(up1-low1)))));
         return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
     }
-    //public static double get_normalized_scroll_value(Scrollbar bar) {
-    //    return
-
-    // might be better to have a seperate relate_bounds_round() or smthn
 }
 
