@@ -1,9 +1,10 @@
 
 // [CMSC3200] Technical Computing Using Java
-// Program 4: Bounce
-// 
-//  Bouncing object program. 
-//  An object bounces around the screen, with adjustable shape, size, pixel velocity, and animation speed. 
+// Program 5: Bouncing Ball
+//
+//  A ball moves around the screen, bouncing off rectangles and screen borders.
+//  Use the controls to adjust the ball's size, velocity, and tickrate. 
+//  Click and drag with the mouse to place rectangles. Right click to delete them.
 //
 // Group 2
 // Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
@@ -13,81 +14,73 @@ package BouncingBall;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.io.*;
 
-public class BouncingBall extends Frame implements WindowListener, ComponentListener, ActionListener, AdjustmentListener {
-    private static final long serialVersionUID = 10L;
- 
-    // Dimension/sizing values. 
-    private Insets margins;
-    private int window_width;   // Window dimensions, entire frame.
-    private int window_height;
-    private int conpan_size;    // Vertical pixels allocated to bottom control panel. Viewscreen fills rest above.
-    private int conpan_sepa;    // Horizontal pixel separation of each control panel element.
-    
-    private int dim_button_w;   // Dimensions of buttons
-    private int dim_button_h;
-    private int dim_scroll_w;   // Dimensions of scrollbars
-    private int dim_scroll_h;
-
-    // Control panel components.
-    private Button bt_start, bt_shape, bt_clear, bt_tail, bt_quit;
+public class BouncingBall extends Frame implements WindowListener, ComponentListener, ActionListener, AdjustmentListener, MouseListener, MouseMotionListener {
+    private static final long SerialVersionUID = 101L;
+   
+    // Two panels of the GUI, ball screen and controls section.
+    private Panel pnl_screen;
+    private Panel pnl_controls;
+    // Graphical bouncing ball + rectangles simulation.
+    private BounceSim bsim;
+    // Elements of controls section.
+    private Button bt_start, bt_pause, bt_quit;
     private Scrollbar sb_tickrate, sb_velocity, sb_size;
     private Label sb_tickrate_lbl, sb_velocity_lbl, sb_size_lbl;
 
-    // The bouncing body canvas. 
-    private BounceSim bsim;
-
-    public BouncingBall(int w, int h) {
-        setLayout(null);
-        set_dimensions(w, h);       // Set dimension variables relative to given window size.
-        try { init_components(); }  // Initialize and add all components to the window.
-        catch (Exception e) { e.printStackTrace(); }
-        size_components();          // Adjust component sizes/positions on screen according to dimension variables. 
-        setVisible(true); 
-        start();                    // Start the graphics.
-    }
-
-    // Set dimension variables relative to frame width and height.
-    public void set_dimensions(int w, int h) {
-        margins = getInsets();
-        window_width  = w;
-        window_height = h;
-
-        // Get true window width (minus margins) for accurate button/scroll width calculations.
-        int marginalized_w = window_width - margins.left - margins.right;
-        conpan_size   = 55;
-        conpan_sepa   = marginalized_w/80;   
-        dim_button_w  = marginalized_w/13; 
-        dim_button_h  = 20;                     // Button and scroll heights are static.
-        dim_scroll_w  = marginalized_w/6; 
-        dim_scroll_h  = 20;
-    }
-
-    public void init_components() {
-        // Configure frame, set size to match dimension variables.
-        setPreferredSize(new Dimension(window_width, window_height));
+    public BouncingBall(Dimension initial_size) {
+        // Configure the main frame:
+        setTitle("Program 5: Bouncing Ball");
+        setLayout(new BorderLayout());
+        setPreferredSize(initial_size.getSize());
         setMinimumSize(getPreferredSize());
-        setBounds(10, 10, window_width, window_height);
+        setBounds(10, 10, getWidth(), getHeight());
         setBackground(Color.lightGray);
-        // Create the graphics, initialize size within margins and above control panel:
-        bsim = new BounceSim(window_width-margins.left-margins.right, window_height-margins.top-margins.bottom-conpan_size);
-        bsim.setBackground(Color.white);
-        add(bsim);
-        // Create conpan elements, add to frame and attach related event listeners:
-        bt_start = new Button("Start");                             add(bt_start);          bt_start.addActionListener(this);
-        bt_shape = new Button("Circle");                            add(bt_shape);          bt_shape.addActionListener(this);
-        bt_clear = new Button("Clear");                             add(bt_clear);          bt_clear.addActionListener(this);
-        bt_tail = new Button("No Toil");                            add(bt_tail);           bt_tail.addActionListener(this);
-        bt_quit = new Button("Quit");                               add(bt_quit);           bt_quit.addActionListener(this);
-        sb_tickrate = new Scrollbar(Scrollbar.HORIZONTAL);          add(sb_tickrate);       sb_tickrate.addAdjustmentListener(this);
-        sb_velocity = new Scrollbar(Scrollbar.HORIZONTAL);          add(sb_velocity);       sb_velocity.addAdjustmentListener(this);
-        sb_size = new Scrollbar(Scrollbar.HORIZONTAL);              add(sb_size);           sb_size.addAdjustmentListener(this);
-        sb_tickrate_lbl = new Label(("Tickrate"), Label.CENTER);    add(sb_tickrate_lbl); 
-        sb_velocity_lbl = new Label(("Speed"), Label.CENTER);       add(sb_velocity_lbl); 
-        sb_size_lbl = new Label(("Size"), Label.CENTER);            add(sb_size_lbl);
-        // Scrollbar value setting:
-        Scrollbar[] bars = {sb_size, sb_tickrate, sb_velocity};
+        // Create the control and screen panels:
+        try {
+            init_pnl_screen();
+            init_pnl_controls();
+        } catch (Exception e) {
+            e.printStackTrace();
+            stop();
+        }
+        // Attach window/component listeners, start things:
+        this.addComponentListener(this);
+        this.addWindowListener(this);
+        setVisible(true);
+        bsim.resize_screen(pnl_screen.getSize()); // Resize the BounceSim canvas to fit above dynamically resized control panel (which is dynamically resized only after being made visible).
+        start();
+    }
+
+    public void init_pnl_screen() {
+        // Set Panel layout and add to main frame:
+        pnl_screen = new Panel(); 
+        pnl_screen.setLayout(new BorderLayout());
+        add("Center", pnl_screen);
+        // Create BounceSim, add to panel:
+        bsim = new BounceSim(getMinimumSize());  // Set initial canvas size to the minimum frame size. Using pnl_screen.getWidth/Height returns zeros at this stage. Perhaps a better way should be found for bsim's canvas to get its height? Perhaps have the canvas as part of this GUI class, then feed that the graphics from the simulation class? That setup might necessitate a seperate thread, or not using some kind of callback function given to bsim.
+        pnl_screen.add("Center", bsim);
+        // Attach mouse listeners:
+        bsim.addMouseListener(this);
+        bsim.addMouseMotionListener(this);
+        validate();
+    }
+    public void init_pnl_controls() {
+        pnl_controls = new Panel();
+        pnl_controls.setLayout(new GridBagLayout());
+        pnl_controls.setMaximumSize(getMinimumSize());
+        add("South", pnl_controls);
+        // Create, initialize components:
+        bt_start = new Button("START"); bt_start.setEnabled(true);
+        bt_pause = new Button("PAUSE"); bt_pause.setEnabled(false);
+        bt_quit = new Button("QUIT");
+        sb_tickrate_lbl = new Label(("Tickrate: ?t/s"), Label.CENTER);    
+        sb_velocity_lbl = new Label(("Velocity: ?px/t"), Label.CENTER);       
+        sb_size_lbl = new Label(("Ball Size: ?px"), Label.CENTER);            
+        sb_tickrate = new Scrollbar(Scrollbar.HORIZONTAL);
+        sb_velocity = new Scrollbar(Scrollbar.HORIZONTAL);
+        sb_size = new Scrollbar(Scrollbar.HORIZONTAL);
+        Scrollbar[] bars = {sb_tickrate, sb_velocity, sb_size};
         for (Scrollbar bar : bars) { 
             bar.setMinimum(1); 
             bar.setValue(1);
@@ -100,114 +93,111 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         adjust_tickrate(.2475);
         adjust_velocity(.35);
         adjust_size(.25);
-        
-        // Add self as component/window event listener. Always do this last (avoid null exceptions in premature events).
-        this.addComponentListener(this);
-        this.addWindowListener(this);
-        
+        // Gridbag schenanigans: 
+        GridBagConstraints gbc = new GridBagConstraints();
+        //  Scrollbars 
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0.075;
+        gbc.ipady = 2;
+        //  Tickrate 
+        gbc.insets.top = 10;  
+        gbc.insets.left = 10;
+        gbc.gridx = 0; gbc.gridy = 0;
+        pnl_controls.add(sb_tickrate, gbc); 
+        gbc.insets.top = 3; gbc.insets.bottom = 7;
+        gbc.ipady = 0;
+        gbc.gridy = 1;
+        pnl_controls.add(sb_tickrate_lbl, gbc); 
+        gbc.ipady = 2;
+        gbc.insets.top = 10; gbc.insets.bottom = 0;
+        //  Velocity
+        gbc.insets.left = 5;
+        gbc.insets.right = 10;
+        gbc.gridx = 1; gbc.gridy = 0;
+        pnl_controls.add(sb_velocity, gbc); 
+        gbc.insets.top = 3; gbc.insets.bottom = 7;
+        gbc.ipady = 0;
+        gbc.gridy = 1;
+        pnl_controls.add(sb_velocity_lbl, gbc); 
+        gbc.ipady = 2;
+        gbc.insets.top = 10; gbc.insets.bottom = 0;
+        //  Size 
+        gbc.weightx = .10;
+        gbc.insets.left = 10;
+        gbc.insets.right = 10; 
+        gbc.gridx = 5; gbc.gridy = 0;
+        pnl_controls.add(sb_size, gbc); 
+        gbc.insets.top = 3; gbc.insets.bottom = 7;
+        gbc.ipady = 0;
+        gbc.gridy = 1;
+        pnl_controls.add(sb_size_lbl, gbc); 
+        gbc.insets.top = 10; gbc.insets.bottom = 0;
+        //  Middle Buttons [Start, Pause, Quit] 
+        gbc.gridheight = 2;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 0.025;
+        gbc.insets.top = 5;
+        gbc.insets.bottom = 5;
+        gbc.insets.left = 0;
+        gbc.insets.right = 0;
+        gbc.gridx = 2; gbc.gridy = 0;
+        pnl_controls.add(bt_start, gbc);
+        gbc.gridx = 3; gbc.gridy = 0;
+        pnl_controls.add(bt_pause, gbc);
+        gbc.gridx = 4; gbc.gridy = 0;
+        pnl_controls.add(bt_quit, gbc);
+        // Attach listeners:
+        bt_start.addActionListener(this);
+        bt_pause.addActionListener(this);
+        bt_quit.addActionListener(this);
+        sb_tickrate.addAdjustmentListener(this);
+        sb_velocity.addAdjustmentListener(this);
+        sb_size.addAdjustmentListener(this);
         validate();
     }
-
-    public void size_components() {
-        // Place control row slightly above center of control panel height, accounting for the bottom margin.
-        int conpan_y = window_height - (conpan_size+margins.bottom - conpan_size/8); 
-        // Begin row at left of center (center being calculated with margins subtracted for true area). Left starting position 
-        // is center subtracted by half of the combined widths of all buttons and scrollbars, plus the left margin, for accurate centering.
-        int conpan_x = ((window_width-margins.left-margins.right)/2)+margins.left - (dim_button_w*5 + dim_scroll_w*3 + conpan_sepa*7)/2; 
-        
-        // Tickrate bar        
-        sb_tickrate.setLocation(conpan_x, conpan_y);
-        sb_tickrate.setSize(dim_scroll_w, dim_scroll_h);
-        sb_tickrate_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
-        sb_tickrate_lbl.setSize(dim_scroll_w, dim_scroll_h);
-        conpan_x += dim_scroll_w + conpan_sepa;
-        // Velocity bar 
-        sb_velocity.setLocation(conpan_x, conpan_y);
-        sb_velocity.setSize(dim_scroll_w, dim_scroll_h);
-        sb_velocity_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
-        sb_velocity_lbl.setSize(dim_scroll_w, dim_scroll_h);
-        conpan_x += dim_scroll_w + conpan_sepa;
-        // Buttons
-        Button[] butts = {bt_start, bt_shape, bt_tail, bt_clear, bt_quit};
-        for (Button butt : butts) {
-            butt.setLocation(conpan_x, conpan_y);
-            butt.setSize(dim_button_w, dim_button_h);
-            conpan_x += dim_button_w + conpan_sepa;
-        }
-        // Size bar 
-        sb_size.setLocation(conpan_x, conpan_y);
-        sb_size.setSize(dim_scroll_w, dim_scroll_h);
-        sb_size_lbl.setLocation(conpan_x, conpan_y + dim_scroll_h);
-        sb_size_lbl.setSize(dim_scroll_w, dim_scroll_h);
-
-        // Size and place the canvas:
-        bsim.setLocation(margins.left, margins.top);
-        bsim.resize_screen(window_width - margins.left - margins.right, window_height - margins.top - margins.bottom - conpan_size);
-    }
-
-    public void start() {
-        bsim.repaint();
-        bsim.set_pause(true); // Start paused.
-        bsim.start();
-    }
-
-    public void stop() {
-        // Stop sim thread, remove listeners, dispose frame, kill.
-        bsim.stop();
+    public void destroy_pnl_controls() {
         bt_start.removeActionListener(this);
-        bt_shape.removeActionListener(this);
-        bt_clear.removeActionListener(this);
-        bt_tail.removeActionListener(this);
+        bt_pause.removeActionListener(this);
         bt_quit.removeActionListener(this);
         sb_tickrate.removeAdjustmentListener(this);
         sb_velocity.removeAdjustmentListener(this);
         sb_size.removeAdjustmentListener(this);
+    }
+    public void destroy_pnl_screen() {
+        pnl_screen.removeMouseListener(this);
+        pnl_screen.removeMouseMotionListener(this);
+        bsim.stop();
+    }
+
+    // Start the program + close it:
+    public void start() { 
+        bsim.repaint(); 
+        bsim.set_pause(true); 
+        bsim.start(); 
+    }
+    public void stop() {
+        destroy_pnl_screen();
+        destroy_pnl_controls();
         this.removeComponentListener(this);
         this.removeWindowListener(this);
         dispose();
         System.exit(0);
     }
-    
+
+    // Event handler implementations:
     public void windowClosing(WindowEvent e) { stop(); }
-
-    public void componentResized(ComponentEvent e) {
-        set_dimensions(getWidth(), getHeight());
-        size_components();
-    }
-
-    public void actionPerformed(ActionEvent e) { 
-        // Functions of buttons:
-        //  bt_start - pause/resume bounce sim
-        //  bt_shape - toggle circle/square
-        //  bt_tail - toggle tail/no tail
-        //  bt_clear - set clear and force a repaint
-        //  bt_quit - call stop() (cleanup and exit)
-        Object source = e.getSource(); 
-        if (source == bt_start) {
+    public void componentResized(ComponentEvent e) { bsim.resize_screen(pnl_screen.getSize()); }
+    public void actionPerformed(ActionEvent e) {
+        Object source = e.getSource();
+        if (source == bt_start || source == bt_pause) {
+            bt_start.setEnabled(bsim.is_paused());
+            bt_pause.setEnabled(!bsim.is_paused());
             bsim.set_pause(!bsim.is_paused());
-            if (bsim.is_paused()) bt_start.setLabel("Run");
-            else bt_start.setLabel("Pause");
         } else 
-        if (source == bt_shape) {
-            bsim.set_circle(!bsim.is_circle());
-            if (bsim.is_paused()) bsim.repaint();  // Force repaint if paused.
-            if (bsim.is_circle()) bt_shape.setLabel("Square");
-            else bt_shape.setLabel("Circle");
-        } else
-        if (source == bt_tail) {
-            bsim.set_tail(!bsim.has_tail());
-            if (bsim.has_tail()) bt_tail.setLabel("No Tail");
-            else bt_tail.setLabel("Tail");
-        } else
-        if (source == bt_clear) {
-            bsim.clear(); 
-            bsim.repaint();
-        } else
         if (source == bt_quit) {
             stop();
         }
     }
-
     public void adjustmentValueChanged(AdjustmentEvent e) {
         Scrollbar bar = (Scrollbar)e.getSource();
         if (bar == sb_tickrate) {
@@ -221,20 +211,38 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
             if (bsim.is_paused()) bsim.repaint(); // Force repaint to show new size in pause state.
         }
     }
-    
-    public void windowClosed(WindowEvent e) {}
-    public void windowOpened(WindowEvent e) {}
-    public void windowActivated(WindowEvent e) {}
-    public void windowDeactivated(WindowEvent e) {}
-    public void windowIconified(WindowEvent e) {}
-    public void windowDeiconified(WindowEvent e) {}
-    public void componentHidden(ComponentEvent e) {}
-    public void componentShown(ComponentEvent e) {}
-    public void componentMoved(ComponentEvent e) {}
-
-    public static void main(String args[]) {
-        new BouncingBall(800, 600);
+    public void mousePressed(MouseEvent e) {
+        String button = "";
+        if (e.getButton() == MouseEvent.BUTTON1) button = "Left";
+        else if (e.getButton() == MouseEvent.BUTTON2) button = "Center";  // Lesson doesn't have these as elses. Why? Is the else condition less efficient than sequential ifs in a micro way? That doesn't sound true.
+        else if (e.getButton() == MouseEvent.BUTTON3) button = "Right";
+        System.out.println(button + " mouse button " + e.getButton() + " pressed");
     }
+    public void mouseReleased(MouseEvent e) {
+        System.out.println("Mouse button " + e.getButton() + " released");
+    }
+    public void mouseClicked(MouseEvent e) {
+        System.out.println("Mouse Clicked" + e.getClickCount() + " clicks");
+    }
+    public void mouseMoved(MouseEvent e) {
+        //list.add(e.paramString());
+    }
+    public void mouseDragged(MouseEvent e) {
+        System.out.println(e.paramString());
+    }
+    public void mouseEntered(MouseEvent e) {
+        System.out.println(e.paramString());
+    }
+    public void mouseExited(MouseEvent e) {
+        System.out.println(e.paramString());
+    }
+    public static void main(String[] args) {
+        new bunce(new Dimension(600, 400));
+    }
+    
+    // Unimplemented windowListener, ComponenetLister:
+    public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
+    public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
 
     // Set values/scrolls to the given percent along their MINs/MAXs. 
     public void adjust_tickrate(double percent) {
@@ -285,8 +293,8 @@ class BounceSim extends Canvas implements Runnable {
     public final int BODY_SIZE_MIN = 10;
     public final int BODY_SIZE_MAX = 200;
 
-    private int screen_width;
-    private int screen_height;
+    private Dimension screen_size;  
+    private int screen_width, screen_height;    // @todo Eventually replace all these with screen_size
   
     // Sim settings: 
     private int sim_delay;          // Ms delay between ticks, 1000/tickrate.
@@ -307,11 +315,12 @@ class BounceSim extends Canvas implements Runnable {
 
     // Bouncing body:
     private int size;   // Expands outward from center. 
-    private Vec2 pos;   // Relative to center pixel.
+    private Vec2 pos;   // Relative to center pixel.    // @todo Should use Points instead
     private Vec2 vel;   // Pixels per tick.
     
-    public BounceSim(int w, int h) {
-        screen_width = w; screen_height = h;
+    public BounceSim(Dimension initial_screen_size) {
+        screen_size = initial_screen_size.getSize();    // ! bandaid
+        screen_width = (int)screen_size.getWidth(); screen_height = (int)screen_size.getHeight();
         
         sim_tickrate = SIM_TICKRATE_MIN;
         sim_delay = 1000/sim_tickrate;
@@ -330,6 +339,8 @@ class BounceSim extends Canvas implements Runnable {
         notail_y = (int)Math.round(pos.y);
         notail_size = size;
         notail_circle = render_circle;
+        
+        setBackground(Color.white);
     }
 
     public void start() {
@@ -381,7 +392,9 @@ class BounceSim extends Canvas implements Runnable {
     
     public int get_width() { return screen_width; }
     public int get_height() { return screen_height; }
-    public void resize_screen(int w, int h) { 
+    public void resize_screen(Dimension new_size) { 
+        // patch fix
+        int w = (int)new_size.getWidth(); int h = (int)new_size.getHeight();
         screen_width = w; screen_height = h; 
         pos.x = Util.restrict_bounds(pos.x, size+1, screen_width-size-1);
         pos.y = Util.restrict_bounds(pos.y, size+1, screen_height-size-1);
@@ -465,6 +478,9 @@ class BounceSim extends Canvas implements Runnable {
     public Vec2 body_get_velocity() { return (new Vec2(vel)); }
     public int body_get_size() { return size; }
 }
+
+
+// @todo get rid of these, replace with Point and whatever proper Math function des the bounding stuff.
 
 // Two dimensional vector, for velocity and position data.
 // Doubles (instead of ints) to support pixel movement slower than the tickrate.
