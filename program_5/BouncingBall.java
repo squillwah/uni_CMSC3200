@@ -14,6 +14,7 @@ package BouncingBall;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.util.Vector;
 
 public class BouncingBall extends Frame implements WindowListener, ComponentListener, ActionListener, AdjustmentListener, MouseListener, MouseMotionListener {
     private static final long SerialVersionUID = 101L;
@@ -24,7 +25,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     // Graphical bouncing ball + rectangles simulation.
     private BounceSim bsim;
     // Elements of controls section.
-    private Button bt_start, bt_pause, bt_quit;
+    private Button bt_start, bt_pause, bt_quit, bt_create, bt_destroy, bt_next;
     private Scrollbar sb_tickrate, sb_velocity, sb_size;
     private Label sb_tickrate_lbl, sb_velocity_lbl, sb_size_lbl;
 
@@ -74,6 +75,9 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         bt_start = new Button("START"); bt_start.setEnabled(true);
         bt_pause = new Button("PAUSE"); bt_pause.setEnabled(false);
         bt_quit = new Button("QUIT");
+        bt_create = new Button("CREATE");
+        bt_destroy = new Button("DESTROY"); bt_destroy.setEnabled(false);
+        bt_next = new Button("NEXT");
         sb_tickrate_lbl = new Label(("Tickrate: ?t/s"), Label.CENTER);    
         sb_velocity_lbl = new Label(("Velocity: ?px/t"), Label.CENTER);       
         sb_size_lbl = new Label(("Ball Size: ?px"), Label.CENTER);            
@@ -132,8 +136,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         gbc.gridy = 1;
         pnl_controls.add(sb_size_lbl, gbc); 
         gbc.insets.top = 10; gbc.insets.bottom = 0;
-        //  Middle Buttons [Start, Pause, Quit] 
-        gbc.gridheight = 2;
+        //  Middle Buttons
+        gbc.gridheight = 1;
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = 0.025;
         gbc.insets.top = 5;
@@ -142,14 +146,24 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         gbc.insets.right = 0;
         gbc.gridx = 2; gbc.gridy = 0;
         pnl_controls.add(bt_start, gbc);
+        gbc.gridy = 1;
+        pnl_controls.add(bt_create, gbc);
         gbc.gridx = 3; gbc.gridy = 0;
         pnl_controls.add(bt_pause, gbc);
+        gbc.gridy = 1;
+        pnl_controls.add(bt_destroy, gbc);
         gbc.gridx = 4; gbc.gridy = 0;
         pnl_controls.add(bt_quit, gbc);
+        gbc.gridy = 1;
+        pnl_controls.add(bt_next, gbc);
         // Attach listeners:
         bt_start.addActionListener(this);
         bt_pause.addActionListener(this);
         bt_quit.addActionListener(this);
+        bt_create.addActionListener(this);
+        bt_destroy.addActionListener(this);
+        bt_next.addActionListener(this);
+
         sb_tickrate.addAdjustmentListener(this);
         sb_velocity.addAdjustmentListener(this);
         sb_size.addAdjustmentListener(this);
@@ -159,6 +173,9 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         bt_start.removeActionListener(this);
         bt_pause.removeActionListener(this);
         bt_quit.removeActionListener(this);
+        bt_create.removeActionListener(this);
+        bt_destroy.removeActionListener(this);
+        bt_next.removeActionListener(this);
         sb_tickrate.removeAdjustmentListener(this);
         sb_velocity.removeAdjustmentListener(this);
         sb_size.removeAdjustmentListener(this);
@@ -183,69 +200,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         dispose();
         System.exit(0);
     }
-
-    // Event handler implementations:
-    public void windowClosing(WindowEvent e) { stop(); }
-    public void componentResized(ComponentEvent e) { bsim.resize_screen(pnl_screen.getSize()); }
-    public void actionPerformed(ActionEvent e) {
-        Object source = e.getSource();
-        if (source == bt_start || source == bt_pause) {
-            bsim.set_pause(!bsim.is_paused());
-            bt_start.setEnabled(bsim.is_paused());
-            bt_pause.setEnabled(!bsim.is_paused());
-        } else 
-        if (source == bt_quit) {
-            stop();
-        }
-    }
-    public void adjustmentValueChanged(AdjustmentEvent e) {
-        Scrollbar bar = (Scrollbar)e.getSource();
-        if (bar == sb_tickrate) {
-            adjust_tickrate(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
-        } else
-        if (bar == sb_velocity) {
-            adjust_velocity(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
-        } else
-        if (bar == sb_size) {
-            adjust_size(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
-            if (bsim.is_paused()) bsim.repaint(); // Force repaint to show new size in pause state.
-        }
-    }
-
-    // Should we implement these mouse events under this frame class or the BounceSim? Should BounceSim be concered with user Mouse movements, or only have methods to places rectangles in places?
-    public void mousePressed(MouseEvent e) {
-        String button = "";
-        if (e.getButton() == MouseEvent.BUTTON1) button = "Left";
-        else if (e.getButton() == MouseEvent.BUTTON2) button = "Center";  // Lesson doesn't have these as elses. Why? Is the else condition less efficient than sequential ifs in a micro way? That doesn't sound true.
-        else if (e.getButton() == MouseEvent.BUTTON3) button = "Right";
-        System.out.println(button + " mouse button " + e.getButton() + " pressed");
-    }
-    public void mouseReleased(MouseEvent e) {
-        System.out.println("Mouse button " + e.getButton() + " released");
-    }
-    public void mouseClicked(MouseEvent e) {
-        System.out.println("Mouse Clicked" + e.getClickCount() + " clicks");
-    }
-    public void mouseMoved(MouseEvent e) {
-        //list.add(e.paramString());
-    }
-    public void mouseDragged(MouseEvent e) {
-        System.out.println(e.paramString());
-    }
-    public void mouseEntered(MouseEvent e) {
-        System.out.println(e.paramString());
-    }
-    public void mouseExited(MouseEvent e) {
-        System.out.println(e.paramString());
-    }
-    public static void main(String[] args) {
-        new BouncingBall(new Dimension(600, 400));
-    }
     
-    // Unimplemented windowListener, ComponenetLister:
-    public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
-    public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
-
     // Set values/scrolls to the given percent along their MINs/MAXs. 
     public void adjust_tickrate(double percent) {
         percent = Util.restrict_bounds(percent, 0.001, 1);
@@ -283,7 +238,99 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         sb_size.setValue(Util.relate_bounds(new_size, bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
         sb_size_lbl.setText("Size: " + new_size*2+1 + "px");
     }
+
+    // Event handler implementations:
+    //  WindowListener
+    public void windowClosing(WindowEvent e) { stop(); }
+    //  ComponenetListener
+    public void componentResized(ComponentEvent e) { bsim.resize_screen(pnl_screen.getSize()); }
+    //  ActionListener
+    public void actionPerformed(ActionEvent e) {
+        Object source = e.getSource();
+        if (source == bt_start || source == bt_pause) {
+            bsim.set_pause(!bsim.is_paused());
+            bt_start.setEnabled(bsim.is_paused());
+            bt_pause.setEnabled(!bsim.is_paused());
+        } else 
+        if (source == bt_create) {
+            bt_create.setEnabled(bsim.add_ball());  // Returns false if ball limit reached.
+            bt_destroy.setEnabled(true);
+            sb_velocity.setValue((int)Math.round(Util.relate_bounds(bsim.body_get_velocity().x, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
+            sb_velocity_lbl.setText("Velocity: " + Math.round(bsim.body_get_velocity().x*100)/100.0 + "px/t");
+            sb_size.setValue(Util.relate_bounds(bsim.body_get_size(), bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
+            sb_size_lbl.setText("Size: " + bsim.body_get_size()*2+1 + "px");    // @todo Should seperate these from here and the adjust methods. Put them into some "update_scrollbar" method.
+        } else
+        if (source == bt_destroy) {
+            bt_destroy.setEnabled(bsim.remove_ball());  
+            sb_velocity.setValue((int)Math.round(Util.relate_bounds(bsim.body_get_velocity().x, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
+            sb_velocity_lbl.setText("Velocity: " + Math.round(bsim.body_get_velocity().x*100)/100.0 + "px/t");
+            sb_size.setValue(Util.relate_bounds(bsim.body_get_size(), bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
+            sb_size_lbl.setText("Size: " + bsim.body_get_size()*2+1 + "px");    // @todo Should seperate these from here and the adjust methods. Put them into some "update_scrollbar" method.
+        } else
+        if (source == bt_next) {
+            bsim.next_ball();
+            sb_velocity.setValue((int)Math.round(Util.relate_bounds(bsim.body_get_velocity().x, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
+            sb_velocity_lbl.setText("Velocity: " + Math.round(bsim.body_get_velocity().x*100)/100.0 + "px/t");
+            sb_size.setValue(Util.relate_bounds(bsim.body_get_size(), bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
+            sb_size_lbl.setText("Size: " + bsim.body_get_size()*2+1 + "px");    // @todo Should seperate these from here and the adjust methods. Put them into some "update_scrollbar" method.
+        } else
+        if (source == bt_quit) {
+            stop();
+        }
+    }
+    //  AdjustmentListener
+    public void adjustmentValueChanged(AdjustmentEvent e) {
+        Scrollbar bar = (Scrollbar)e.getSource();
+        if (bar == sb_tickrate) {
+            adjust_tickrate(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
+        } else
+        if (bar == sb_velocity) {
+            adjust_velocity(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
+        } else
+        if (bar == sb_size) {
+            adjust_size(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
+            if (bsim.is_paused()) bsim.repaint(); // Force repaint to show new size in pause state.
+        }
+    }
+    //  MouseListener
+    // Should we implement these mouse events under this frame class or the BounceSim? Should BounceSim be concered with user Mouse movements, or only have methods to places rectangles in places?
+    public void mousePressed(MouseEvent e) {
+        String button = "";
+        if (e.getButton() == MouseEvent.BUTTON1) button = "Left";
+        else if (e.getButton() == MouseEvent.BUTTON2) button = "Center";  // Lesson doesn't have these as elses. Why? Is the else condition less efficient than sequential ifs in a micro way? That doesn't sound true.
+        else if (e.getButton() == MouseEvent.BUTTON3) button = "Right";
+        System.out.println(button + " mouse button " + e.getButton() + " pressed");
+    }
+    public void mouseReleased(MouseEvent e) {
+        System.out.println("Mouse button " + e.getButton() + " released");
+    }
+    public void mouseClicked(MouseEvent e) {
+        System.out.println("Mouse Clicked" + e.getClickCount() + " clicks");
+        // use a Point to store the click point
+    }
+    public void mouseEntered(MouseEvent e) {
+        System.out.println(e.paramString());
+    }
+    public void mouseExited(MouseEvent e) {
+        System.out.println(e.paramString());
+    }
+    //  MouseMotionListener
+    public void mouseMoved(MouseEvent e) {
+        //list.add(e.paramString());
+    }
+    public void mouseDragged(MouseEvent e) {
+        System.out.println(e.paramString());
+    }
+    
+    // Unimplemented WindowListener, ComponenetLister:
+    public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
+    public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
+    
+    public static void main(String[] args) {
+        new BouncingBall(new Dimension(600, 400));
+    }
 }
+
 
 class BounceSim extends Canvas implements Runnable {
     private static final long serialVersionUID = 11L;
@@ -294,9 +341,10 @@ class BounceSim extends Canvas implements Runnable {
     public final double BODY_VEL_MAX = 20;
     public final int BODY_SIZE_MIN = 10;
     public final int BODY_SIZE_MAX = 200;
+    public final int MIN_BALLS = 1;     // Do not make less than one.
+    public final int MAX_BALLS = 10;
 
-    private Dimension screen_size;  
-    private int screen_width, screen_height;    // @todo Eventually replace all these with screen_size
+    // Looking for window dimensions? They're in the parent class, use getWidth/getHeight/getSize/setSize.
   
     // Sim settings: 
     private int sim_delay;          // Ms delay between ticks, 1000/tickrate.
@@ -305,25 +353,13 @@ class BounceSim extends Canvas implements Runnable {
     private boolean sim_paused;
     private boolean sim_running;
 
-    // Render flags: 
-    private boolean render_clear;   // Clear the canvas on next draw. Resets self.
-    private boolean render_circle;  // Render the body as a circle. Otherwise drawn as square.
-    private boolean render_tail;    // Keep tails (don't erase last frame's shape).
-   
-    // State of previous frame object, for tail erasure/shape changes. 
-    private boolean notail_circle;
-    private int notail_x, notail_y; 
-    private int notail_size;    
+    // Objects 
+    class Ball { public int size; public Vec2 pos; public Vec2 vel; Color color; } // * Keeping Vec2's instead of changing to points, decimal (sub-pixel) precision is desired for smoothest movement.
+    private Vector<Ball> balls;
+    private Ball selected_ball; // Reference to the selected ball in the vector (for changing velocity/size)
+    //private vector<Rect> rects
 
-    // Bouncing body:
-    private int size;   // Expands outward from center. 
-    private Vec2 pos;   // Relative to center pixel.    // @todo Should use Points instead
-    private Vec2 vel;   // Pixels per tick.
-    
     public BounceSim(Dimension initial_screen_size) {
-        //screen_size = initial_screen_size.getSize();    // ! bandaid
-        //screen_width = (int)screen_size.getWidth(); screen_height = (int)screen_size.getHeight();
-
         setSize(initial_screen_size);
         
         sim_tickrate = SIM_TICKRATE_MIN;
@@ -331,22 +367,26 @@ class BounceSim extends Canvas implements Runnable {
         sim_thread = null;
         sim_paused = true;
         sim_running = false;
-
-        size = BODY_SIZE_MIN;
-        pos = new Vec2(getWidth()/4, getHeight()/4);    // should use point (!! or maybe not, considering it might only be integer precision?)
-        vel = Vec2.mul((new Vec2(1,1)), Math.sqrt((BODY_VEL_MIN*BODY_VEL_MIN)/2));
-
-        render_circle = false;  // Start as rect, with tails.
-        render_tail = true;
-        render_clear = false;
-        notail_x = (int)Math.round(pos.x);
-        notail_y = (int)Math.round(pos.y);
-        notail_size = size;
-        notail_circle = render_circle;
         
+        balls = new Vector<Ball>();
+        balls.addElement(new Ball());
+        selected_ball = balls.elementAt(0);
+        selected_ball.size = BODY_SIZE_MIN;
+        selected_ball.pos = new Vec2(getWidth()/4, getHeight()/4);
+        selected_ball.vel = Vec2.mul((new Vec2(1,1)), Math.sqrt((BODY_VEL_MIN*BODY_VEL_MIN)/2));
+        selected_ball.color = Color.red;
+       
+        /* 
+        balls.addElement(new Ball());
+        balls.elementAt(1).size = BODY_SIZE_MIN;
+        balls.elementAt(1).pos = new Vec2(getWidth()/4, getHeight()/4);
+        balls.elementAt(1).vel = Vec2.mul((new Vec2(-1,-1)), Math.sqrt((BODY_VEL_MAX*BODY_VEL_MAX)/2));
+        balls.elementAt(1).color = Color.lightGray;*/
+
+
         setBackground(Color.white);
     }
-
+    
     public void start() {
         if (sim_thread == null) {
             sim_running = true;
@@ -365,25 +405,28 @@ class BounceSim extends Canvas implements Runnable {
     public void run() {
         while (sim_running) {
             while (!sim_paused) {
-                Vec2 next_pos = Vec2.add(pos, vel);
-                
-                // Screen collision detection: 
-                if (next_pos.x < 1+size+1) { 
-                    next_pos.x = 1+size+1; 
-                    vel.x = -vel.x; 
-                } else if (next_pos.x > getWidth()-size-1-1) { 
-                    next_pos.x = getWidth()-size-1-1; 
-                    vel.x = -vel.x; 
-                }
-                if (next_pos.y < 1+size+1) { 
-                    next_pos.y = 1+size+1; 
-                    vel.y = -vel.y; 
-                } else if (next_pos.y > getHeight()-size-1-1) { 
-                    next_pos.y = getHeight()-size-1-1; 
-                    vel.y = -vel.y; 
-                }
+                for (Ball ball : balls) {
+                    Vec2 next_pos = Vec2.add(ball.pos, ball.vel);
+                    
+                    // Screen collision detection: 
+                    if (next_pos.x < 1+ball.size+1) { 
+                        next_pos.x = 1+ball.size+1; 
+                        ball.vel.x = -ball.vel.x; 
+                    } else if (next_pos.x > getWidth()-ball.size-1-1) { 
+                        next_pos.x = getWidth()-ball.size-1-1; 
+                        ball.vel.x = -ball.vel.x; 
+                    }
+                    if (next_pos.y < 1+ball.size+1) { 
+                        next_pos.y = 1+ball.size+1; 
+                        ball.vel.y = -ball.vel.y; 
+                    } else if (next_pos.y > getHeight()-ball.size-1-1) { 
+                        next_pos.y = getHeight()-ball.size-1-1; 
+                        ball.vel.y = -ball.vel.y; 
+                    }
 
-                pos = next_pos;
+                    ball.pos = next_pos;
+                }
+                
                 repaint();
                 
                 try { Thread.sleep(sim_delay); }
@@ -393,20 +436,55 @@ class BounceSim extends Canvas implements Runnable {
             catch (InterruptedException e) {}   
         }
     }
+
+    public boolean add_ball() { 
+        // @todo a degre of randomness to each ball's initialization (size/speed color?)
+
+        if (balls.size() < MAX_BALLS) {
+            Ball new_ball = new Ball();
+            new_ball.size = BODY_SIZE_MIN+20;   // @todo better size/vel defaults, maybe some ball initializer? could make a constructor, but that implies mins/max in the ball object when it's really more of a struct in this case.
+            new_ball.pos = new Vec2(getWidth()/4, getHeight()/4);
+            new_ball.vel = Vec2.mul((new Vec2(1,1)), Math.sqrt((BODY_VEL_MIN+2*BODY_VEL_MIN+2)/2));
+            new_ball.color = Color.lightGray;
+            balls.addElement(new_ball);
+            next_ball();
+        }
+        return balls.size() < MAX_BALLS;     // Returns if the *next* call is valid or not (true if still under limit, false if now at limit)
+    }
+    public boolean remove_ball() { 
+        if (balls.size() > MIN_BALLS) {
+            Ball old_selected = selected_ball;
+            next_ball();
+            balls.removeElement(old_selected);
+        }
+        return balls.size() > MIN_BALLS; 
+    }
+    public void next_ball() {      // Currently selected ball should be a different color.
+        // ! assuming balls is never empty 
+        System.out.println(selected_ball);
+        if (balls.size() > 1) {
+            selected_ball.color = Color.lightGray;
+            if (balls.lastElement() != selected_ball) 
+                selected_ball = balls.elementAt(balls.indexOf(selected_ball)+1);
+            else 
+                selected_ball = balls.firstElement();
+            selected_ball.color = Color.red;
+        }
+        System.out.println(selected_ball);
+
+        //@todo (maybe) a stack type structure would be best for this, to avoid confusion when deleting balls and it picking one at the beginning of the vector and not the previous.
+    }
     
     public Dimension get_screen_size() { return getSize(); }
     public void resize_screen(Dimension new_size) { 
-        pos.x = Util.restrict_bounds(pos.x, size+1, new_size.getWidth()-size-1);
-        pos.y = Util.restrict_bounds(pos.y, size+1, new_size.getWidth()-size-1);
+        for (Ball ball : balls) {
+            ball.pos.x = Util.restrict_bounds(ball.pos.x, ball.size+1, new_size.getWidth()-ball.size-1);
+            ball.pos.y = Util.restrict_bounds(ball.pos.y, ball.size+1, new_size.getWidth()-ball.size-1);
+        }
         setSize(new_size);
     }
     
-    public boolean is_circle() { return render_circle; }  
-    public boolean has_tail() { return render_tail; }
     public boolean is_paused() { return sim_paused; }
-    public void clear() { render_clear = true; }
-    public void set_circle(boolean c) { notail_circle = render_circle; render_circle = c; }
-    public void set_tail(boolean t) { render_tail = t; }
     public void set_pause(boolean p) { 
         if (sim_paused != p) {
             sim_paused = p; 
@@ -416,37 +494,16 @@ class BounceSim extends Canvas implements Runnable {
     
     // Use update to draw graphics instead of paint (remove screen wipes).
     public void update(Graphics g) {
-        if (render_clear) {
-            super.paint(g);         // Call original paint function to wipe the screen.
-            render_clear = false;   // Clear the clear.
-            g.setColor(Color.red);
-            g.drawRect(0, 0, getWidth()-1, getHeight()-1);      // Redraw the red boarder.
-        }
-        if (!render_tail || sim_paused) {   // Clear previous frame when tails disabled or bouncing paused.
-            g.setColor(getBackground());
-            if (notail_circle) g.fillOval(notail_x-notail_size-2, notail_y-notail_size-2, notail_size*2+3, notail_size*2+3);
-            else g.fillRect(notail_x-notail_size-1, notail_y-notail_size-1, notail_size*2+2, notail_size*2+2);
-        }
-
-        // Top left position from center pixel, rounding subpixel to pixel precision.
-        int tl_x = (int)Math.round(pos.x-1-size);   
-        int tl_y = (int)Math.round(pos.y-1-size);
-        if (render_circle) {       
-            g.setColor(Color.lightGray);
-            g.fillOval(tl_x, tl_y, size*2+1, size*2+1); 
+        int tl_x;   // Top left position from center pixel, rounding subpixel to pixel precision.
+        int tl_y;
+        for (Ball ball : balls) {
+            tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
+            tl_y = (int)Math.round(ball.pos.y-1-ball.size);
+            g.setColor(ball.color);
+            g.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
             g.setColor(Color.black);
-            g.drawOval(tl_x, tl_y, size*2+1, size*2+1);
-        } else {
-            g.setColor(Color.lightGray);
-            g.fillRect(tl_x, tl_y, size*2+1, size*2+1);
-            g.setColor(Color.black);
-            g.drawRect(tl_x, tl_y, size*2+1, size*2+1);
+            g.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
         }
-
-        notail_x = (int)Math.round(pos.x);
-        notail_y = (int)Math.round(pos.y);
-        notail_circle = render_circle;
-        notail_size = size;
     }
 
     // Override paint to draw the red boarder and call update (os will trigger a paint occasionally).
@@ -461,22 +518,28 @@ class BounceSim extends Canvas implements Runnable {
         sim_delay = (int)Math.round(1000/sim_tickrate);
     }
     public void body_set_velocity(Vec2 new_vel) {
-        vel.x = new_vel.x; vel.y = new_vel.y;
+        selected_ball.vel.x = new_vel.x; selected_ball.vel.y = new_vel.y;
     }
     public void body_set_size(int px) {
-        notail_size = size;
+
+        // We should have some select button in gui, which determines which this (and velocity) acts on. Right now, it only effects the first ball.
+
+        //Ball ball = balls.elementAt(0);  // ! We should never allow removing the first ball. Grey out the button in GUI.
+        Ball ball = selected_ball;
+
         int next_size = Util.restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
         // Restrict within screen bounds from current position:
-        if ((pos.x+next_size+1) >= getWidth()-1) next_size = (int)(getWidth()-pos.x-2);
-        else if ((pos.x-next_size-1) <= 1) next_size = (int)(pos.x-2);
-        if ((pos.y+next_size+1) >= getHeight()-1) next_size = (int)(getHeight()-pos.y-2);
-        else if ((pos.y-next_size-1) <= 1) next_size = (int)(pos.y-2);
-        size = next_size;
+        //Util.restrict_bounds( should use restrict bounds here.
+        if ((ball.pos.x+next_size+1) >= getWidth()-1) next_size = (int)(getWidth()-ball.pos.x-2);
+        else if ((ball.pos.x-next_size-1) <= 1) next_size = (int)(ball.pos.x-2);
+        if ((ball.pos.y+next_size+1) >= getHeight()-1) next_size = (int)(getHeight()-ball.pos.y-2);
+        else if ((ball.pos.y-next_size-1) <= 1) next_size = (int)(ball.pos.y-2);
+        ball.size = next_size;
     }
 
     public int sim_get_tickrate() { return sim_tickrate; }
-    public Vec2 body_get_velocity() { return (new Vec2(vel)); }
-    public int body_get_size() { return size; }
+    public Vec2 body_get_velocity() { return (new Vec2(selected_ball.vel)); }  // Should be the one selected in GUI. GUI should have buttons (create ball, destroy ball, and next ball)
+    public int body_get_size() { return selected_ball.size; }
 }
 
 
@@ -504,6 +567,8 @@ class Vec2 {
         product.mul(multiplier);
         return product;
     }
+
+    // need to make a magnitude method
 }
 
 class Util {
