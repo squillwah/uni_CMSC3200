@@ -58,7 +58,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         pnl_screen.setLayout(new BorderLayout());
         add("Center", pnl_screen);
         // Create BounceSim, add to panel:
-        bsim = new BounceSim(getMinimumSize());  // Set initial canvas size to the minimum frame size. Using pnl_screen.getWidth/Height returns zeros at this stage. Perhaps a better way should be found for bsim's canvas to get its height? Perhaps have the canvas as part of this GUI class, then feed that the graphics from the simulation class? That setup might necessitate a seperate thread, or not using some kind of callback function given to bsim.
+        bsim = new BounceSim(getMinimumSize());  // Use minimum frame size for initial canvas size. pnl_screen.getSize() is still empty at this stage.
         pnl_screen.add("Center", bsim);
         // Attach mouse listeners:
         bsim.addMouseListener(this);
@@ -190,9 +190,9 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     public void actionPerformed(ActionEvent e) {
         Object source = e.getSource();
         if (source == bt_start || source == bt_pause) {
+            bsim.set_pause(!bsim.is_paused());
             bt_start.setEnabled(bsim.is_paused());
             bt_pause.setEnabled(!bsim.is_paused());
-            bsim.set_pause(!bsim.is_paused());
         } else 
         if (source == bt_quit) {
             stop();
@@ -211,6 +211,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
             if (bsim.is_paused()) bsim.repaint(); // Force repaint to show new size in pause state.
         }
     }
+
+    // Should we implement these mouse events under this frame class or the BounceSim? Should BounceSim be concered with user Mouse movements, or only have methods to places rectangles in places?
     public void mousePressed(MouseEvent e) {
         String button = "";
         if (e.getButton() == MouseEvent.BUTTON1) button = "Left";
@@ -237,7 +239,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         System.out.println(e.paramString());
     }
     public static void main(String[] args) {
-        new bunce(new Dimension(600, 400));
+        new BouncingBall(new Dimension(600, 400));
     }
     
     // Unimplemented windowListener, ComponenetLister:
@@ -319,8 +321,10 @@ class BounceSim extends Canvas implements Runnable {
     private Vec2 vel;   // Pixels per tick.
     
     public BounceSim(Dimension initial_screen_size) {
-        screen_size = initial_screen_size.getSize();    // ! bandaid
-        screen_width = (int)screen_size.getWidth(); screen_height = (int)screen_size.getHeight();
+        //screen_size = initial_screen_size.getSize();    // ! bandaid
+        //screen_width = (int)screen_size.getWidth(); screen_height = (int)screen_size.getHeight();
+
+        setSize(initial_screen_size);
         
         sim_tickrate = SIM_TICKRATE_MIN;
         sim_delay = 1000/sim_tickrate;
@@ -329,7 +333,7 @@ class BounceSim extends Canvas implements Runnable {
         sim_running = false;
 
         size = BODY_SIZE_MIN;
-        pos = new Vec2(screen_width/4, screen_height/4);
+        pos = new Vec2(getWidth()/4, getHeight()/4);    // should use point (!! or maybe not, considering it might only be integer precision?)
         vel = Vec2.mul((new Vec2(1,1)), Math.sqrt((BODY_VEL_MIN*BODY_VEL_MIN)/2));
 
         render_circle = false;  // Start as rect, with tails.
@@ -367,15 +371,15 @@ class BounceSim extends Canvas implements Runnable {
                 if (next_pos.x < 1+size+1) { 
                     next_pos.x = 1+size+1; 
                     vel.x = -vel.x; 
-                } else if (next_pos.x > screen_width-size-1-1) { 
-                    next_pos.x = screen_width-size-1-1; 
+                } else if (next_pos.x > getWidth()-size-1-1) { 
+                    next_pos.x = getWidth()-size-1-1; 
                     vel.x = -vel.x; 
                 }
                 if (next_pos.y < 1+size+1) { 
                     next_pos.y = 1+size+1; 
                     vel.y = -vel.y; 
-                } else if (next_pos.y > screen_height-size-1-1) { 
-                    next_pos.y = screen_height-size-1-1; 
+                } else if (next_pos.y > getHeight()-size-1-1) { 
+                    next_pos.y = getHeight()-size-1-1; 
                     vel.y = -vel.y; 
                 }
 
@@ -390,16 +394,12 @@ class BounceSim extends Canvas implements Runnable {
         }
     }
     
-    public int get_width() { return screen_width; }
-    public int get_height() { return screen_height; }
+    public Dimension get_screen_size() { return getSize(); }
     public void resize_screen(Dimension new_size) { 
-        // patch fix
-        int w = (int)new_size.getWidth(); int h = (int)new_size.getHeight();
-        screen_width = w; screen_height = h; 
-        pos.x = Util.restrict_bounds(pos.x, size+1, screen_width-size-1);
-        pos.y = Util.restrict_bounds(pos.y, size+1, screen_height-size-1);
-        setSize(screen_width, screen_height);
-    }    
+        pos.x = Util.restrict_bounds(pos.x, size+1, new_size.getWidth()-size-1);
+        pos.y = Util.restrict_bounds(pos.y, size+1, new_size.getWidth()-size-1);
+        setSize(new_size);
+    }
     
     public boolean is_circle() { return render_circle; }  
     public boolean has_tail() { return render_tail; }
@@ -420,7 +420,7 @@ class BounceSim extends Canvas implements Runnable {
             super.paint(g);         // Call original paint function to wipe the screen.
             render_clear = false;   // Clear the clear.
             g.setColor(Color.red);
-            g.drawRect(0, 0, screen_width-1, screen_height-1);      // Redraw the red boarder.
+            g.drawRect(0, 0, getWidth()-1, getHeight()-1);      // Redraw the red boarder.
         }
         if (!render_tail || sim_paused) {   // Clear previous frame when tails disabled or bouncing paused.
             g.setColor(getBackground());
@@ -452,7 +452,7 @@ class BounceSim extends Canvas implements Runnable {
     // Override paint to draw the red boarder and call update (os will trigger a paint occasionally).
     public void paint(Graphics g) {
         g.setColor(Color.red);
-        g.drawRect(0, 0, screen_width-1, screen_height-1);
+        g.drawRect(0, 0, getWidth()-1, getHeight()-1);
         update(g);
     }
 
@@ -467,9 +467,9 @@ class BounceSim extends Canvas implements Runnable {
         notail_size = size;
         int next_size = Util.restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
         // Restrict within screen bounds from current position:
-        if ((pos.x+next_size+1) >= screen_width-1) next_size = (int)(screen_width-pos.x-2);
+        if ((pos.x+next_size+1) >= getWidth()-1) next_size = (int)(getWidth()-pos.x-2);
         else if ((pos.x-next_size-1) <= 1) next_size = (int)(pos.x-2);
-        if ((pos.y+next_size+1) >= screen_height-1) next_size = (int)(screen_height-pos.y-2);
+        if ((pos.y+next_size+1) >= getHeight()-1) next_size = (int)(getHeight()-pos.y-2);
         else if ((pos.y-next_size-1) <= 1) next_size = (int)(pos.y-2);
         size = next_size;
     }
