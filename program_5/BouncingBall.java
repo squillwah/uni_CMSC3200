@@ -76,8 +76,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         bt_pause = new Button("PAUSE"); bt_pause.setEnabled(false);
         bt_quit = new Button("QUIT");
         bt_create = new Button("CREATE");
-        bt_destroy = new Button("DESTROY"); bt_destroy.setEnabled(false);
-        bt_next = new Button("NEXT");
+        bt_destroy = new Button("DESTROY"); bt_destroy.setEnabled(false);   // Assuming single ball initialization.
+        bt_next = new Button("NEXT"); bt_next.setEnabled(false);
         sb_tickrate_lbl = new Label(("Tickrate: ?t/s"), Label.CENTER);    
         sb_velocity_lbl = new Label(("Velocity: ?px/t"), Label.CENTER);       
         sb_size_lbl = new Label(("Ball Size: ?px"), Label.CENTER);            
@@ -93,7 +93,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
             bar.setUnitIncrement(5); 
             bar.setBlockIncrement(50); 
             bar.setBackground(Color.gray); 
-        } 
+        } // @todo We should pick more exotic colors for all the UI
         adjust_tickrate(.2475);
         adjust_velocity(.35);
         adjust_size(.25);
@@ -163,7 +163,6 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         bt_create.addActionListener(this);
         bt_destroy.addActionListener(this);
         bt_next.addActionListener(this);
-
         sb_tickrate.addAdjustmentListener(this);
         sb_velocity.addAdjustmentListener(this);
         sb_size.addAdjustmentListener(this);
@@ -185,7 +184,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         pnl_screen.removeMouseMotionListener(this);
         bsim.stop();
     }
-
+    
     // Start the program + close it:
     public void start() { 
         bsim.repaint(); 
@@ -200,22 +199,34 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         dispose();
         System.exit(0);
     }
-    
+
+    // Refresh scrollbar values with bsim gets.
+    public void sb_refresh_tickrate() {
+        int tps = bsim.sim_get_tickrate();
+        sb_tickrate.setValue(Util.relate_bounds(tps, bsim.SIM_TICKRATE_MIN, bsim.SIM_TICKRATE_MAX, sb_tickrate.getMinimum(), sb_tickrate.getMaximum()-sb_tickrate.getVisibleAmount()));
+        sb_tickrate_lbl.setText("Tickrate (speed): " + tps + "t/s");
+    }
+    public void sb_refresh_velocity() {
+        double mag = Vec2.magnitude(bsim.body_get_velocity());
+        sb_velocity.setValue((int)Math.round(Util.relate_bounds(mag, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
+        sb_velocity_lbl.setText("Velocity: " + Math.round(mag*100)/100.0 + "px/t");
+    }
+    public void sb_refresh_size() {
+        int size = bsim.body_get_size(); 
+        sb_size.setValue(Util.relate_bounds(size, bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
+        sb_size_lbl.setText("Size: " + size*2+1 + "px");
+    }
+
     // Set values/scrolls to the given percent along their MINs/MAXs. 
     public void adjust_tickrate(double percent) {
         percent = Util.restrict_bounds(percent, 0.001, 1);
         int new_tickrate = (int)Math.round(Util.relate_bounds(percent, 0.001, 1, bsim.SIM_TICKRATE_MIN, bsim.SIM_TICKRATE_MAX));
-
         bsim.sim_set_tickrate(new_tickrate);
-        
-        // Update scrollbar.
-        sb_tickrate.setValue(Util.relate_bounds(new_tickrate, bsim.SIM_TICKRATE_MIN, bsim.SIM_TICKRATE_MAX, sb_tickrate.getMinimum(), sb_tickrate.getMaximum()-sb_tickrate.getVisibleAmount()));
-        sb_tickrate_lbl.setText("Tickrate (speed): " + new_tickrate + "t/s");
+        sb_refresh_tickrate();
     }
     public void adjust_velocity(double percent) {
         percent = Util.restrict_bounds(percent, 0.001, 1);
         double magnitude = Util.relate_bounds(percent, 0.001, 1, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX);
-        
         // Preserve vector heading.
         Vec2 new_vel = bsim.body_get_velocity(); 
         new_vel.x /= Math.abs(new_vel.x); // ! May cause issue if vel is ever 0.
@@ -224,19 +235,14 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         // (equal components, assuming movement is always perfectly diagonal).
         new_vel.mul(Math.sqrt((magnitude*magnitude/2)));
         bsim.body_set_velocity(new_vel);
-
-        sb_velocity.setValue((int)Math.round(Util.relate_bounds(magnitude, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
-        sb_velocity_lbl.setText("Velocity: " + Math.round(magnitude*100)/100.0 + "px/t");
+        sb_refresh_velocity();
     }
     public void adjust_size(double percent) { 
         percent = Util.restrict_bounds(percent, 0.001, 1);
         int new_size = (int)Math.round(Util.relate_bounds(percent, 0.001, 1, bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX));
-        
         bsim.body_set_size(new_size);
         new_size = bsim.body_get_size(); // Size may have been restricted below SIZE_MAX if object was close to screen edge.
-        
-        sb_size.setValue(Util.relate_bounds(new_size, bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
-        sb_size_lbl.setText("Size: " + new_size*2+1 + "px");
+        sb_refresh_size();
     }
 
     // Event handler implementations:
@@ -252,27 +258,29 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
             bt_start.setEnabled(bsim.is_paused());
             bt_pause.setEnabled(!bsim.is_paused());
         } else 
-        if (source == bt_create) {
-            bt_create.setEnabled(bsim.add_ball());  // Returns false if ball limit reached.
+        if (source == bt_create && bsim.num_balls() < bsim.MAX_BALLS) {
+            bsim.add_ball();
+            bt_create.setEnabled(bsim.num_balls() < bsim.MAX_BALLS);
             bt_destroy.setEnabled(true);
-            sb_velocity.setValue((int)Math.round(Util.relate_bounds(bsim.body_get_velocity().x, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
-            sb_velocity_lbl.setText("Velocity: " + Math.round(bsim.body_get_velocity().x*100)/100.0 + "px/t");
-            sb_size.setValue(Util.relate_bounds(bsim.body_get_size(), bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
-            sb_size_lbl.setText("Size: " + bsim.body_get_size()*2+1 + "px");    // @todo Should seperate these from here and the adjust methods. Put them into some "update_scrollbar" method.
+            bt_next.setEnabled(true);
+            sb_refresh_velocity();
+            sb_refresh_size();
+            if (bsim.is_paused()) bsim.repaint(); // may not always need a call
         } else
-        if (source == bt_destroy) {
-            bt_destroy.setEnabled(bsim.remove_ball());  
-            sb_velocity.setValue((int)Math.round(Util.relate_bounds(bsim.body_get_velocity().x, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
-            sb_velocity_lbl.setText("Velocity: " + Math.round(bsim.body_get_velocity().x*100)/100.0 + "px/t");
-            sb_size.setValue(Util.relate_bounds(bsim.body_get_size(), bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
-            sb_size_lbl.setText("Size: " + bsim.body_get_size()*2+1 + "px");    // @todo Should seperate these from here and the adjust methods. Put them into some "update_scrollbar" method.
+        if (source == bt_destroy && bsim.num_balls() > 1) {
+            bsim.remove_ball();
+            bt_destroy.setEnabled(bsim.num_balls() > 1);  
+            bt_next.setEnabled(bt_destroy.isEnabled());
+            bt_create.setEnabled(true);
+            sb_refresh_velocity();
+            sb_refresh_size();
+            if (bsim.is_paused()) bsim.repaint();
         } else
-        if (source == bt_next) {
+        if (source == bt_next && bsim.num_balls() > 1) {
             bsim.next_ball();
-            sb_velocity.setValue((int)Math.round(Util.relate_bounds(bsim.body_get_velocity().x, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX, sb_velocity.getMinimum(), sb_velocity.getMaximum()-sb_velocity.getVisibleAmount())));
-            sb_velocity_lbl.setText("Velocity: " + Math.round(bsim.body_get_velocity().x*100)/100.0 + "px/t");
-            sb_size.setValue(Util.relate_bounds(bsim.body_get_size(), bsim.BODY_SIZE_MIN, bsim.BODY_SIZE_MAX, sb_size.getMinimum(), sb_size.getMaximum()-sb_size.getVisibleAmount()));
-            sb_size_lbl.setText("Size: " + bsim.body_get_size()*2+1 + "px");    // @todo Should seperate these from here and the adjust methods. Put them into some "update_scrollbar" method.
+            sb_refresh_velocity();
+            sb_refresh_size();
+            if (bsim.is_paused()) bsim.repaint();
         } else
         if (source == bt_quit) {
             stop();
@@ -327,7 +335,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
     
     public static void main(String[] args) {
-        new BouncingBall(new Dimension(600, 400));
+        new BouncingBall(new Dimension(1000, 500));
     }
 }
 
@@ -335,14 +343,14 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
 class BounceSim extends Canvas implements Runnable {
     private static final long serialVersionUID = 11L;
 
-    public final int SIM_TICKRATE_MIN = 1;
-    public final int SIM_TICKRATE_MAX = 256;
-    public final double BODY_VEL_MIN = 0.01;    // Magnitude, sqrt(x^2 + y^2)
-    public final double BODY_VEL_MAX = 20;
-    public final int BODY_SIZE_MIN = 10;
-    public final int BODY_SIZE_MAX = 200;
-    public final int MIN_BALLS = 1;     // Do not make less than one.
-    public final int MAX_BALLS = 10;
+    public static final int SIM_TICKRATE_MIN = 1;
+    public static final int SIM_TICKRATE_MAX = 256;
+    //public static final double VEL_COMPONENT_MAX = 20; // Absolute 
+    public static final double BODY_VEL_MIN = 0.01;    // Magnitude, sqrt(x^2 + y^2)   // should do this all differently with forces or smthn, but best not mess with it
+    public static final double BODY_VEL_MAX = 20;
+    public static final int BODY_SIZE_MIN = 10;
+    public static final int BODY_SIZE_MAX = 200;
+    public static final int MAX_BALLS = 10;
 
     // Looking for window dimensions? They're in the parent class, use getWidth/getHeight/getSize/setSize.
   
@@ -354,39 +362,25 @@ class BounceSim extends Canvas implements Runnable {
     private boolean sim_running;
 
     // Objects 
-    class Ball { public int size; public Vec2 pos; public Vec2 vel; Color color; } // * Keeping Vec2's instead of changing to points, decimal (sub-pixel) precision is desired for smoothest movement.
     private Vector<Ball> balls;
     private Ball selected_ball; // Reference to the selected ball in the vector (for changing velocity/size)
     //private vector<Rect> rects
 
     public BounceSim(Dimension initial_screen_size) {
         setSize(initial_screen_size);
-        
         sim_tickrate = SIM_TICKRATE_MIN;
         sim_delay = 1000/sim_tickrate;
         sim_thread = null;
         sim_paused = true;
         sim_running = false;
-        
         balls = new Vector<Ball>();
         balls.addElement(new Ball());
         selected_ball = balls.elementAt(0);
-        selected_ball.size = BODY_SIZE_MIN;
-        selected_ball.pos = new Vec2(getWidth()/4, getHeight()/4);
-        selected_ball.vel = Vec2.mul((new Vec2(1,1)), Math.sqrt((BODY_VEL_MIN*BODY_VEL_MIN)/2));
         selected_ball.color = Color.red;
-       
-        /* 
-        balls.addElement(new Ball());
-        balls.elementAt(1).size = BODY_SIZE_MIN;
-        balls.elementAt(1).pos = new Vec2(getWidth()/4, getHeight()/4);
-        balls.elementAt(1).vel = Vec2.mul((new Vec2(-1,-1)), Math.sqrt((BODY_VEL_MAX*BODY_VEL_MAX)/2));
-        balls.elementAt(1).color = Color.lightGray;*/
-
-
         setBackground(Color.white);
     }
-    
+   
+    // Starting/stopping the running thread. 
     public void start() {
         if (sim_thread == null) {
             sim_running = true;
@@ -437,44 +431,36 @@ class BounceSim extends Canvas implements Runnable {
         }
     }
 
-    public boolean add_ball() { 
-        // @todo a degre of randomness to each ball's initialization (size/speed color?)
-
+    // Adding, removing, switching balls.
+    public int num_balls() {
+        return balls.size();
+    }
+    public void add_ball() { 
         if (balls.size() < MAX_BALLS) {
             Ball new_ball = new Ball();
-            new_ball.size = BODY_SIZE_MIN+20;   // @todo better size/vel defaults, maybe some ball initializer? could make a constructor, but that implies mins/max in the ball object when it's really more of a struct in this case.
-            new_ball.pos = new Vec2(getWidth()/4, getHeight()/4);
-            new_ball.vel = Vec2.mul((new Vec2(1,1)), Math.sqrt((BODY_VEL_MIN+2*BODY_VEL_MIN+2)/2));
-            new_ball.color = Color.lightGray;
             balls.addElement(new_ball);
             next_ball();
         }
-        return balls.size() < MAX_BALLS;     // Returns if the *next* call is valid or not (true if still under limit, false if now at limit)
     }
-    public boolean remove_ball() { 
-        if (balls.size() > MIN_BALLS) {
+    public void remove_ball() { 
+        if (balls.size() > 1) {     // Balllessness is unsupported. Never allow zero balls.
             Ball old_selected = selected_ball;
-            next_ball();
+            if (balls.elementAt(0) == old_selected) selected_ball = balls.lastElement();
+            else selected_ball = balls.elementAt(balls.indexOf(old_selected)-1);
             balls.removeElement(old_selected);
-        }
-        return balls.size() > MIN_BALLS; 
-    }
-    public void next_ball() {      // Currently selected ball should be a different color.
-        // ! assuming balls is never empty 
-        System.out.println(selected_ball);
-        if (balls.size() > 1) {
-            selected_ball.color = Color.lightGray;
-            if (balls.lastElement() != selected_ball) 
-                selected_ball = balls.elementAt(balls.indexOf(selected_ball)+1);
-            else 
-                selected_ball = balls.firstElement();
             selected_ball.color = Color.red;
         }
-        System.out.println(selected_ball);
-
-        //@todo (maybe) a stack type structure would be best for this, to avoid confusion when deleting balls and it picking one at the beginning of the vector and not the previous.
     }
-    
+    public void next_ball() {      // Currently selected ball should be a different color.
+        if (balls.size() > 1) {
+            selected_ball.color = Color.lightGray;
+            if (balls.lastElement() == selected_ball) selected_ball = balls.firstElement();
+            else selected_ball = balls.elementAt(balls.indexOf(selected_ball)+1);
+            selected_ball.color = Color.red;
+        }
+    }
+   
+    // Accessing screen size. 
     public Dimension get_screen_size() { return getSize(); }
     public void resize_screen(Dimension new_size) { 
         for (Ball ball : balls) {
@@ -483,7 +469,8 @@ class BounceSim extends Canvas implements Runnable {
         }
         setSize(new_size);
     }
-    
+   
+    // Pausing/playing. 
     public boolean is_paused() { return sim_paused; }
     public void set_pause(boolean p) { 
         if (sim_paused != p) {
@@ -513,20 +500,16 @@ class BounceSim extends Canvas implements Runnable {
         update(g);
     }
 
+    // Exposed settings for simulation tickrate, ball velocity, and ball size.
     public void sim_set_tickrate(int tps) {
         sim_tickrate = Util.restrict_bounds(tps, SIM_TICKRATE_MIN, SIM_TICKRATE_MAX);
         sim_delay = (int)Math.round(1000/sim_tickrate);
     }
-    public void body_set_velocity(Vec2 new_vel) {
+    public void body_set_velocity(Vec2 new_vel) {       // It really would be better not to expose velocity directly (and modify only through applied forces), but I don't really care that much.
         selected_ball.vel.x = new_vel.x; selected_ball.vel.y = new_vel.y;
     }
     public void body_set_size(int px) {
-
-        // We should have some select button in gui, which determines which this (and velocity) acts on. Right now, it only effects the first ball.
-
-        //Ball ball = balls.elementAt(0);  // ! We should never allow removing the first ball. Grey out the button in GUI.
         Ball ball = selected_ball;
-
         int next_size = Util.restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
         // Restrict within screen bounds from current position:
         //Util.restrict_bounds( should use restrict bounds here.
@@ -536,14 +519,33 @@ class BounceSim extends Canvas implements Runnable {
         else if ((ball.pos.y-next_size-1) <= 1) next_size = (int)(ball.pos.y-2);
         ball.size = next_size;
     }
-
     public int sim_get_tickrate() { return sim_tickrate; }
-    public Vec2 body_get_velocity() { return (new Vec2(selected_ball.vel)); }  // Should be the one selected in GUI. GUI should have buttons (create ball, destroy ball, and next ball)
+    public Vec2 body_get_velocity() { return (new Vec2(selected_ball.vel)); }
     public int body_get_size() { return selected_ball.size; }
-}
 
+    // The balls that bounce.
+    class Ball { 
+        public int size; 
+        public Vec2 pos;    // * Keeping Vec2's instead of changing to points, decimal (sub-pixel) precision is desired for smoothest movement.
+        public Vec2 vel; 
+        Color color; 
+        // Randomized constructor.
+        public Ball() {
+            size = (int)Util.relate_bounds(Math.random(), 0.0, 1.0, BODY_SIZE_MIN, BODY_SIZE_MAX); 
+            
+            // Will need to make sure this doesn't collide with anything. @todo 
+            double x = Util.relate_bounds(Math.random(), 0.0, 1.0, size+1, getWidth()-size-1);   
+            double y = Util.relate_bounds(Math.random(), 0.0, 1.0, size+1, getHeight()-size-1);  // There's probably some cute math function for normalization we should be using instead of relate_bounds.
+            pos = new Vec2(x, y);
+            
+            double v = Util.relate_bounds(Math.random(), 0.0, 1.0, BODY_VEL_MIN, BODY_VEL_MAX);
+            vel = Vec2.mul(new Vec2(1,1), Math.sqrt(v*v/2));
+            
+            color = Color.lightGray;
+        }
+    }
+} 
 
-// @todo get rid of these, replace with Point and whatever proper Math function des the bounding stuff.
 
 // Two dimensional vector, for velocity and position data.
 // Doubles (instead of ints) to support pixel movement slower than the tickrate.
@@ -567,10 +569,12 @@ class Vec2 {
         product.mul(multiplier);
         return product;
     }
-
-    // need to make a magnitude method
+    public static double magnitude(Vec2 v) {
+        return Math.sqrt(v.x*v.x+v.y*v.y);
+    }
 }
 
+// @todo there are probably better methods from Math that we can use instead of these.
 class Util {
     private Util() {}
 
