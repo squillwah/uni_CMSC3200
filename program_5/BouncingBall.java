@@ -350,18 +350,22 @@ class BounceSim extends Canvas implements Runnable {
     public static final double BODY_VEL_MAX = 20;
     public static final int BODY_SIZE_MIN = 10;
     public static final int BODY_SIZE_MAX = 200;
-    public static final int MAX_BALLS = 10;
+    public static final int MAX_BALLS = 100;
 
     // Looking for window dimensions? They're in the parent class, use getWidth/getHeight/getSize/setSize.
+ 
+    // Double buffering
+    private Image backbuff;
+    private Graphics bfg;
   
-    // Sim settings: 
+    // Sim settings:
     private int sim_delay;          // Ms delay between ticks, 1000/tickrate.
     private int sim_tickrate; 
     private Thread sim_thread;
     private boolean sim_paused;
     private boolean sim_running;
 
-    // Objects 
+    // Objects:
     private Vector<Ball> balls;
     private Ball selected_ball; // Reference to the selected ball in the vector (for changing velocity/size)
     //private vector<Rect> rects
@@ -417,6 +421,10 @@ class BounceSim extends Canvas implements Runnable {
                         next_pos.y = getHeight()-ball.size-1-1; 
                         ball.vel.y = -ball.vel.y; 
                     }
+
+                    // Should we bother with ball on ball collisions?
+                    // If we do, we'll need to do proper spherical collisions to get the right normals.
+                    // So we can't use the rect.collides. That might have a bonus of better corner collisions with the balls on rects. I think.
 
                     ball.pos = next_pos;
                 }
@@ -479,25 +487,29 @@ class BounceSim extends Canvas implements Runnable {
         }
     }
     
-    // Use update to draw graphics instead of paint (remove screen wipes).
-    public void update(Graphics g) {
-        int tl_x;   // Top left position from center pixel, rounding subpixel to pixel precision.
-        int tl_y;
+    // Override update to draw a full frame and swap. Fixes terrible white canvas flicker.
+    //  * note: differs from lesson, but the program is unusable without it (on my laptop).
+    public void update(Graphics g) { paint(g); }
+
+    public void paint(Graphics g) { 
+        backbuff = createImage(getWidth(), getHeight());
+        if (bfg != null) bfg.dispose(); // Why not just do this at the end always?
+        bfg = backbuff.getGraphics();
+
+        bfg.setColor(Color.red);
+        bfg.drawRect(0, 0, getWidth()-1, getHeight()-1);
+        
+        int tl_x, tl_y;
         for (Ball ball : balls) {
             tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
             tl_y = (int)Math.round(ball.pos.y-1-ball.size);
-            g.setColor(ball.color);
-            g.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
-            g.setColor(Color.black);
-            g.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
+            bfg.setColor(ball.color);
+            bfg.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
+            bfg.setColor(Color.black);
+            bfg.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
         }
-    }
 
-    // Override paint to draw the red boarder and call update (os will trigger a paint occasionally).
-    public void paint(Graphics g) {
-        g.setColor(Color.red);
-        g.drawRect(0, 0, getWidth()-1, getHeight()-1);
-        update(g);
+        g.drawImage(backbuff, 0, 0, null);
     }
 
     // Exposed settings for simulation tickrate, ball velocity, and ball size.
@@ -537,6 +549,10 @@ class BounceSim extends Canvas implements Runnable {
             double x = Util.relate_bounds(Math.random(), 0.0, 1.0, size+1, getWidth()-size-1);   
             double y = Util.relate_bounds(Math.random(), 0.0, 1.0, size+1, getHeight()-size-1);  // There's probably some cute math function for normalization we should be using instead of relate_bounds.
             pos = new Vec2(x, y);
+
+            // Solutions for finding the free space:
+            //  - Pick a random rectangle, move off to the side a litte bit, and check the max space until it hits another rectangle. Pick that middle position, with a size slightly smaller than the distance in between.
+            //  - Some kind of data structure for spatial information? Would a BSP tree be applicable here? 
             
             double v = Util.relate_bounds(Math.random(), 0.0, 1.0, BODY_VEL_MIN, BODY_VEL_MAX);
             vel = Vec2.mul(new Vec2(1,1), Math.sqrt(v*v/2));
