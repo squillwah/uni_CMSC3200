@@ -488,7 +488,8 @@ class BounceSim extends Canvas implements Runnable {
     }
     
     // Override update to draw a full frame and swap. Fixes terrible white canvas flicker.
-    //  * note: differs from lesson, but the program is unusable without it (on my laptop).
+    //  * note: Differs from lesson, but the program is unusable without it (on my laptop).
+    //    The concern is that the continuous overdrawing without a "true" clear might cause some memory leak, but I've not noticed anything.
     public void update(Graphics g) { paint(g); }
 
     public void paint(Graphics g) { 
@@ -501,13 +502,16 @@ class BounceSim extends Canvas implements Runnable {
         
         int tl_x, tl_y;
         for (Ball ball : balls) {
+            if (ball == selected_ball) continue;
             tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
             tl_y = (int)Math.round(ball.pos.y-1-ball.size);
-            bfg.setColor(ball.color);
-            bfg.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
-            bfg.setColor(Color.black);
-            bfg.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
+            bfg.setColor(ball.color);   bfg.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
+            bfg.setColor(Color.black);  bfg.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
         }
+        tl_x = (int)Math.round(selected_ball.pos.x-1-selected_ball.size);   // Always draw selected on top. @todo if we add ball on ball collisions, this becomes unnecessary.
+        tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
+        bfg.setColor(selected_ball.color);  bfg.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
+        bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
 
         g.drawImage(backbuff, 0, 0, null);
     }
