@@ -26,12 +26,16 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     private Panel pnl_controls;
     // Bouncing ball/rectangle simulation.
     private BounceSim bsim;
-    // BufferedCanvas display for the simulation
+    // BufferedCanvas display for the simulation.
     private BufferedCanvas screen;
     // Elements of controls section.
     private Button bt_start, bt_pause, bt_quit, bt_create, bt_destroy, bt_next;
     private Scrollbar sb_tickrate, sb_velocity, sb_size;
     private Label sb_tickrate_lbl, sb_velocity_lbl, sb_size_lbl;
+    // Mouse vars.
+    private Rectangle dragbox;
+    private Point m1;
+    private Point m2;
 
     public BouncingBall(Dimension initial_size, int fps) {
         // Configure the main frame:
@@ -68,8 +72,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         pnl_screen = new Panel(); 
         pnl_screen.setLayout(new BorderLayout());
         add("Center", pnl_screen);
+        dragbox = new Rectangle(0, 0, 0, 0);
         // Create BounceSim, add to panel:
-        //bsim = new BounceSim(getMinimumSize());  // Use minimum frame size for initial canvas size. pnl_screen.getSize() is still empty at this stage.
         screen = new BufferedCanvas(getMinimumSize(), framerate);
         pnl_screen.add("Center", screen);
         // Attach mouse listeners:
@@ -83,6 +87,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         pnl_controls.setMaximumSize(getMinimumSize());
         add("South", pnl_controls);
         // Create, initialize components:
+        m1 = new Point(0,0);
+        m2 = new Point(0,0);
         bt_start = new Button("START"); bt_start.setEnabled(true);
         bt_pause = new Button("PAUSE"); bt_pause.setEnabled(false);
         bt_quit = new Button("QUIT");
@@ -197,9 +203,6 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     // Start the program + close it:
     public void start() { 
         screen.start();
-        
-        //bsim.repaint(); 
-        //bsim.set_pause(true); 
         bsim.start(); 
         bsim.forcedraw();
     }
@@ -316,34 +319,31 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         }
     }
     //  MouseListener
-    // Should we implement these mouse events under this frame class or the BounceSim? Should BounceSim be concered with user Mouse movements, or only have methods to places rectangles in places?
     public void mousePressed(MouseEvent e) {
-        String button = "";
-        if (e.getButton() == MouseEvent.BUTTON1) button = "Left";
-        else if (e.getButton() == MouseEvent.BUTTON2) button = "Center";  // Lesson doesn't have these as elses. Why? Is the else condition less efficient than sequential ifs in a micro way? That doesn't sound true.
-        else if (e.getButton() == MouseEvent.BUTTON3) button = "Right";
-        System.out.println(button + " mouse button " + e.getButton() + " pressed");
+        m1 = e.getPoint();
+        screen.set_dragbox(dragbox);
     }
     public void mouseReleased(MouseEvent e) {
-        System.out.println("Mouse button " + e.getButton() + " released");
+        if (!dragbox.isEmpty()) bsim.add_rect(dragbox);
+        screen.set_dragbox(null);
+        dragbox.setBounds(0,0,0,0);
+        bsim.forcedraw();
     }
     public void mouseClicked(MouseEvent e) {
         System.out.println("Mouse Clicked" + e.getClickCount() + " clicks");
-        // use a Point to store the click point
     }
-    public void mouseEntered(MouseEvent e) {
-        System.out.println(e.paramString());
-    }
-    public void mouseExited(MouseEvent e) {
-        System.out.println(e.paramString());
-    }
+    public void mouseEntered(MouseEvent e) { screen.set_dragbox(dragbox); }
+    public void mouseExited(MouseEvent e) { screen.set_dragbox(new Rectangle(dragbox)); } // Don't update when mouse dragged off.
     //  MouseMotionListener
-    public void mouseMoved(MouseEvent e) {
-        //list.add(e.paramString());
-    }
     public void mouseDragged(MouseEvent e) {
-        System.out.println(e.paramString());
+        m2 = e.getPoint();
+        dragbox.setLocation(Math.max(1, Math.min(Math.min(m1.x,m2.x), screen.getWidth()-1)), 
+                            Math.max(1, Math.min(Math.min(m1.y,m2.y), screen.getHeight()-1)));
+        dragbox.setSize(Math.min(Math.abs(m1.x-m2.x), screen.getWidth()-dragbox.x-1), 
+                        Math.min(Math.abs(m1.y-m2.y), screen.getHeight()-dragbox.y-1));
+        bsim.forcedraw();
     }
+    public void mouseMoved(MouseEvent e) {}
     
     // Unimplemented WindowListener, ComponenetLister:
     public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
@@ -363,7 +363,11 @@ class BufferedCanvas extends Canvas implements Runnable {
     private Image frontbuff;
     private Image backbuff;
     private Graphics backbuff_g;
-    private boolean swapped;
+
+    private Rectangle db;
+    
+    private boolean fl_draw_db;
+    private boolean fl_swap;
 
     private Thread render_thread;
     private boolean render_running;
@@ -376,14 +380,15 @@ class BufferedCanvas extends Canvas implements Runnable {
         frontbuff = null;
         backbuff = null;
         backbuff_g = null;
-        swapped = false;
         render_thread = null;
         render_running = false;
+        db = null;
+        fl_draw_db = false;
+        fl_swap = false;
     }
 
     public boolean start() {
         if (render_thread == null && isDisplayable()) { // Buffers will fail to create if the canvas is not displayable yet.
-            frontbuff = createImage(getWidth(), getHeight());
             backbuff = createImage(getWidth(), getHeight());
             render_running = true;
             render_thread = new Thread(this);
@@ -400,35 +405,69 @@ class BufferedCanvas extends Canvas implements Runnable {
     }
     public void run() {
         while (render_running) {
-            repaint();
+            if (fl_swap) {
+                if (fl_draw_db) backbuff_g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
+                backbuff_g.dispose();
+                frontbuff = backbuff;
+                backbuff = createImage(getWidth(), getHeight());
+                backbuff_g = null; 
+                fl_swap = false;
+                repaint();
+            }
             try { Thread.sleep(frame_delay); } 
             catch (InterruptedException e) {}
         }
     }
 
     public Graphics get_backbuff() { 
-        if (backbuff_g != null) backbuff_g.dispose();   // Properly dispose of the old graphics. (will cause issue if get_backbuff() is called more than once, but just don't do that).
-        backbuff_g = backbuff.getGraphics(); 
-        return backbuff_g;
+        Graphics bfg = null;
+        if (!fl_swap) {  //backbuff_g == null) { 
+            backbuff_g = backbuff.getGraphics();
+            bfg = backbuff_g;
+        }
+        return bfg;
     }
-    public void swap() { 
-        frontbuff = backbuff;
-        backbuff = createImage(getWidth(), getHeight());
-        swapped = true;
-    }
+    public void swap() { fl_swap = backbuff != null; }
+        // Draw overlay.
+        // Assuming backbuffer draws and swap calls are being done sequentially (not on seperate threads),
+        // it should be safe to use backbuff_g here (as it's only disposed of when the backbuff is retrieved).
+        //backbuff_g.drawRect(overlay_rect.get);  
+        
+        // Draw the dragbox overlay before swap.
+        //if (draw_db) backbuff_g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
+        // Dispose old backbuffer graphics, swap buffers, create new backbuffer and graphics.
 
     // Override update to just call paint, without clearing, only after buffers are swapped. 
     // Removing the default canvas clearing fixes the terrible white canvas flicker.
     //  * note: Differs from lesson, but the program is unusable without it (on my laptop).
     //          Hopefully the continuous overdraws won't cause any memory issues.
     public void update(Graphics g) { 
-        if (swapped) {
+        //if (draw_db) {
+        //    frontbuff_g = frontbuff.getGraphics();
+        //    frontbuff_g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
+        //    frontbuff_g.dispose();
+        //}
+        //if (swapped || draw_db) {
+
             paint(g); 
-            swapped = false;
-        }
+        //    swapped = false;
+        //}
     }        
     public void paint(Graphics g) { 
         g.drawImage(frontbuff, 0, 0, null); 
+        //if (draw_db) g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
+        //System.out.println(draw_db + " " + db);
+        //if (draw_db) g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
+    }
+
+    // Set an overlay rect, to be drawn on top the backbuffer every time it is swapped in for drawing.
+    // Intended for mouse dragbox overlay type stuff.
+
+    // Set the overlay dragbox reference.
+    // It will be drawn ontop of the front buffer, each frame.
+    public void set_dragbox(Rectangle dragbox) {
+        fl_draw_db = (dragbox != null);
+        if (fl_draw_db) db = dragbox;
     }
 }
 
@@ -455,11 +494,13 @@ class BounceSim implements Runnable {
     private boolean sim_paused;
     private boolean sim_running;
     private Dimension space_size;
+    private Rectangle space_perimeter;
 
     // Objects:
     private Vector<Ball> balls;
     private Ball selected_ball; // Reference to the selected ball in the vector (for changing velocity/size)
-    //private vector<Rect> rects
+    private Vector<Rectangle> rects;
+    private Rectangle new_rect; // Temporary buffer of new rect.
 
     // Main thread flags. 
     private boolean fl_add_ball;
@@ -468,6 +509,7 @@ class BounceSim implements Runnable {
     private boolean fl_force_draw;
     private boolean fl_force_tick;
     private boolean fl_skip_tick;
+    private boolean fl_add_rect;
 
     public BounceSim(Dimension initial_space_size, BufferedCanvas bc) {
         sim_tickrate = SIM_TICKRATE_MIN;
@@ -475,17 +517,21 @@ class BounceSim implements Runnable {
         sim_thread = null;
         sim_paused = true;
         sim_running = false;
-        space_size = initial_space_size.getSize();
+        space_size = initial_space_size.getSize();  // @todo points instead? no points means no grade points?
+        space_perimeter = new Rectangle(new Point(0, 0), space_size);
+        space_perimeter.grow(-1,-1);
         balls = new Vector<Ball>();
         balls.addElement(new Ball());
         selected_ball = balls.elementAt(0);
         selected_ball.color = Color.red;
+        rects = new Vector<Rectangle>();
         fl_add_ball = false;
         fl_next_ball = false;
         fl_remove_ball = false;
         fl_force_draw = false;
         fl_force_tick = false;
         fl_skip_tick = false;
+        fl_add_rect = false;
         renderer = bc;
     }
 
@@ -514,6 +560,21 @@ class BounceSim implements Runnable {
 
     public void run() {
         while (sim_running) {
+            if (fl_add_rect) {
+                boolean addit = true;
+                for (int rectdex = 0; rectdex < rects.size(); rectdex++) {
+                    if (new_rect.contains(rects.elementAt(rectdex))) {
+                        rects.removeElementAt(rectdex);
+                        rectdex--;
+                    } else if (rects.elementAt(rectdex).contains(new_rect)) {
+                        addit = false;
+                        rectdex = rects.size();
+                    } 
+                }
+                if (addit) rects.addElement(new_rect);
+            }
+
+
             // Control the adding, removing, and switching of balls.
             if (fl_add_ball && balls.size() < MAX_BALLS) {
                 Ball new_ball = new Ball();
@@ -569,7 +630,7 @@ class BounceSim implements Runnable {
             if (!sim_paused || fl_force_draw) {
                 fl_force_draw = false;
                 draw();
-                try { Thread.sleep(sim_delay-1); }                  
+                try { Thread.sleep(sim_delay-1); }                          //  ! jank
                 catch (InterruptedException e) {                            // Interrupting the thread to draw will cause the next tick to run prematurely (to draw again at the end of it).
                     fl_skip_tick = fl_force_draw && (sim_tickrate < 48);    // This has the effect of speeding up the simulation, though it's only really noticable at lower tickrates.
                     fl_skip_tick = fl_skip_tick && !fl_force_tick;          // To combat this, skip the next tick when fl_force_draw was set and the tickrate is below some arbitrary "low" value.
@@ -596,6 +657,8 @@ class BounceSim implements Runnable {
     public void add_ball() { fl_add_ball = true; }
     public void remove_ball() { fl_remove_ball = true; }
     public void next_ball() { fl_next_ball = true; }
+
+    public void add_rect(Rectangle rect) { new_rect = new Rectangle(rect); fl_add_rect = true; }
    
     // Accessing space size. 
     public Dimension get_space_size() { return space_size.getSize(); }
@@ -625,23 +688,28 @@ class BounceSim implements Runnable {
     // Internal, only call once within simulation thread.
     private void draw() {
         Graphics bfg = renderer.get_backbuff();
+        if (bfg != null) {
+            bfg.setColor(Color.red);
+            bfg.drawRect(0, 0, (int)space_size.getWidth()-1, (int)space_size.getHeight()-1);
 
-        bfg.setColor(Color.red);
-        bfg.drawRect(0, 0, (int)space_size.getWidth()-1, (int)space_size.getHeight()-1);
-        
-        int tl_x, tl_y;
-        for (Ball ball : balls) {
-            if (ball == selected_ball) continue;
-            tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
-            tl_y = (int)Math.round(ball.pos.y-1-ball.size);
-            bfg.setColor(ball.color);   bfg.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
-            bfg.setColor(Color.black);  bfg.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
+            for (Rectangle rect : rects) {
+                bfg.setColor(Color.black);
+                bfg.fillRect(rect.x, rect.y, rect.width, rect.height);
+            }
+            
+            int tl_x, tl_y;
+            for (Ball ball : balls) {
+                if (ball == selected_ball) continue;
+                tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
+                tl_y = (int)Math.round(ball.pos.y-1-ball.size);
+                bfg.setColor(ball.color);   bfg.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
+                bfg.setColor(Color.black);  bfg.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
+            }
+            tl_x = (int)Math.round(selected_ball.pos.x-1-selected_ball.size);   // Always draw selected on top. @todo if we add ball on ball collisions, this becomes unnecessary.
+            tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
+            bfg.setColor(selected_ball.color);  bfg.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
+            bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
         }
-        tl_x = (int)Math.round(selected_ball.pos.x-1-selected_ball.size);   // Always draw selected on top. @todo if we add ball on ball collisions, this becomes unnecessary.
-        tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
-        bfg.setColor(selected_ball.color);  bfg.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
-        bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
-        
         renderer.swap();
     }
     // External, for forcing a draw while the thread is paused/blocked.
