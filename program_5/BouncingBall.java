@@ -339,6 +339,76 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     }
 }
 
+// Implement the rendering as a seperate class, with a seperate thread.
+//  * note: Differs from lesson, but I think it just makes more sense this way.
+class BounceCanvas extends Canvas implements Runnable {
+    private static final int FRAMERATE = 60;
+
+    private int framerate;
+    private int frame_delay;
+
+    private Image frontbuff;
+    private Image backbuff;
+    private boolean swapped;
+
+    private Thread render_thread;
+    //private boolean render_paused;  // No need for this, since sizes and rects can still be altered during pause.
+    private boolean render_running;
+
+    public BounceCanvas(Dimension initial_size) {
+        framerate = FRAMERATE;
+        frame_delay = 1000/framerate;
+        setSize(intial_size.getSize());
+        frontbuff = new Image(getWidth(), getHeight());
+        backbuff = new Image(getWidth(), getHeight());
+        swapped = false;
+        render_thread = null;
+        render_running = false;
+        start();
+    }
+
+    public void start() {
+        if (render_thread == null) {
+            render_running = true;
+            render_thread = new Thread(this);
+            render_thread.start();
+        }
+    }
+    public void stop() {
+        if (render_thread != null) {
+            render_running  = false;
+            render_thread.interrupt();
+            render_thread = null;
+        }
+    }
+    public void run() {
+        while (render_running) {
+            repaint();
+            try { Thread.sleep(frame_delay); } 
+            catch (InterruptedException e) {}
+        }
+    }
+
+    public Graphics get_backbuff() { return backbuff.getGraphics(); }
+    public void swap() { 
+        frontbuff = backbuff;
+        backbuff = new Image(getWidth(), getHeight());
+        swapped = true;
+    }
+
+    // Only update if the buffers actually swapped.
+    // Also removes the default screen clear before paint(), fixing the terrible flicker.
+    public void update(Graphics g) { 
+        if (swapped) {
+            paint(g); 
+            swapped = false;
+        }
+    }        
+    public void paint(Graphics g) { 
+        g.drawImage(frontbuff); 
+        System.out.println("drawn");
+    }
+}
 
 class BounceSim extends Canvas implements Runnable {
     private static final long serialVersionUID = 11L;
@@ -487,9 +557,9 @@ class BounceSim extends Canvas implements Runnable {
         }
     }
     
-    // Override update to draw a full frame and swap. Fixes terrible white canvas flicker.
+    // Override update to just call paint, without clearing. Fixes terrible white canvas flicker.
     //  * note: Differs from lesson, but the program is unusable without it (on my laptop).
-    //    The concern is that the continuous overdrawing without a "true" clear might cause some memory leak, but I've not noticed anything.
+    //    Hopefully the continuous overdraws won't cause any memory issues.
     public void update(Graphics g) { paint(g); }
 
     public void paint(Graphics g) { 
@@ -514,6 +584,7 @@ class BounceSim extends Canvas implements Runnable {
         bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
 
         g.drawImage(backbuff, 0, 0, null);
+        System.out.println("paint");
     }
 
     // Exposed settings for simulation tickrate, ball velocity, and ball size.
