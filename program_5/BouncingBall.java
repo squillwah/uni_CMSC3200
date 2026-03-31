@@ -3,7 +3,7 @@
 // Program 5: Bouncing Ball
 //
 //  A ball moves around the screen, bouncing off rectangles and screen borders.
-//  Use the controls to adjust the ball's size, velocity, and tickrate. 
+//  Use the controls to change the tickrate, add, switch, remove balls, and adjust their ball sizes and velocities.
 //  Click and drag with the mouse to place rectangles. Right click to delete them.
 //
 // Group 2
@@ -18,6 +18,8 @@ import java.util.Vector;
 
 public class BouncingBall extends Frame implements WindowListener, ComponentListener, ActionListener, AdjustmentListener, MouseListener, MouseMotionListener {
     private static final long SerialVersionUID = 101L;
+
+    // Frame size is part of the Frame. Use getSize().
    
     // Two panels of the GUI, ball screen and controls section.
     private Panel pnl_screen;
@@ -50,20 +52,16 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         // Attach window/component listeners, make visible.
         this.addComponentListener(this);
         this.addWindowListener(this);
+        // Set visible and adjust screen size the new size of its panel.
         setVisible(true);
-        // Fix the size of the BufferedCanvas to fit inside pnl_screen, now that it's made visible.
         screen.setSize(pnl_screen.getSize());
         // Finally create the BounceSim, with a space size that of screen and the renderer set to screen.
-        // * Do this as a final step, as the sizes and BufferedCanvas will be not be initialized/displayable until the parent frame is made visible.
+        // * Do this as a final step, as the size and displayablility of BufferedCanvas will be not be set properly until the parent frame visible.
         bsim = new BounceSim(screen.getSize(), screen);
         adjust_tickrate(.2475); adjust_velocity(.35); adjust_size(.25); // Set defaults for the first ball.
         start();
     }
 
-    void resize_screen(Dimension new_size) {
-        bsim.resize_space(new_size);    // Sets the BounceSim's ball space (within the red border).
-        screen.setSize(new_size);       // Sets the Canvas's dimensions.
-    }
 
     public void init_pnl_screen(int framerate) {
         // Set Panel layout and add to main frame:
@@ -243,8 +241,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         double magnitude = Util.relate_bounds(percent, 0.001, 1, bsim.BODY_VEL_MIN, bsim.BODY_VEL_MAX);
         // Preserve vector heading.
         Vec2 new_vel = bsim.body_get_velocity(); 
-        new_vel.x /= Math.abs(new_vel.x); // ! May cause issue if vel is ever 0.
-        new_vel.y /= Math.abs(new_vel.y);
+        new_vel.x = Math.signum(new_vel.x);
+        new_vel.y = Math.signum(new_vel.y);
         // Adjust velocity magnitude, given the percentage between VEL_MIN and VEL_MAX.
         // (equal components, assuming movement is always perfectly diagonal).
         new_vel.mul(Math.sqrt((magnitude*magnitude/2)));
@@ -257,6 +255,12 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         bsim.body_set_size(new_size);
         new_size = bsim.body_get_size(); // Size may have been restricted below SIZE_MAX if object was close to screen edge.
         sb_refresh_size();
+    }
+    
+    // Resize the BufferedCanvas (draw space, canvas image) and BounceSim (bounce space, within red border).
+    void resize_screen(Dimension new_size) {
+        bsim.resize_space(new_size);
+        screen.setSize(new_size);
     }
 
     // Event handler implementations:
@@ -275,29 +279,23 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         if (source == bt_create && bsim.num_balls() < bsim.MAX_BALLS) {
             bt_create.setEnabled(bsim.num_balls() < bsim.MAX_BALLS-1);
             bsim.add_ball();
+            bsim.forcedraw();
+            sb_refresh_velocity();  sb_refresh_size();
             bt_destroy.setEnabled(true);
             bt_next.setEnabled(true);
-            bsim.forcedraw();
-            sb_refresh_velocity();
-            sb_refresh_size();
-            //if (bsim.is_paused()) bsim.draw_shapes(); // may not always need a call
         } else
         if (source == bt_destroy && bsim.num_balls() > 1) {
             bt_destroy.setEnabled(bsim.num_balls()-1 > 1);  
             bsim.remove_ball();
+            bsim.forcedraw();
+            sb_refresh_velocity();  sb_refresh_size();
             bt_next.setEnabled(bt_destroy.isEnabled());
             bt_create.setEnabled(true);
-            bsim.forcedraw();
-            sb_refresh_velocity();
-            sb_refresh_size();
-            //if (bsim.is_paused()) bsim.draw_shapes();
         } else
         if (source == bt_next && bsim.num_balls() > 1) {
             bsim.next_ball();
-            //if (bsim.is_paused()) bsim.draw_shapes();
             bsim.forcedraw();
-            sb_refresh_velocity();
-            sb_refresh_size();
+            sb_refresh_velocity();  sb_refresh_size();
         } else
         if (source == bt_quit) {
             stop();
@@ -315,7 +313,6 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         if (bar == sb_size) {
             adjust_size(bar.getValue()/(double)(bar.getMaximum()-bar.getVisibleAmount()));
             bsim.forcedraw();
-       //     /*if (bsim.is_paused())*/ bsim.draw_shapes(); // Force repaint to show new size in pause state.
         }
     }
     //  MouseListener
@@ -353,7 +350,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
     
     public static void main(String[] args) {
-        new BouncingBall(new Dimension(1000, 500), 120);
+        new BouncingBall(new Dimension(900, 600), 120);
     }
 }
 
@@ -440,18 +437,13 @@ class BounceSim implements Runnable {
 
     public static final int SIM_TICKRATE_MIN = 1;
     public static final int SIM_TICKRATE_MAX = 256;
-    //public static final double VEL_COMPONENT_MAX = 20; // Absolute 
-    public static final double BODY_VEL_MIN = 0.01;    // Magnitude, sqrt(x^2 + y^2)   // should do this all differently with forces or smthn, but best not mess with it
+    public static final double BODY_VEL_MIN = 0.01;    // Magnitude, sqrt(x^2 + y^2)
     public static final double BODY_VEL_MAX = 20;
     public static final int BODY_SIZE_MIN = 10;
     public static final int BODY_SIZE_MAX = 200;
     public static final int MAX_BALLS = 100;
 
     // Looking for window dimensions? They're in the parent class, use getWidth/getHeight/getSize/setSize.
- 
-    // Double buffering
-    private Image backbuff;
-    private Graphics bfg;
 
     // The renderer:
     BufferedCanvas renderer;
@@ -526,11 +518,8 @@ class BounceSim implements Runnable {
             if (fl_add_ball && balls.size() < MAX_BALLS) {
                 Ball new_ball = new Ball();
                 balls.addElement(new_ball);
-                //next_ball();
                 fl_next_ball = true;
-                //draw(); // Call a draw, to show balls.
                 fl_add_ball = false;
-                //fl_force_draw = true;
             }
             if (fl_remove_ball && balls.size() > 1) {   // Balllessness is unsupported. Never allow zero balls.
                 Ball old_selected = selected_ball;
@@ -539,7 +528,6 @@ class BounceSim implements Runnable {
                 balls.removeElement(old_selected);
                 selected_ball.color = Color.red;
                 fl_remove_ball = false;
-                //fl_force_draw = true;
             }
             if (fl_next_ball && balls.size() > 1) {
                 selected_ball.color = Color.lightGray;
@@ -547,7 +535,6 @@ class BounceSim implements Runnable {
                 else selected_ball = balls.elementAt(balls.indexOf(selected_ball)+1);
                 selected_ball.color = Color.red;
                 fl_next_ball = false;
-                //fl_force_draw = true;
             }
            
             // Stepping of the simulation.  
@@ -583,22 +570,25 @@ class BounceSim implements Runnable {
                 fl_force_draw = false;
                 draw();
                 try { Thread.sleep(sim_delay-1); }                  
-                catch (InterruptedException e) {                        // If interrupted to force draw, skip the next tick (don't speed up simulation). 
-                    fl_skip_tick = fl_force_draw;                       // Though if a force_tick is desired, actually don't skip.
-                    fl_skip_tick = fl_skip_tick && !fl_force_tick;      // ! This fix causes inverse problem of slowing down simulation, but that's less noticable.
-                }
+                catch (InterruptedException e) {                            // Interrupting the thread to draw will cause the next tick to run prematurely (to draw again at the end of it).
+                    fl_skip_tick = fl_force_draw && (sim_tickrate < 48);    // This has the effect of speeding up the simulation, though it's only really noticable at lower tickrates.
+                    fl_skip_tick = fl_skip_tick && !fl_force_tick;          // To combat this, skip the next tick when fl_force_draw was set and the tickrate is below some arbitrary "low" value.
+                                                                            //  * note that this also causes the inverse problem of slowing down the simulation, but who cares.
+                                                                            //  * also if a force_tick is desired, actually don't skip.
+                }                                                       
             } else {
                 try { Thread.sleep(1); } // To update sim_pause on interrupts, if paused.
                 catch (InterruptedException e) {}
             }
         }
     }
+
     // Force a tick of the simulation, for instant updates of size/velocity/balls.
     public void forcetick() { 
         if (sim_running) {
-            fl_force_tick = false;
+            fl_force_tick = true;
             sim_thread.interrupt(); 
-        } // ! @todo buggy
+        }
     }
     
     // Adding, removing, switching balls. Only once per tick.
@@ -632,7 +622,6 @@ class BounceSim implements Runnable {
         }
     }
     
-
     // Internal, only call once within simulation thread.
     private void draw() {
         Graphics bfg = renderer.get_backbuff();
@@ -655,14 +644,13 @@ class BounceSim implements Runnable {
         
         renderer.swap();
     }
-    // External, for updating the canvas when simulation is paused.
+    // External, for forcing a draw while the thread is paused/blocked.
     public void forcedraw() { 
         if (sim_running) {
             fl_force_draw = true;
             sim_thread.interrupt(); 
         }
     }
-
 
     // Exposed settings for simulation tickrate, ball velocity, and ball size.
     public void sim_set_tickrate(int tps) {
@@ -671,7 +659,6 @@ class BounceSim implements Runnable {
     }
     public void body_set_velocity(Vec2 new_vel) {       // It really would be better not to expose velocity directly (and modify only through applied forces), but I don't really care that much.
         selected_ball.vel.x = new_vel.x; selected_ball.vel.y = new_vel.y;
-        //forcetick();
     }
     public void body_set_size(int px) {
         Ball ball = selected_ball;
@@ -683,7 +670,6 @@ class BounceSim implements Runnable {
         if ((ball.pos.y+next_size+1) >= space_size.getHeight()-1) next_size = (int)(space_size.getHeight()-ball.pos.y-2);
         else if ((ball.pos.y-next_size-1) <= 1) next_size = (int)(ball.pos.y-2);
         ball.size = next_size;
-        //forcetick();
     }
     public int sim_get_tickrate() { return sim_tickrate; }
     public Vec2 body_get_velocity() { return (new Vec2(selected_ball.vel)); }
@@ -715,7 +701,6 @@ class BounceSim implements Runnable {
         }
     }
 } 
-
 
 // Two dimensional vector, for velocity and position data.
 // Doubles (instead of ints) to support pixel movement slower than the tickrate.
