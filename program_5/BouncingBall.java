@@ -273,31 +273,31 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
             bt_pause.setEnabled(!bsim.is_paused());
         } else 
         if (source == bt_create && bsim.num_balls() < bsim.MAX_BALLS) {
+            bt_create.setEnabled(bsim.num_balls() < bsim.MAX_BALLS-1);
             bsim.add_ball();
-            bt_create.setEnabled(bsim.num_balls() < bsim.MAX_BALLS);
             bt_destroy.setEnabled(true);
             bt_next.setEnabled(true);
+            bsim.forcedraw();
             sb_refresh_velocity();
             sb_refresh_size();
-            bsim.forcedraw();
             //if (bsim.is_paused()) bsim.draw_shapes(); // may not always need a call
         } else
         if (source == bt_destroy && bsim.num_balls() > 1) {
+            bt_destroy.setEnabled(bsim.num_balls()-1 > 1);  
             bsim.remove_ball();
-            bt_destroy.setEnabled(bsim.num_balls() > 1);  
             bt_next.setEnabled(bt_destroy.isEnabled());
             bt_create.setEnabled(true);
+            bsim.forcedraw();
             sb_refresh_velocity();
             sb_refresh_size();
-            bsim.forcedraw();
             //if (bsim.is_paused()) bsim.draw_shapes();
         } else
         if (source == bt_next && bsim.num_balls() > 1) {
             bsim.next_ball();
-            sb_refresh_velocity();
-            sb_refresh_size();
             //if (bsim.is_paused()) bsim.draw_shapes();
             bsim.forcedraw();
+            sb_refresh_velocity();
+            sb_refresh_size();
         } else
         if (source == bt_quit) {
             stop();
@@ -369,7 +369,6 @@ class BufferedCanvas extends Canvas implements Runnable {
     private boolean swapped;
 
     private Thread render_thread;
-    //private boolean render_paused;  // No need for this, since sizes and rects can still be altered during pause.
     private boolean render_running;
 
     public BufferedCanvas(Dimension initial_size, int fps) {
@@ -386,7 +385,7 @@ class BufferedCanvas extends Canvas implements Runnable {
     }
 
     public boolean start() {
-        if (render_thread == null && isDisplayable()) {     // Buffers will fail to create if the canvas is not displayable yet.
+        if (render_thread == null && isDisplayable()) { // Buffers will fail to create if the canvas is not displayable yet.
             frontbuff = createImage(getWidth(), getHeight());
             backbuff = createImage(getWidth(), getHeight());
             render_running = true;
@@ -411,8 +410,8 @@ class BufferedCanvas extends Canvas implements Runnable {
     }
 
     public Graphics get_backbuff() { 
-        if (backbuff_g != null) backbuff_g.dispose();
-        backbuff_g = backbuff.getGraphics();
+        if (backbuff_g != null) backbuff_g.dispose();   // Properly dispose of the old graphics. (will cause issue if get_backbuff() is called more than once, but just don't do that).
+        backbuff_g = backbuff.getGraphics(); 
         return backbuff_g;
     }
     public void swap() { 
@@ -421,8 +420,10 @@ class BufferedCanvas extends Canvas implements Runnable {
         swapped = true;
     }
 
-    // Only update if the buffers actually swapped.
-    // Also removes the default screen clear before paint(), fixing the terrible flicker.
+    // Override update to just call paint, without clearing, only after buffers are swapped. 
+    // Removing the default canvas clearing fixes the terrible white canvas flicker.
+    //  * note: Differs from lesson, but the program is unusable without it (on my laptop).
+    //          Hopefully the continuous overdraws won't cause any memory issues.
     public void update(Graphics g) { 
         if (swapped) {
             paint(g); 
@@ -468,6 +469,14 @@ class BounceSim implements Runnable {
     private Ball selected_ball; // Reference to the selected ball in the vector (for changing velocity/size)
     //private vector<Rect> rects
 
+    // Main thread flags. 
+    private boolean fl_add_ball;
+    private boolean fl_next_ball;
+    private boolean fl_remove_ball;
+    private boolean fl_force_draw;
+    private boolean fl_force_tick;
+    private boolean fl_skip_tick;
+
     public BounceSim(Dimension initial_space_size, BufferedCanvas bc) {
         sim_tickrate = SIM_TICKRATE_MIN;
         sim_delay = 1000/sim_tickrate;
@@ -479,6 +488,12 @@ class BounceSim implements Runnable {
         balls.addElement(new Ball());
         selected_ball = balls.elementAt(0);
         selected_ball.color = Color.red;
+        fl_add_ball = false;
+        fl_next_ball = false;
+        fl_remove_ball = false;
+        fl_force_draw = false;
+        fl_force_tick = false;
+        fl_skip_tick = false;
         renderer = bc;
     }
 
@@ -507,86 +522,105 @@ class BounceSim implements Runnable {
 
     public void run() {
         while (sim_running) {
-            while (!sim_paused) {
-                for (Ball ball : balls) {
-                    Vec2 next_pos = Vec2.add(ball.pos, ball.vel);
-                    
-                    // Screen collision detection: 
-                    if (next_pos.x < 1+ball.size+1) { 
-                        next_pos.x = 1+ball.size+1; 
-                        ball.vel.x = -ball.vel.x; 
-                    } else if (next_pos.x > renderer.getWidth()-ball.size-1-1) { 
-                        next_pos.x = renderer.getWidth()-ball.size-1-1; 
-                        ball.vel.x = -ball.vel.x; 
+            // Control the adding, removing, and switching of balls.
+            if (fl_add_ball && balls.size() < MAX_BALLS) {
+                Ball new_ball = new Ball();
+                balls.addElement(new_ball);
+                //next_ball();
+                fl_next_ball = true;
+                //draw(); // Call a draw, to show balls.
+                fl_add_ball = false;
+                //fl_force_draw = true;
+            }
+            if (fl_remove_ball && balls.size() > 1) {   // Balllessness is unsupported. Never allow zero balls.
+                Ball old_selected = selected_ball;
+                if (balls.elementAt(0) == old_selected) selected_ball = balls.lastElement();
+                else selected_ball = balls.elementAt(balls.indexOf(old_selected)-1);
+                balls.removeElement(old_selected);
+                selected_ball.color = Color.red;
+                fl_remove_ball = false;
+                //fl_force_draw = true;
+            }
+            if (fl_next_ball && balls.size() > 1) {
+                selected_ball.color = Color.lightGray;
+                if (balls.lastElement() == selected_ball) selected_ball = balls.firstElement();
+                else selected_ball = balls.elementAt(balls.indexOf(selected_ball)+1);
+                selected_ball.color = Color.red;
+                fl_next_ball = false;
+                //fl_force_draw = true;
+            }
+           
+            // Stepping of the simulation.  
+            if (!sim_paused || fl_force_tick) {
+                if (!fl_skip_tick) {
+                    fl_force_tick = false;
+                    for (Ball ball : balls) {
+                        Vec2 next_pos = Vec2.add(ball.pos, ball.vel);
+                        // Screen collision detection: 
+                        if (next_pos.x < 1+ball.size+1) { 
+                            next_pos.x = 1+ball.size+1; 
+                            ball.vel.x = -ball.vel.x; 
+                        } else if (next_pos.x > renderer.getWidth()-ball.size-1-1) { 
+                            next_pos.x = renderer.getWidth()-ball.size-1-1; 
+                            ball.vel.x = -ball.vel.x; 
+                        }
+                        if (next_pos.y < 1+ball.size+1) { 
+                            next_pos.y = 1+ball.size+1; 
+                            ball.vel.y = -ball.vel.y; 
+                        } else if (next_pos.y > renderer.getHeight()-ball.size-1-1) { 
+                            next_pos.y = renderer.getHeight()-ball.size-1-1; 
+                            ball.vel.y = -ball.vel.y; 
+                        }
+                        // Should we bother with ball on ball collisions?
+                        // If we do, we'll need to do proper spherical collisions to get the right normals.
+                        // So we can't use the rect.collides. That might have a bonus of better corner collisions with the balls on rects. I think.
+                        ball.pos = next_pos;
                     }
-                    if (next_pos.y < 1+ball.size+1) { 
-                        next_pos.y = 1+ball.size+1; 
-                        ball.vel.y = -ball.vel.y; 
-                    } else if (next_pos.y > renderer.getHeight()-ball.size-1-1) { 
-                        next_pos.y = renderer.getHeight()-ball.size-1-1; 
-                        ball.vel.y = -ball.vel.y; 
-                    }
+                } else fl_skip_tick = false;
+            }
 
-                    // Should we bother with ball on ball collisions?
-                    // If we do, we'll need to do proper spherical collisions to get the right normals.
-                    // So we can't use the rect.collides. That might have a bonus of better corner collisions with the balls on rects. I think.
-
-                    ball.pos = next_pos;
-                }
-                
+            if (!sim_paused || fl_force_draw) {
+                fl_force_draw = false;
                 draw();
-                
-                try { Thread.sleep(sim_delay); }
+                try { Thread.sleep(sim_delay-1); }                  
+                catch (InterruptedException e) {                        // If interrupted to force draw, skip the next tick (don't speed up simulation). 
+                    fl_skip_tick = fl_force_draw;                       // Though if a force_tick is desired, actually don't skip.
+                    fl_skip_tick = fl_skip_tick && !fl_force_tick;      // ! This fix causes inverse problem of slowing down simulation, but that's less noticable.
+                }
+            } else {
+                try { Thread.sleep(1); } // To update sim_pause on interrupts, if paused.
                 catch (InterruptedException e) {}
             }
-            try { Thread.sleep(1); }    // To update sim_pause on interrupts.
-            catch (InterruptedException e) {}   
         }
     }
     // Force a tick of the simulation, for instant updates of size/velocity/balls.
-    public void forcetick() { if (sim_running) sim_thread.interrupt(); } // ! @todo buggy
+    public void forcetick() { 
+        if (sim_running) {
+            fl_force_tick = false;
+            sim_thread.interrupt(); 
+        } // ! @todo buggy
+    }
     
-
-    // Adding, removing, switching balls.
-    public int num_balls() {
-        return balls.size();
-    }
-    public void add_ball() { 
-        if (balls.size() < MAX_BALLS) {
-            Ball new_ball = new Ball();
-            balls.addElement(new_ball);
-            next_ball();
-            //forcetick();
-        }
-    }
-    public void remove_ball() { 
-        if (balls.size() > 1) {     // Balllessness is unsupported. Never allow zero balls.
-            Ball old_selected = selected_ball;
-            if (balls.elementAt(0) == old_selected) selected_ball = balls.lastElement();
-            else selected_ball = balls.elementAt(balls.indexOf(old_selected)-1);
-            balls.removeElement(old_selected);
-            selected_ball.color = Color.red;
-            //forcetick();
-        }
-    }
-    public void next_ball() {      // Currently selected ball should be a different color.
-        if (balls.size() > 1) {
-            selected_ball.color = Color.lightGray;
-            if (balls.lastElement() == selected_ball) selected_ball = balls.firstElement();
-            else selected_ball = balls.elementAt(balls.indexOf(selected_ball)+1);
-            selected_ball.color = Color.red;
-            //forcetick();
-        }
-    }
+    // Adding, removing, switching balls. Only once per tick.
+    public int num_balls() { return balls.size(); }
+    public void add_ball() { fl_add_ball = true; }
+    public void remove_ball() { fl_remove_ball = true; }
+    public void next_ball() { fl_next_ball = true; }
    
     // Accessing space size. 
     public Dimension get_space_size() { return space_size.getSize(); }
     public void resize_space(Dimension new_size) { 
-        for (Ball ball : balls) {
-            ball.pos.x = Util.restrict_bounds(ball.pos.x, ball.size+1, new_size.getWidth()-ball.size-1);
-            ball.pos.y = Util.restrict_bounds(ball.pos.y, ball.size+1, new_size.getWidth()-ball.size-1);
-        }
-        //renderer.setSize(new_size);
+        space_size = new_size.getSize();
+        try {
+            for (Ball ball : balls) {
+                ball.pos.x = Util.restrict_bounds(ball.pos.x, ball.size+1, space_size.getWidth()-ball.size-1);
+                ball.pos.y = Util.restrict_bounds(ball.pos.y, ball.size+1, space_size.getHeight()-ball.size-1);
+                forcedraw();
+            }
+        } catch (java.util.ConcurrentModificationException e) {}    // Can very rarely occur if you resize the window madly while adding/removing balls.
+                                                                    // Unavoidable, unless we do this checking in the thread. Then we face the issue of 
+                                                                    // low tickrates letting things get out of bounds before the next tick.
+                                                                    // Accesses to balls should really only be done in run(), but so it goes.
     }
    
     // Pausing/playing. 
@@ -598,9 +632,6 @@ class BounceSim implements Runnable {
         }
     }
     
-    // Override update to just call paint, without clearing. Fixes terrible white canvas flicker.
-    //  * note: Differs from lesson, but the program is unusable without it (on my laptop).
-    //    Hopefully the continuous overdraws won't cause any memory issues.
 
     // Internal, only call once within simulation thread.
     private void draw() {
@@ -625,7 +656,12 @@ class BounceSim implements Runnable {
         renderer.swap();
     }
     // External, for updating the canvas when simulation is paused.
-    public void forcedraw() { if (sim_paused) draw(); }
+    public void forcedraw() { 
+        if (sim_running) {
+            fl_force_draw = true;
+            sim_thread.interrupt(); 
+        }
+    }
 
 
     // Exposed settings for simulation tickrate, ball velocity, and ball size.
