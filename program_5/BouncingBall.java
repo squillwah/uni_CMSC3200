@@ -19,8 +19,6 @@ import java.util.Vector;
 public class BouncingBall extends Frame implements WindowListener, ComponentListener, ActionListener, AdjustmentListener, MouseListener, MouseMotionListener {
     private static final long SerialVersionUID = 101L;
 
-    // Frame size is part of the Frame. Use getSize().
-   
     // Two panels of the GUI, ball screen and controls section.
     private Panel pnl_screen;
     private Panel pnl_controls;
@@ -267,7 +265,6 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     void resize_screen(Dimension new_size) {
         bsim.resize_space(new_size);
         screen.setSize(new_size);
-      
         Insets i = getInsets(); 
         Dimension msize = bsim.get_min_space_size(); 
         setMinimumSize(new Dimension(Math.max(msize.width+i.left+i.right, true_msize.width), 
@@ -338,7 +335,6 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         bsim.forcedraw();
     }
     public void mouseClicked(MouseEvent e) {
-        System.out.println("Mouse Clicked" + e.getClickCount() + " clicks");
         if (e.getButton() == MouseEvent.BUTTON3) {
             bsim.remove_rect_at_point(e.getPoint());
             bsim.forcedraw();
@@ -548,8 +544,6 @@ class BounceSim implements Runnable {
         renderer.stop();
     }
 
-    private Rectangle debugrect;
-
     public void run() {
         while (sim_running) {
             // Add the new rectangle.
@@ -560,14 +554,19 @@ class BounceSim implements Runnable {
                     if (new_rect.intersects(balls.elementAt(balldex).get_rect())) {
                         addit = false;
                         balldex = balls.size();
-                    // And make sure to absorb smaller rects
-                    } else if (new_rect.contains(rects.elementAt(rectdex))) {
-                        rects.removeElementAt(rectdex);
-                        rectdex--;
-                    // As well as ignore new but engulfed rects.
-                    } else if (rects.elementAt(rectdex).contains(new_rect)) {
-                        addit = false;
-                        rectdex = rects.size();
+                    }
+                } 
+                if (addit) {
+                    for (int rectdex = 0; rectdex < rects.size(); rectdex++) {
+                        // And make sure to absorb smaller rects
+                        if (new_rect.contains(rects.elementAt(rectdex))) {
+                            rects.removeElementAt(rectdex);
+                            rectdex--;
+                        // As well as ignore new but engulfed rects.
+                        } else if (rects.elementAt(rectdex).contains(new_rect)) {
+                            addit = false;
+                            rectdex = rects.size();
+                        }
                     }
                 }
                 if (addit) {
@@ -763,9 +762,6 @@ class BounceSim implements Runnable {
             tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
             bfg.setColor(selected_ball.color);  bfg.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
             bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
-            Rectangle test_rect = selected_ball.get_rect();
-            bfg.drawRect(test_rect.x, test_rect.y, test_rect.width, test_rect.height);
-            if (debugrect != null) bfg.drawRect(debugrect.x, debugrect.y, debugrect.width, debugrect.height);
         }
         renderer.swap();
     }
