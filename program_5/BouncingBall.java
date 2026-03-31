@@ -205,6 +205,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
         //bsim.repaint(); 
         //bsim.set_pause(true); 
         bsim.start(); 
+        bsim.forcedraw();
     }
     public void stop() {
         destroy_pnl_screen();
@@ -413,6 +414,7 @@ class BufferedCanvas extends Canvas implements Runnable {
     public Graphics get_backbuff() { return backbuff.getGraphics(); }
     public void swap() { 
         frontbuff = backbuff;
+        backbuff.getGraphics().dispose();
         backbuff = createImage(getWidth(), getHeight());
         swapped = true;
     }
