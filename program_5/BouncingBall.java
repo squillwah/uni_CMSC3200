@@ -36,6 +36,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     private Rectangle dragbox;
     private Point m1;
     private Point m2;
+    // Misc
+    private final Dimension true_msize = new Dimension(600, 600);
 
     public BouncingBall(Dimension initial_size, int fps) {
         // Configure the main frame:
@@ -110,7 +112,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
             bar.setUnitIncrement(5); 
             bar.setBlockIncrement(50); 
             bar.setBackground(Color.gray); 
-        } // @todo We should pick more exotic colors for all the UI
+        }
         // Gridbag schenanigans: 
         GridBagConstraints gbc = new GridBagConstraints();
         //  Scrollbars 
@@ -261,9 +263,15 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     }
     
     // Resize the BufferedCanvas (draw space, canvas image) and BounceSim (bounce space, within red border).
+    // Grab the minimum viable size from BounceSim's space, but don't allow it to be smaller than this frame's true_msize.
     void resize_screen(Dimension new_size) {
         bsim.resize_space(new_size);
         screen.setSize(new_size);
+      
+        Insets i = getInsets(); 
+        Dimension msize = bsim.get_min_space_size(); 
+        setMinimumSize(new Dimension(Math.max(msize.width+i.left+i.right, true_msize.width), 
+                                     Math.max(msize.height+pnl_controls.getSize().height+i.top+i.bottom, true_msize.height)));
     }
 
     // Event handler implementations:
@@ -331,6 +339,10 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     }
     public void mouseClicked(MouseEvent e) {
         System.out.println("Mouse Clicked" + e.getClickCount() + " clicks");
+        if (e.getButton() == MouseEvent.BUTTON3) {
+            bsim.remove_rect_at_point(e.getPoint());
+            bsim.forcedraw();
+        }
     }
     public void mouseEntered(MouseEvent e) { screen.set_dragbox(dragbox); }
     public void mouseExited(MouseEvent e) { screen.set_dragbox(new Rectangle(dragbox)); } // Don't update when mouse dragged off.
@@ -355,7 +367,7 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
 }
 
 // Implement the rendering as a seperate class, with a seperate thread.
-//  * note: Differs from lesson, but I think it just makes more sense this way.
+//  * note: Differs from lesson, but I think it just makes more sense this way. Thought.
 class BufferedCanvas extends Canvas implements Runnable {
     private int framerate;
     private int frame_delay;
@@ -406,10 +418,10 @@ class BufferedCanvas extends Canvas implements Runnable {
     public void run() {
         while (render_running) {
             if (fl_swap) {
-                if (fl_draw_db) backbuff_g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
+                if (fl_draw_db) backbuff_g.drawRect(db.x, db.y, db.width, db.height);
                 backbuff_g.dispose();
                 frontbuff = backbuff;
-                backbuff = createImage(getWidth(), getHeight());
+                backbuff = null;
                 backbuff_g = null; 
                 fl_swap = false;
                 repaint();
@@ -421,50 +433,23 @@ class BufferedCanvas extends Canvas implements Runnable {
 
     public Graphics get_backbuff() { 
         Graphics bfg = null;
-        if (!fl_swap) {  //backbuff_g == null) { 
+        if (!fl_swap) { // Only give it if not currently swapping.
+            backbuff = createImage(getWidth(), getHeight());
             backbuff_g = backbuff.getGraphics();
             bfg = backbuff_g;
         }
         return bfg;
     }
-    public void swap() { fl_swap = backbuff != null; }
-        // Draw overlay.
-        // Assuming backbuffer draws and swap calls are being done sequentially (not on seperate threads),
-        // it should be safe to use backbuff_g here (as it's only disposed of when the backbuff is retrieved).
-        //backbuff_g.drawRect(overlay_rect.get);  
-        
-        // Draw the dragbox overlay before swap.
-        //if (draw_db) backbuff_g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
-        // Dispose old backbuffer graphics, swap buffers, create new backbuffer and graphics.
+    public void swap() { fl_swap = backbuff != null; } 
 
-    // Override update to just call paint, without clearing, only after buffers are swapped. 
-    // Removing the default canvas clearing fixes the terrible white canvas flicker.
+    // Override update to just call paint, without clearing.
+    // Default update (with canvas clear) causes a terrible white flicker.
     //  * note: Differs from lesson, but the program is unusable without it (on my laptop).
-    //          Hopefully the continuous overdraws won't cause any memory issues.
-    public void update(Graphics g) { 
-        //if (draw_db) {
-        //    frontbuff_g = frontbuff.getGraphics();
-        //    frontbuff_g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
-        //    frontbuff_g.dispose();
-        //}
-        //if (swapped || draw_db) {
+    //          Hopefully the continuous overdraws won't cause any memory issues or something.
+    public void update(Graphics g) { paint(g); }        
+    public void paint(Graphics g) { g.drawImage(frontbuff, 0, 0, null); }
 
-            paint(g); 
-        //    swapped = false;
-        //}
-    }        
-    public void paint(Graphics g) { 
-        g.drawImage(frontbuff, 0, 0, null); 
-        //if (draw_db) g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
-        //System.out.println(draw_db + " " + db);
-        //if (draw_db) g.drawRect((int)db.getX(), (int)db.getY(), (int)db.getWidth(), (int)db.getHeight());
-    }
-
-    // Set an overlay rect, to be drawn on top the backbuffer every time it is swapped in for drawing.
-    // Intended for mouse dragbox overlay type stuff.
-
-    // Set the overlay dragbox reference.
-    // It will be drawn ontop of the front buffer, each frame.
+    // Dragbox is drawn on top of the backbuffer, right before the swap.
     public void set_dragbox(Rectangle dragbox) {
         fl_draw_db = (dragbox != null);
         if (fl_draw_db) db = dragbox;
@@ -494,13 +479,15 @@ class BounceSim implements Runnable {
     private boolean sim_paused;
     private boolean sim_running;
     private Dimension space_size;
+    private Dimension space_size_min;
     private Rectangle space_perimeter;
 
     // Objects:
-    private Vector<Ball> balls;
-    private Ball selected_ball; // Reference to the selected ball in the vector (for changing velocity/size)
     private Vector<Rectangle> rects;
-    private Rectangle new_rect; // Temporary buffer of new rect.
+    private Vector<Ball> balls;
+    private Rectangle new_rect;     // Temporary buffers for adding/removing rects,
+    private Point     del_rectp;    // (modifications to the environment must only be done in run).
+    private Ball selected_ball;     // Reference to the selected ball in the vector (for changing velocity/size).
 
     // Main thread flags. 
     private boolean fl_add_ball;
@@ -510,6 +497,7 @@ class BounceSim implements Runnable {
     private boolean fl_force_tick;
     private boolean fl_skip_tick;
     private boolean fl_add_rect;
+    private boolean fl_remove_rect;
 
     public BounceSim(Dimension initial_space_size, BufferedCanvas bc) {
         sim_tickrate = SIM_TICKRATE_MIN;
@@ -518,13 +506,14 @@ class BounceSim implements Runnable {
         sim_paused = true;
         sim_running = false;
         space_size = initial_space_size.getSize();  // @todo points instead? no points means no grade points?
+        space_size_min = initial_space_size.getSize();
         space_perimeter = new Rectangle(new Point(0, 0), space_size);
         space_perimeter.grow(-1,-1);
+        rects = new Vector<Rectangle>();
         balls = new Vector<Ball>();
         balls.addElement(new Ball());
         selected_ball = balls.elementAt(0);
         selected_ball.color = Color.red;
-        rects = new Vector<Rectangle>();
         fl_add_ball = false;
         fl_next_ball = false;
         fl_remove_ball = false;
@@ -532,6 +521,7 @@ class BounceSim implements Runnable {
         fl_force_tick = false;
         fl_skip_tick = false;
         fl_add_rect = false;
+        fl_remove_rect = false;
         renderer = bc;
     }
 
@@ -558,22 +548,53 @@ class BounceSim implements Runnable {
         renderer.stop();
     }
 
+    private Rectangle debugrect;
+
     public void run() {
         while (sim_running) {
+            // Add the new rectangle.
             if (fl_add_rect) {
                 boolean addit = true;
-                for (int rectdex = 0; rectdex < rects.size(); rectdex++) {
-                    if (new_rect.contains(rects.elementAt(rectdex))) {
+                // As long as it's not on a ball
+                for (int balldex = 0; balldex < balls.size(); balldex++) {
+                    if (new_rect.intersects(balls.elementAt(balldex).get_rect())) {
+                        addit = false;
+                        balldex = balls.size();
+                    // And make sure to absorb smaller rects
+                    } else if (new_rect.contains(rects.elementAt(rectdex))) {
                         rects.removeElementAt(rectdex);
                         rectdex--;
+                    // As well as ignore new but engulfed rects.
                     } else if (rects.elementAt(rectdex).contains(new_rect)) {
                         addit = false;
                         rectdex = rects.size();
-                    } 
+                    }
                 }
-                if (addit) rects.addElement(new_rect);
+                if (addit) {
+                    rects.addElement(new_rect);
+                    // Update minimum window size requirements.
+                    if (new_rect.x+new_rect.width > space_size_min.width) space_size_min.width = (new_rect.x+new_rect.width);
+                    if (new_rect.y+new_rect.height > space_size_min.height) space_size_min.height = (new_rect.y+new_rect.height);
+                }
+                fl_add_rect = false;
             }
-
+            // Remove the removed rectangle.
+            if (fl_remove_rect) {
+                for (int rectdex = 0; rectdex < rects.size(); rectdex++) {
+                    if (rects.elementAt(rectdex).contains(del_rectp)) {
+                        rects.removeElementAt(rectdex);
+                        rectdex = rects.size();
+                    }
+                }
+                // Update minimum window size again.
+                Dimension new_min_size = new Dimension(0,0);
+                for (Rectangle rect : rects) {
+                    if (rect.x+rect.width > new_min_size.width) new_min_size.width = (rect.x+rect.width);
+                    if (rect.y+rect.height > new_min_size.height) new_min_size.height = (rect.y+rect.height);
+                } 
+                space_size_min = new_min_size;
+                fl_remove_rect = false;
+            }
 
             // Control the adding, removing, and switching of balls.
             if (fl_add_ball && balls.size() < MAX_BALLS) {
@@ -604,39 +625,52 @@ class BounceSim implements Runnable {
                     fl_force_tick = false;
                     for (Ball ball : balls) {
                         Vec2 next_pos = Vec2.add(ball.pos, ball.vel);
-                        // Screen collision detection: 
-                        if (next_pos.x < 1+ball.size+1) { 
-                            next_pos.x = 1+ball.size+1; 
-                            ball.vel.x = -ball.vel.x; 
-                        } else if (next_pos.x > renderer.getWidth()-ball.size-1-1) { 
-                            next_pos.x = renderer.getWidth()-ball.size-1-1; 
-                            ball.vel.x = -ball.vel.x; 
+                        // Collision detection, with rectangle intersections.
+                        Rectangle hitbox = ball.get_rect();
+                        hitbox.setLocation((int)next_pos.x-ball.size-1, (int)next_pos.y-ball.size-1);
+                        Rectangle p_intersect = space_perimeter.intersection(hitbox);
+                        // Perimeter:
+                        if (p_intersect.width != hitbox.width) {
+                            ball.vel.x *= -1;
+                            if (ball.vel.x > 1) next_pos.x = ball.size+1;   // Snap to edge of screen.
+                            else next_pos.x = space_perimeter.width-ball.size-1;
                         }
-                        if (next_pos.y < 1+ball.size+1) { 
-                            next_pos.y = 1+ball.size+1; 
-                            ball.vel.y = -ball.vel.y; 
-                        } else if (next_pos.y > renderer.getHeight()-ball.size-1-1) { 
-                            next_pos.y = renderer.getHeight()-ball.size-1-1; 
-                            ball.vel.y = -ball.vel.y; 
+                        if (p_intersect.height != hitbox.height) {
+                            ball.vel.y *= -1;
+                            if (ball.vel.y > 1) next_pos.y = ball.size+1;
+                            else next_pos.y = space_perimeter.height-ball.size-1;;
                         }
-                        // Should we bother with ball on ball collisions?
-                        // If we do, we'll need to do proper spherical collisions to get the right normals.
-                        // So we can't use the rect.collides. That might have a bonus of better corner collisions with the balls on rects. I think.
+                        // Rectangles:
+                        boolean no_intersect = true;
+                        for (Rectangle rect : rects) {
+                            Rectangle r_intersect = rect.intersection(hitbox);
+                            if (!r_intersect.isEmpty()) {
+                                no_intersect = false;
+                                if (ball.collides()) { 
+                                    if (r_intersect.height > r_intersect.width) {   // Depending on face of rectangle hit, reflect velocity component.
+                                        ball.vel.x *= -1; 
+                                        next_pos.x = ball.pos.x;
+                                    } else {
+                                        ball.vel.y *= -1;
+                                        next_pos.y = ball.pos.y;
+                                    }
+                                }
+                            } 
+                        }
                         ball.pos = next_pos;
+                        ball.set_collision(ball.collides() || no_intersect);    // Set no collide balls as collidable once no intersects detected.
                     }
                 } else fl_skip_tick = false;
             }
 
             if (!sim_paused || fl_force_draw) {
                 fl_force_draw = false;
-                draw();
-                try { Thread.sleep(sim_delay-1); }                          //  ! jank
-                catch (InterruptedException e) {                            // Interrupting the thread to draw will cause the next tick to run prematurely (to draw again at the end of it).
-                    fl_skip_tick = fl_force_draw && (sim_tickrate < 48);    // This has the effect of speeding up the simulation, though it's only really noticable at lower tickrates.
-                    fl_skip_tick = fl_skip_tick && !fl_force_tick;          // To combat this, skip the next tick when fl_force_draw was set and the tickrate is below some arbitrary "low" value.
-                                                                            //  * note that this also causes the inverse problem of slowing down the simulation, but who cares.
-                                                                            //  * also if a force_tick is desired, actually don't skip.
-                }                                                       
+                draw();                                                     //  ! jank
+                try { Thread.sleep(sim_delay-1); }                          // Interrupting the thread to draw will cause the next tick to run prematurely (to draw again at the end of it).
+                catch (InterruptedException e) {                            // This has the effect of speeding up the simulation, though it's only really noticable at lower tickrates.
+                    fl_skip_tick = fl_force_draw && (sim_tickrate < 48);    // To combat this, skip the next tick when fl_force_draw was set and the tickrate is below some arbitrary "low" value.
+                    fl_skip_tick = fl_skip_tick && !fl_force_tick;          //  * note that this also causes the inverse problem of slowing down the simulation, but who cares.
+                }                                                           //  * also if a force_tick is desired, actually don't skip.
             } else {
                 try { Thread.sleep(1); } // To update sim_pause on interrupts, if paused.
                 catch (InterruptedException e) {}
@@ -659,11 +693,14 @@ class BounceSim implements Runnable {
     public void next_ball() { fl_next_ball = true; }
 
     public void add_rect(Rectangle rect) { new_rect = new Rectangle(rect); fl_add_rect = true; }
+    public void remove_rect_at_point(Point p) { del_rectp = p; fl_remove_rect = true; }
    
     // Accessing space size. 
     public Dimension get_space_size() { return space_size.getSize(); }
     public void resize_space(Dimension new_size) { 
         space_size = new_size.getSize();
+        space_perimeter = new Rectangle(new Point(0, 0), space_size);
+        space_perimeter.grow(-1,-1);
         try {
             for (Ball ball : balls) {
                 ball.pos.x = Util.restrict_bounds(ball.pos.x, ball.size+1, space_size.getWidth()-ball.size-1);
@@ -675,6 +712,23 @@ class BounceSim implements Runnable {
                                                                     // low tickrates letting things get out of bounds before the next tick.
                                                                     // Accesses to balls should really only be done in run(), but so it goes.
     }
+    public Dimension get_min_space_size() { return space_size_min.getSize(); }
+
+    public Point get_lowest_corner_rectangle_point() {
+        Point largest = new Point(0,0);
+        try {
+            Point corn;
+            for (Rectangle rect : rects) {
+                corn = rect.getLocation();
+                corn.x += rect.width;
+                corn.y += rect.height;
+                largest.x = Math.max(corn.x, largest.x);
+                largest.y = Math.max(corn.y, largest.y);
+            }
+        } catch (java.util.ConcurrentModificationException e) {}
+        return largest;
+    }
+
    
     // Pausing/playing. 
     public boolean is_paused() { return sim_paused; }
@@ -709,6 +763,9 @@ class BounceSim implements Runnable {
             tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
             bfg.setColor(selected_ball.color);  bfg.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
             bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
+            Rectangle test_rect = selected_ball.get_rect();
+            bfg.drawRect(test_rect.x, test_rect.y, test_rect.width, test_rect.height);
+            if (debugrect != null) bfg.drawRect(debugrect.x, debugrect.y, debugrect.width, debugrect.height);
         }
         renderer.swap();
     }
@@ -731,17 +788,17 @@ class BounceSim implements Runnable {
     public void body_set_size(int px) {
         Ball ball = selected_ball;
         int next_size = Util.restrict_bounds(px, BODY_SIZE_MIN, BODY_SIZE_MAX);
-        // Restrict within screen bounds from current position:
-        //Util.restrict_bounds( should use restrict bounds here.
-        if ((ball.pos.x+next_size+1) >= space_size.getWidth()-1) next_size = (int)(space_size.getWidth()-ball.pos.x-2);
-        else if ((ball.pos.x-next_size-1) <= 1) next_size = (int)(ball.pos.x-2);
-        if ((ball.pos.y+next_size+1) >= space_size.getHeight()-1) next_size = (int)(space_size.getHeight()-ball.pos.y-2);
-        else if ((ball.pos.y-next_size-1) <= 1) next_size = (int)(ball.pos.y-2);
-        ball.size = next_size;
+        if (ball_perimeter_check(ball, next_size)) ball.size = next_size;
     }
     public int sim_get_tickrate() { return sim_tickrate; }
     public Vec2 body_get_velocity() { return (new Vec2(selected_ball.vel)); }
     public int body_get_size() { return selected_ball.size; }
+
+    private boolean ball_perimeter_check(Ball ball, int s) {
+        Rectangle r = ball.get_rect();
+        r.setSize(s*2+2, s*2+2);
+        return r.equals(space_perimeter.intersection(r));
+    }
 
     // The balls that bounce.
     class Ball { 
@@ -749,24 +806,28 @@ class BounceSim implements Runnable {
         public Vec2 pos;    // * Keeping Vec2's instead of changing to points, decimal (sub-pixel) precision is desired for smoothest movement.
         public Vec2 vel; 
         Color color; 
+        boolean collides; // For spawning random balls in a rect heavy scene. Allow them to float ontop until they hit free space.
         // Randomized constructor.
         public Ball() {
             size = (int)Util.relate_bounds(Math.random(), 0.0, 1.0, BODY_SIZE_MIN, BODY_SIZE_MAX); 
-            
-            // Will need to make sure this doesn't collide with anything. @todo 
             double x = Util.relate_bounds(Math.random(), 0.0, 1.0, size+1, space_size.getWidth()-size-1);   
-            double y = Util.relate_bounds(Math.random(), 0.0, 1.0, size+1, space_size.getHeight()-size-1);  // There's probably some cute math function for normalization we should be using instead of relate_bounds.
+            double y = Util.relate_bounds(Math.random(), 0.0, 1.0, size+1, space_size.getHeight()-size-1);  // Math library? Lerp?
             pos = new Vec2(x, y);
-
-            // Solutions for finding the free space:
-            //  - Pick a random rectangle, move off to the side a litte bit, and check the max space until it hits another rectangle. Pick that middle position, with a size slightly smaller than the distance in between.
-            //  - Some kind of data structure for spatial information? Would a BSP tree be applicable here? 
-            
             double v = Util.relate_bounds(Math.random(), 0.0, 1.0, BODY_VEL_MIN, BODY_VEL_MAX);
             vel = Vec2.mul(new Vec2(1,1), Math.sqrt(v*v/2));
-            
-            color = Color.lightGray;
+            collides = true;
+            set_collision(rects.size() == 0); // All balls in a rectanglified environment start as non-collide, then become collidable when collision detects detects them as such.
         }
+        public Rectangle get_rect() {
+            return new Rectangle((int)pos.x-size-1, (int)pos.y-size-1, size*2+2, size*2+2);
+        }
+        public void set_collision(boolean c) { 
+            collides = c; 
+            if (this == selected_ball) color = Color.red;
+            else if (collides) color = Color.lightGray;
+            else color = Color.gray;
+        }
+        public boolean collides() { return collides; }
     }
 } 
 
