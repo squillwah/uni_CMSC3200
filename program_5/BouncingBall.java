@@ -10,7 +10,7 @@
 // Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
 // SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
 
-package BouncingBall;
+//package BouncingBall;
 
 import java.awt.*;
 import java.awt.event.*;
@@ -30,6 +30,8 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     private Button bt_start, bt_pause, bt_quit, bt_create, bt_destroy, bt_next;
     private Scrollbar sb_tickrate, sb_velocity, sb_size;
     private Label sb_tickrate_lbl, sb_velocity_lbl, sb_size_lbl;
+    private Point rect_drag_start;
+    private boolean rect_dragging;
 
     public BouncingBall(Dimension initial_size) {
         // Configure the main frame:
@@ -322,31 +324,66 @@ public class BouncingBall extends Frame implements WindowListener, ComponentList
     //  MouseListener
     // Should we implement these mouse events under this frame class or the BounceSim? Should BounceSim be concered with user Mouse movements, or only have methods to places rectangles in places?
     public void mousePressed(MouseEvent e) {
-        String button = "";
-        if (e.getButton() == MouseEvent.BUTTON1) button = "Left";
-        else if (e.getButton() == MouseEvent.BUTTON2) button = "Center";  // Lesson doesn't have these as elses. Why? Is the else condition less efficient than sequential ifs in a micro way? That doesn't sound true.
-        else if (e.getButton() == MouseEvent.BUTTON3) button = "Right";
-        System.out.println(button + " mouse button " + e.getButton() + " pressed");
+        Point point = clamp_mouse_point(e.getPoint());
+        if (e.getButton() == MouseEvent.BUTTON1) {
+            rect_dragging = true;
+            rect_drag_start = point;
+            bsim.set_drag_preview(null);
+            bsim.forcedraw();
+        } else if (e.getButton() == MouseEvent.BUTTON3) {
+            bsim.remove_rectangle_at(point);
+            bsim.forcedraw();
+        }
     }
     public void mouseReleased(MouseEvent e) {
-        System.out.println("Mouse button " + e.getButton() + " released");
+        if (rect_dragging && e.getButton() == MouseEvent.BUTTON1) {
+            Rectangle new_rect = build_drag_rectangle(rect_drag_start, clamp_mouse_point(e.getPoint()));
+            rect_dragging = false;
+            rect_drag_start = null;
+            bsim.set_drag_preview(null);
+            if (new_rect != null) {
+                bsim.add_rectangle(new_rect);
+            }
+            bsim.forcedraw();
+        }
     }
     public void mouseClicked(MouseEvent e) {
-        System.out.println("Mouse Clicked" + e.getClickCount() + " clicks");
         // use a Point to store the click point
     }
     public void mouseEntered(MouseEvent e) {
-        System.out.println(e.paramString());
     }
     public void mouseExited(MouseEvent e) {
-        System.out.println(e.paramString());
     }
     //  MouseMotionListener
     public void mouseMoved(MouseEvent e) {
         //list.add(e.paramString());
     }
     public void mouseDragged(MouseEvent e) {
-        System.out.println(e.paramString());
+        if (rect_dragging) {
+            bsim.set_drag_preview(build_drag_rectangle(rect_drag_start, clamp_mouse_point(e.getPoint())));
+            bsim.forcedraw();
+        }
+    }
+    private Point clamp_mouse_point(Point point) {
+        int max_x = Math.max(1, screen.getWidth()-2);
+        int max_y = Math.max(1, screen.getHeight()-2);
+        return new Point(
+            Util.restrict_bounds(point.x, 1, max_x),
+            Util.restrict_bounds(point.y, 1, max_y)
+        );
+    }
+    private Rectangle build_drag_rectangle(Point start, Point end) {
+        if (start == null || end == null) {
+            return null;
+        }
+        if (start.equals(end)) {
+            return null;
+        }
+        int x = Math.min(start.x, end.x);
+        int y = Math.min(start.y, end.y);
+        int width = Math.abs(end.x - start.x)+1;
+        int height = Math.abs(end.y - start.y)+1;
+        return new Rectangle(x, y, width, height);
     }
     
     // Unimplemented WindowListener, ComponenetLister:
@@ -461,7 +498,8 @@ class BounceSim extends Canvas implements Runnable {
     // Objects:
     private Vector<Ball> balls;
     private Ball selected_ball; // Reference to the selected ball in the vector (for changing velocity/size)
-    //private vector<Rect> rects
+    private Vector<SimRect> rectangles;
+    private Rectangle drag_preview;
 
     public BounceSim(Dimension initial_screen_size) {
         setSize(initial_screen_size);
@@ -471,9 +509,11 @@ class BounceSim extends Canvas implements Runnable {
         sim_paused = true;
         sim_running = false;
         balls = new Vector<Ball>();
+        rectangles = new Vector<SimRect>();
         balls.addElement(new Ball());
         selected_ball = balls.elementAt(0);
         selected_ball.color = Color.red;
+        drag_preview = null;
         setBackground(Color.blue);
 
         renderer = null; //new BounceCanvas(initial_screen_size);
@@ -527,6 +567,7 @@ class BounceSim extends Canvas implements Runnable {
                     // Should we bother with ball on ball collisions?
                     // If we do, we'll need to do proper spherical collisions to get the right normals.
                     // So we can't use the rect.collides. That might have a bonus of better corner collisions with the balls on rects. I think.
+                    resolve_rectangle_collisions(ball, next_pos);
 
                     ball.pos = next_pos;
                 }
@@ -574,13 +615,40 @@ class BounceSim extends Canvas implements Runnable {
             //forcetick();
         }
     }
+    public void add_rectangle(Rectangle rect) {
+        if (rect != null && rect.width > 0 && rect.height > 0) {
+            rectangles.addElement(new SimRect(rect));
+        }
+    }
+    public void remove_rectangle_at(Point point) {
+        for (int i = rectangles.size()-1; i >= 0; i--) {
+            if (rectangles.elementAt(i).contains(point)) {
+                rectangles.removeElementAt(i);
+                break;
+            }
+        }
+    }
+    public void set_drag_preview(Rectangle rect) {
+        drag_preview = (rect == null) ? null : new Rectangle(rect);
+    }
    
     // Accessing screen size. 
     public Dimension get_screen_size() { return getSize(); }
     public void resize_s(Dimension new_size) { 
+        setSize(new_size);
         for (Ball ball : balls) {
-            ball.pos.x = Util.restrict_bounds(ball.pos.x, ball.size+1, new_size.getWidth()-ball.size-1);
-            ball.pos.y = Util.restrict_bounds(ball.pos.y, ball.size+1, new_size.getWidth()-ball.size-1);
+            ball.pos.x = Util.restrict_bounds(ball.pos.x, ball.size+2, new_size.getWidth()-ball.size-2);
+            ball.pos.y = Util.restrict_bounds(ball.pos.y, ball.size+2, new_size.getHeight()-ball.size-2);
+        }
+        for (int i = rectangles.size()-1; i >= 0; i--) {
+            SimRect rect = rectangles.elementAt(i);
+            rect.x = Util.restrict_bounds(rect.x, 1, Math.max(1, new_size.width-2));
+            rect.y = Util.restrict_bounds(rect.y, 1, Math.max(1, new_size.height-2));
+            rect.width = Math.min(rect.width, Math.max(0, new_size.width-rect.x-1));
+            rect.height = Math.min(rect.height, Math.max(0, new_size.height-rect.y-1));
+            if (rect.width <= 0 || rect.height <= 0) {
+                rectangles.removeElementAt(i);
+            }
         }
         //renderer.setSize(new_size);
     }
@@ -603,47 +671,14 @@ class BounceSim extends Canvas implements Runnable {
         backbuff = createImage(getWidth(), getHeight());
         if (bfg != null) bfg.dispose(); // Why not just do this at the end always?
         bfg = backbuff.getGraphics();
-
-        bfg.setColor(Color.red);
-        bfg.drawRect(0, 0, getWidth()-1, getHeight()-1);
-        
-        int tl_x, tl_y;
-        for (Ball ball : balls) {
-            if (ball == selected_ball) continue;
-            tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
-            tl_y = (int)Math.round(ball.pos.y-1-ball.size);
-            bfg.setColor(ball.color);   bfg.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
-            bfg.setColor(Color.black);  bfg.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
-        }
-        tl_x = (int)Math.round(selected_ball.pos.x-1-selected_ball.size);   // Always draw selected on top. @todo if we add ball on ball collisions, this becomes unnecessary.
-        tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
-        bfg.setColor(selected_ball.color);  bfg.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
-        bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
-
+        draw_scene(bfg);
         g.drawImage(backbuff, 0, 0, null);
-        System.out.println("paint");
     }
 
     // Internal, only call once within simulation thread.
     private void draw() {
         Graphics bfg = renderer.get_backbuff();
-
-        bfg.setColor(Color.red);
-        bfg.drawRect(0, 0, getWidth()-1, getHeight()-1);
-        
-        int tl_x, tl_y;
-        for (Ball ball : balls) {
-            if (ball == selected_ball) continue;
-            tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
-            tl_y = (int)Math.round(ball.pos.y-1-ball.size);
-            bfg.setColor(ball.color);   bfg.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
-            bfg.setColor(Color.black);  bfg.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
-        }
-        tl_x = (int)Math.round(selected_ball.pos.x-1-selected_ball.size);   // Always draw selected on top. @todo if we add ball on ball collisions, this becomes unnecessary.
-        tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
-        bfg.setColor(selected_ball.color);  bfg.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
-        bfg.setColor(Color.black);          bfg.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
-        
+        draw_scene(bfg);
         renderer.swap();
     }
 
@@ -677,6 +712,110 @@ class BounceSim extends Canvas implements Runnable {
     public Vec2 body_get_velocity() { return (new Vec2(selected_ball.vel)); }
     public int body_get_size() { return selected_ball.size; }
 
+    private void draw_scene(Graphics g) {
+        g.setColor(Color.white);
+        g.fillRect(0, 0, getWidth(), getHeight());
+
+        g.setColor(Color.red);
+        g.drawRect(0, 0, getWidth()-1, getHeight()-1);
+        
+        for (SimRect rect : rectangles) {
+            draw_rectangle(g, rect.x, rect.y, rect.width, rect.height);
+        }
+        if (drag_preview != null) {
+            draw_rectangle(g, drag_preview.x, drag_preview.y, drag_preview.width, drag_preview.height);
+        }
+        
+        int tl_x, tl_y;
+        for (Ball ball : balls) {
+            if (ball == selected_ball) continue;
+            tl_x = (int)Math.round(ball.pos.x-1-ball.size);   
+            tl_y = (int)Math.round(ball.pos.y-1-ball.size);
+            g.setColor(ball.color);   g.fillOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1); 
+            g.setColor(Color.black);  g.drawOval(tl_x, tl_y, ball.size*2+1, ball.size*2+1);
+        }
+        tl_x = (int)Math.round(selected_ball.pos.x-1-selected_ball.size);   // Always draw selected on top. @todo if we add ball on ball collisions, this becomes unnecessary.
+        tl_y = (int)Math.round(selected_ball.pos.y-1-selected_ball.size);
+        g.setColor(selected_ball.color);  g.fillOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1); 
+        g.setColor(Color.black);          g.drawOval(tl_x, tl_y, selected_ball.size*2+1, selected_ball.size*2+1);
+    }
+    private void draw_rectangle(Graphics g, int x, int y, int width, int height) {
+        g.setColor(Color.lightGray);
+        g.fillRect(x, y, width, height);
+        g.setColor(Color.darkGray);
+        g.drawRect(x, y, width-1, height-1);
+    }
+    private void resolve_rectangle_collisions(Ball ball, Vec2 next_pos) {
+        double prev_left = ball_left(ball.pos, ball.size);
+        double prev_right = ball_right(ball.pos, ball.size);
+        double prev_top = ball_top(ball.pos, ball.size);
+        double prev_bottom = ball_bottom(ball.pos, ball.size);
+
+        for (SimRect rect : rectangles) {
+            double next_left = ball_left(next_pos, ball.size);
+            double next_right = ball_right(next_pos, ball.size);
+            double next_top = ball_top(next_pos, ball.size);
+            double next_bottom = ball_bottom(next_pos, ball.size);
+
+            if (next_right < rect.left() || next_left > rect.right() || next_bottom < rect.top() || next_top > rect.bottom()) {
+                continue;
+            }
+
+            boolean hit_x = false;
+            boolean hit_y = false;
+
+            if (prev_right <= rect.left() && next_right >= rect.left()) {
+                next_pos.x = rect.left()-ball.size;
+                ball.vel.x = -ball.vel.x;
+                hit_x = true;
+            } else if (prev_left >= rect.right() && next_left <= rect.right()) {
+                next_pos.x = rect.right()+ball.size+2;
+                ball.vel.x = -ball.vel.x;
+                hit_x = true;
+            }
+
+            if (prev_bottom <= rect.top() && next_bottom >= rect.top()) {
+                next_pos.y = rect.top()-ball.size;
+                ball.vel.y = -ball.vel.y;
+                hit_y = true;
+            } else if (prev_top >= rect.bottom() && next_top <= rect.bottom()) {
+                next_pos.y = rect.bottom()+ball.size+2;
+                ball.vel.y = -ball.vel.y;
+                hit_y = true;
+            }
+
+            if (!hit_x && !hit_y) {
+                double overlap_left = Math.abs(next_right-rect.left());
+                double overlap_right = Math.abs(rect.right()-next_left);
+                double overlap_top = Math.abs(next_bottom-rect.top());
+                double overlap_bottom = Math.abs(rect.bottom()-next_top);
+
+                double min_horizontal = Math.min(overlap_left, overlap_right);
+                double min_vertical = Math.min(overlap_top, overlap_bottom);
+
+                if (min_horizontal <= min_vertical) {
+                    if (ball.pos.x < rect.center_x()) {
+                        next_pos.x = rect.left()-ball.size;
+                    } else {
+                        next_pos.x = rect.right()+ball.size+2;
+                    }
+                    ball.vel.x = -ball.vel.x;
+                } else {
+                    if (ball.pos.y < rect.center_y()) {
+                        next_pos.y = rect.top()-ball.size;
+                    } else {
+                        next_pos.y = rect.bottom()+ball.size+2;
+                    }
+                    ball.vel.y = -ball.vel.y;
+                }
+            }
+        }
+    }
+    private double ball_left(Vec2 pos, int size) { return pos.x-size-1; }
+    private double ball_right(Vec2 pos, int size) { return pos.x+size-1; }
+    private double ball_top(Vec2 pos, int size) { return pos.y-size-1; }
+    private double ball_bottom(Vec2 pos, int size) { return pos.y+size-1; }
+
     // The balls that bounce.
     class Ball { 
         public int size; 
@@ -701,6 +840,28 @@ class BounceSim extends Canvas implements Runnable {
             
             color = Color.lightGray;
         }
+    }
+    class SimRect {
+        public int x;
+        public int y;
+        public int width;
+        public int height;
+
+        public SimRect(Rectangle rect) {
+            x = rect.x;
+            y = rect.y;
+            width = rect.width;
+            height = rect.height;
+        }
+        public boolean contains(Point point) {
+            return point.x >= x && point.x <= right() && point.y >= y && point.y <= bottom();
+        }
+        public int left() { return x; }
+        public int right() { return x+width-1; }
+        public int top() { return y; }
+        public int bottom() { return y+height-1; }
+        public double center_x() { return x + width/2.0; }
+        public double center_y() { return y + height/2.0; }
     }
 } 
 
@@ -750,4 +911,3 @@ class Util {
         return low2 + ((up2-low2) * ((num-low1)/(up1-low1)));
     }
 }
-
