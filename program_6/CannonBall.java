@@ -29,16 +29,24 @@ public class CannonBall {
         display = new MultiBufferedCanvas(game.renderer());
         
         pnl_display.add("Center", display);
+        display.setSize(initial_size);
         
         //validate() ? 
         window.setVisible(true);
+
+        game.test();
+
+    }
+
+    public static void main(String[] args) {
+        new CannonBall(new Dimension(600, 600));
     }
 
     // Right now for testing, just have the canvas resize with frame (using this as componenet listener). Keep game world size static to see how the renderer handles that.
 }
 
 class CannonBallEngine {
-    private Renderer game_renderer = new Renderer(6) {
+    private Renderer gr = new Renderer(6, new Dimension(400,400)) {
         // Give the render layers more descriptive names.
         public final int l_background = LAYERS[0];  // This should work, as long as the super constructor executes before extension initialization.
         public final int l_statics    = LAYERS[1];
@@ -49,20 +57,20 @@ class CannonBallEngine {
     
         public void draw(int layer, Graphics g) {
             //switch (layer) {
-                // Could very easily support drawing multiple layers onto one graphics here, if that ever becomes desirable.
-                if (layer == l_background:  draw_background(g); break;
-                case l_statics:     draw_statics(g);    break;
-                case l_bubbles:     draw_bubbles(g);    break;
-                case l_balloids:    draw_balloids(g);   break;
-                case l_cannon:      draw_cannon(g);     break;
-                case l_dragbox:     draw_dragbox(g);    break;
-                default: 
-                    System.out.println("err: bad layer code in draw");
+                // Could very easily support drawing multiple layers onto one graphics here (with &), if that ever becomes desirable.
+                if (layer == l_background)      draw_background(g);
+                else if (layer == l_statics)    draw_statics(g);    
+                else if (layer == l_bubbles)    draw_bubbles(g);    
+                else if (layer == l_balloids)   draw_balloids(g);   
+                else if (layer == l_cannon)     draw_cannon(g);     
+                else if (layer == l_dragbox)    draw_dragbox(g);    
+                else System.out.println("err: bad layer code in draw");
             //}
         }
     
         private void draw_background(Graphics g) {
             // @todo depending on the planet, can make the background different.
+            g.drawRect(0, 0, res_x(), res_y());
         }
     
         private void draw_statics(Graphics g) {
@@ -87,6 +95,12 @@ class CannonBallEngine {
     };
 
     public CannonBallEngine(Dimension world_size) {}
+
+    public void test() {
+        gr.redraw(gr.l_background);
+    }
+
+    public Renderer renderer() { return gr; }
 }
 
 // Abstract class for Game to extend (and define rendering logic with).
@@ -110,7 +124,8 @@ abstract class Renderer {
     
     // Draw logic for given layer. 
     // Overridden by game, called by MBC during paint.
-    public void draw(int layer, Graphics g);
+    public abstract void draw(int layer, Graphics g);
+
     // Flag given layer for redraw.
     // For example, after balls have been moved or a rectangle was added.
     public void redraw(int layer) { 
@@ -122,6 +137,8 @@ abstract class Renderer {
         redraw = 0; 
         return layers; 
     }
+    public int res_x() { return resolution.width; }
+    public int res_y() { return resolution.height; }
 }
 
 class MultiBufferedCanvas extends Canvas {
@@ -130,36 +147,38 @@ class MultiBufferedCanvas extends Canvas {
     private Image backbuff;
     private Renderer renderer;
     private BufferedImage[] layerbuffs;
-    private Graphics gra;
+    private Graphics gfx;
     
-    public MultiBufferedCanvas(Dimension size, Renderer r) {
-        setSize(size);
+    public MultiBufferedCanvas(/*Dimension size,*/ Renderer r) {
+        //setSize(size);
         setBackground(Color.white);
         renderer = r;
         layerbuffs = new BufferedImage[renderer.LAYER_COUNT];
         for (int i = 0; i < renderer.LAYER_COUNT; i++) 
-            layerbuffs[i] = new BufferedImage(r.resolution.width, r.resolution.height, TYPE_INT_ARGB);  // Init empty layers
+            layerbuffs[i] = new BufferedImage(renderer.res_x(), renderer.res_y(), BufferedImage.TYPE_INT_ARGB);  // Init empty layers
     }
 
     public void update(Graphics g) {
         // Iterate through layers, redraw if marked for redraw.
         int draws = renderer.redraws();
         for (int i = 0; i < renderer.LAYER_COUNT; i++) {
-            if (draws & renderer.LAYERS[i]) {
-                layerbuffs[i] = new BufferedImage(r.resolution.width, r.resolution.height, TYPE_INT_ARGB);
-                gra = layerbuffs[i].getGraphics();
+            if ((draws & renderer.LAYERS[i]) > 0) {
+                layerbuffs[i] = new BufferedImage(renderer.res_x(), renderer.res_y(), BufferedImage.TYPE_INT_ARGB);
+                gfx = layerbuffs[i].getGraphics();
                 renderer.draw(renderer.LAYERS[i], g);
-                gra.dispose();
+                gfx.dispose();
             }
         }
-        if (draws) paint(g);  // Only recompose layers if there was a redraw
+        if (draws > 0) paint(g);  // Only recompose layers if there was a redraw
     }
 
     public void paint(Graphics g) {
-        backbuff = createImage(r.resolution.width, r.resolution.height);    // Blank, to wipe last frame and preserve first layer.
+        backbuff = createImage(renderer.res_x(), renderer.res_y());    // Blank, to wipe last frame and preserve first layer.
+        gfx = backbuff.getGraphics();
         for (BufferedImage layer : layerbuffs) 
-            backbuff.drawImage(layer, 0, 0, null);
-        g.drawImage(backbuff);
+            gfx.drawImage(layer, 0, 0, null);
+        gfx.dispose();
+        g.drawImage(backbuff, 0, 0, null);
     }
 }
 
