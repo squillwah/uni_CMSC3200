@@ -13,18 +13,18 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
     private Panel pnl_display, pnl_controls;
 
     // The game logic, drawing system.
-//    private CannonBallEngine engine;
+    private CannonBallEngine engine;
 //    private MultiBufferedCanvas display;
 
     // Elements of UI: MenuItems, ScrollBars, Labels
     private MenuBar menubar;
     private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed;
-    private MenuItem[] mnu_control_itms;                        private final byte run     = 0, pause = 1, restart = 2, quit  = 3,              CONTROLS = 4;
-    private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, SIZES    = 5;
-    private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, SPEEDS   = 5;
-    private CheckboxMenuItem[] mnu_environment_itms;            private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, PLANETS = 9;
-    private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;
-    private Scrollbar sb_cannon_force, sb_cannon_angle;
+    private MenuItem[] mnu_control_itms;                        private final byte run     = 0, pause = 1, restart = 2, quit  = 3,              NUM_CONTROLS = 4;   // Array access offset constants.
+    private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, NUM_SIZES    = 5;
+    private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
+    private CheckboxMenuItem[] mnu_environment_itms;            private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
+    private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
+    private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 // @todo sometime maybe idk, Menu and Menubar support a getMenu and getItem Count method, we could use that to dynamically traverse the menubar structure to find things instead of defining it all here and in constructor.
 
     // Update flags corresponding to control events. 
     // For use in thread loop, to update a game value before ticking the engine.
@@ -46,13 +46,15 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
     private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
 
     public uitest(Dimension initial_size) {
+        engine = new CannonBallEngine();
+        
         // Frame
         window = new Frame();
         window.setTitle("CannonBubbles");
         window.setMinimumSize(initial_size);
         window.setBackground(Color.black);
         window.setLayout(new BorderLayout());
-        // Elements of frame 
+        // Menubar, MenuItems. 
         menubar = new MenuBar();
         mnu_control               = menubar.add(new Menu("Control"));
         mnu_control_itms          = new MenuItem[4];
@@ -78,7 +80,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         mnu_parameters_mnu_speed_itms[xfast]  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xfast"));
         mnu_environment = menubar.add(new Menu("Environment"));
         mnu_environment_itms          = new CheckboxMenuItem[9];
-        mnu_environment_itms[mercury] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury"));
+        mnu_environment_itms[mercury] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury")); // @todo Could we think of a way to do all this in the Engine, and attach the Engine as listener? Just pass the menubar or menuitem back to this frame somehow? What about the Scrolls too?
         mnu_environment_itms[venus]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Venus"));
         mnu_environment_itms[earth]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Earth"));
         mnu_environment_itms[mars]    = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mars"));
@@ -87,16 +89,21 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         mnu_environment_itms[uranus]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
         mnu_environment_itms[neptune] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
         mnu_environment_itms[pluto]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
+        // Panels
         pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
         pnl_controls = (Panel)window.add("South", (new Panel()));
+        // Scrolls
         Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);
         Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);
+        // Labels
         Label lbl_cannon_force = new Label("Force: ?px/s");
         Label lbl_cannon_angle = new Label("Angle: ?deg");
         Label lbl_time         = new Label("Time: ?s");
         Label lbl_score_ball   = new Label("Bubble: ");
         Label lbl_score_player = new Label("You: ");
-        
+       
+        // Attach Listeners 
+        for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
@@ -120,6 +127,20 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         window.add("Center", pnl_display);
         window.add("South", pnl_controls);
 
+
+        // Set radio defaults
+        //set_radio(mnu_parameters_mnu_size_itms, mnu_parameters_mnu_size_itms[medium]);
+        //set_radio(mnu_parameters_mnu_speed_itms, mnu_parameters_mnu_speed_itms[normal]);
+        //set_radio(mnu_environment_itms, mnu_environment_itms[earth]);
+        mnu_control_itms[pause].setEnabled(false);
+        mnu_parameters_mnu_size_itms[medium].setState(true);    // @todo Should we add randomness here? What about an extra menuitem on each, that disables all radios and applies a random size, speed, or gravity?
+        mnu_parameters_mnu_speed_itms[normal].setState(true);
+        mnu_environment_itms[earth].setState(true);
+        engine.set_gravity(10);
+        engine.set_bubble_size(10);
+        engine.set_bubble_speed(10);
+
+
         //pnl_display.add("Center", display);
         //display.setSize(initial_size);
         
@@ -131,82 +152,100 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         new uitest(new Dimension(600, 600));
     }
 
-    private void quit() {
+    private void exit() {
+        for (MenuItem mi : mnu_control_itms) mi.removeActionListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.removeItemListener(this);
+        window.dispose();
+        System.exit(0);
     }
 
+
+
+    // ! the critical consideration is whether or not to have all these listeners as part of this main frame class, or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
 
     }
 
     public void actionPerformed(ActionEvent e) {
-
-    }
-
-    private boolean handle_size_menu_item(Object item) {
-        boolean handled = false;
-        for (int i = 0; !handled && i < SIZES; i++) {
-            if (item == mnu_parameters_mnu_size_itms[i]) {
-                switch (i) {
-                    case xsmall: System.out.println("xslow"); break;
-                    case small: System.out.println("slow"); break;
-                    case medium: System.out.println("medium"); break;
-                    case large: System.out.println("fast"); break;
-                    case xlarge: System.out.println("xfast"); break;
-                    default: System.out.println("err: bad menu item offset");
-                }
-                handled = true;
-            }
+        Object item = e.getSource();
+        switch (find_mitem(mnu_control_itms, NUM_CONTROLS, item)) {
+            case -1: break;
+            case run:
+            case pause:
+                engine.set_pause(!engine.is_paused());
+                mnu_control_itms[run].setEnabled(engine.is_paused());
+                mnu_control_itms[pause].setEnabled(!engine.is_paused());
+                break;
+            case restart:
+                engine.restart();
+                mnu_control_itms[run].setEnabled(true);     // Assuming restart always pauses. @todo may want to change this depending on game feel. Or rubric demands.
+                mnu_control_itms[pause].setEnabled(false);
+                break;
+            case quit:
+                exit();
+                break;
+            default: System.out.println("err: bad control menu item offset, can't match: " + item); break;
         }
-        return handled;
-    }
-    private boolean handle_speed_menu_item(Object item) {
-        boolean handled = false;
-        for (int i = 0; !handled && i < SPEEDS; i++) {
-            if (item == mnu_parameters_mnu_speed_itms[i]) {
-                switch (i) {
-                    case xslow: System.out.println("xslow"); break;
-                    case slow: System.out.println("slow"); break;
-                    case normal: System.out.println("medium"); break;
-                    case fast: System.out.println("fast"); break;
-                    case xfast: System.out.println("xfast"); break;
-                    default: System.out.println("err: bad menu item offset");
-                }
-                handled = true;
-            }
-        }
-        return handled;
-    }
-    private boolean handle_environment_menu_item(Object item) {
-        boolean handled = false;
-        for (int i = 0; !handled && i < PLANETS; i++) {
-            if (item == mnu_environment_itms[i]) {
-                switch (i) {
-                    case mercury: System.out.println("xslow"); break;
-                    case venus: System.out.println("slow"); break;
-                    case earth: System.out.println("medium"); break;
-                    case mars: System.out.println("fast"); break;
-                    case jupiter: System.out.println("xfast"); break;
-                    case saturn: System.out.println("xfast"); break;
-                    case uranus: System.out.println("xfast"); break;
-                    case neptune: System.out.println("xfast"); break;
-                    case pluto: System.out.println("xfast"); quit(); break;
-                    default: System.out.println("err: bad menu item offset");
-                }
-                handled = true;
-            }
-        }
-        return handled;
     }
 
+    // Return index of object in CheckboxMenuItem array. -1 if absent.
+    private int find_mitem(/*Checkbox*/MenuItem[] radios, int size, Object item) {
+        int i;
+        for (i = 0; i < size && item != radios[i]; i++);
+        if (!(i < size)) i = -1;
+        return i;
+    }
+
+    // Tick given radio on and clear all others in array.
+    private void set_mradio(CheckboxMenuItem[] radios, CheckboxMenuItem radio) {
+        for (CheckboxMenuItem r : radios) r.setState(false);
+        radio.setState(true);
+    }
+  
     public void itemStateChanged(ItemEvent e) {
-        Object source = e.getSource();
-        if (!handle_size_menu_item(source)) 
-        if (!handle_speed_menu_item(source))
-        handle_environment_menu_item(source);
+        Object item = e.getSource();
+        //if (item instanceof CheckboxMenuItem) 
+        int radio;
+        if ((radio = find_mitem(mnu_parameters_mnu_size_itms, NUM_SIZES, item)) > -1) {
+            set_mradio(mnu_parameters_mnu_size_itms, (CheckboxMenuItem)item);
+            switch (radio) {
+                case xsmall: engine.set_bubble_size(5); break;
+                case small:  engine.set_bubble_size(10); break;
+                case medium: engine.set_bubble_size(20); break;         // Could also have set_bubble_size(5, x), to specify the middle size and a range smaller/bigger for randomness. Or that random variation could just be hardset as some constant or constant adjusted for size.
+                case large:  engine.set_bubble_size(40); break;
+                case xlarge: engine.set_bubble_size(80); break;
+                default: System.out.println("err: bad size menu item offset, can't match: " + item); break;
+            } 
+        } else 
+        if ((radio = find_mitem(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, item)) > -1) {
+            set_mradio(mnu_parameters_mnu_speed_itms, (CheckboxMenuItem)item);
+            switch (radio) {
+                case xslow:  engine.set_bubble_speed(5); break;     // Could do away with the offsets, have another parallel array of the settings, and just iterate 0->NUM_whatever. Or since they're parallel, just use the return of radio (cause that'll be the index in the value array). That could automate all the creations and adding of the MenuItems to one NUM_ITEMS number, though setting up names for the items and the related setting values would all still be manual. Would also make the planet gravity values a little unintuitive, because they have no direct relation (speeds, sizes go up). You would need to know that they're planets, and in the order from the sun.
+                case slow:   engine.set_bubble_speed(10); break;    // Although the offsets do have their benefits, say if we wanted to do a specific thing for a specific setting, like changing a color or graphic. It's nice to be able to tell explicity which setting, and not treat them all the same.
+                case normal: engine.set_bubble_speed(20); break;    
+                case fast:   engine.set_bubble_speed(40); break;
+                case xfast:  engine.set_bubble_speed(80); break;
+                default: System.out.println("err: bad speed menu item offset, can't match: " + item); break;
+            } 
+        } else 
+        if ((radio = find_mitem(mnu_environment_itms, NUM_PLANETS, item)) > -1) {
+            set_mradio(mnu_environment_itms, (CheckboxMenuItem)item);
+            switch (radio) {
+                case mercury: engine.set_gravity(10); break;    // How many meters is a pixel?
+                case venus:   engine.set_gravity(11); break;
+                case earth:   engine.set_gravity(12); break;
+                case mars:    engine.set_gravity(13); break;
+                case jupiter: engine.set_gravity(14); break;
+                case saturn:  engine.set_gravity(15); break;
+                case uranus:  engine.set_gravity(16); break;
+                case neptune: engine.set_gravity(17); break;
+                case pluto:   engine.set_gravity(18); exit(); break;
+                default: System.out.println("err: bad env menu item offset, can't match: " + item); break;
+            }
+        }
     }
 
     // @todo would be far better to use an array for these radio settings and just iterate that in itemStateChanged instead of doing this
@@ -217,6 +256,37 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
 
 
     // Right now for testing, just have the canvas resize with frame (using this as componenet listener). Keep game world size static to see how the renderer handles that.
+}
+
+class CannonBallEngine {
+    
+    private boolean paused; // If we have paused here, but the main loop is in main, and all the setting of rects and changing of sizes is of course done here, then pausing may cause issues with setting those during pause.
+                            // Unless, pause doesn't stop ticks from doing anything entirely, it just skips the velocity/collision parsing stuff. Still allows for changing size, speed vars, and adding/deling rects. And moving the cannon. Ig. It should be that the cannon can fire multiple bullets, with a configurable rate of fire. But that's only during not pause, obv. Should we allow angle adjustment during a pause? Could be a setting. What does rubric say?
+
+
+    public CannonBallEngine() {
+        paused = true;
+    }
+    public void set_bubble_size(int px) {
+        System.out.println("Size: " + px);
+    }
+    public void set_bubble_speed(double pps) {
+        System.out.println("Speed: " + pps);
+    }
+    public void set_gravity(double ppsps) {
+        System.out.println("Gravity: " + ppsps);
+    }
+    public void set_pause(boolean p) {
+        paused = p;
+        System.out.println("Pause: " + paused);
+    }
+    public boolean is_paused() { 
+        return paused; 
+    }
+    public void restart() {
+        System.out.println("Restart");
+        set_pause(true);
+    }
 }
 
 /*
