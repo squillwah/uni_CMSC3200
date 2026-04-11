@@ -5,55 +5,26 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 
-public class uitest {
+public class uitest implements ActionListener, AdjustmentListener, ItemListener {
     private static final long SerialVersionUID = 124987123L;
    
     // Frame and panels
     private Frame window;
-    private Panel pnl_display;
-    private Panel pnl_controls;
+    private Panel pnl_display, pnl_controls;
 
     // The game logic, drawing system.
 //    private CannonBallEngine engine;
 //    private MultiBufferedCanvas display;
 
-    // Elements of UI
+    // Elements of UI: MenuItems, ScrollBars, Labels
     private MenuBar menubar;
-    private Menu     mnu_control;
-    private MenuItem mnu_control_itm_run;
-    private MenuItem mnu_control_itm_pause;
-    private MenuItem mnu_control_itm_restart;
-    private MenuItem mnu_control_itm_quit;
-    private Menu     mnu_parameters;
-    private Menu     mnu_parameters_mnu_size;
-    private CheckboxMenuItem mnu_parameters_mnu_size_itm_xsmall;
-    private CheckboxMenuItem mnu_parameters_mnu_size_itm_small;
-    private CheckboxMenuItem mnu_parameters_mnu_size_itm_medium;
-    private CheckboxMenuItem mnu_parameters_mnu_size_itm_large;
-    private CheckboxMenuItem mnu_parameters_mnu_size_itm_xlarge;
-    private Menu     mnu_parameters_mnu_speed;
-    private CheckboxMenuItem mnu_parameters_mnu_speed_itm_xslow;    // Can change these to parallel arrays later, use funny names and stuff. Ig this is akin to "difficulty".
-    private CheckboxMenuItem mnu_parameters_mnu_speed_itm_slow;
-    private CheckboxMenuItem mnu_parameters_mnu_speed_itm_normal;
-    private CheckboxMenuItem mnu_parameters_mnu_speed_itm_fast;
-    private CheckboxMenuItem mnu_parameters_mnu_speed_itm_xfast;
-    private Menu     mnu_environment;
-    private CheckboxMenuItem mnu_environment_itm_mercury;
-    private CheckboxMenuItem mnu_environment_itm_venus;
-    private CheckboxMenuItem mnu_environment_itm_earth;
-    private CheckboxMenuItem mnu_environment_itm_mars;
-    private CheckboxMenuItem mnu_environment_itm_jupiter;
-    private CheckboxMenuItem mnu_environment_itm_saturn;
-    private CheckboxMenuItem mnu_environment_itm_uranus;
-    private CheckboxMenuItem mnu_environment_itm_neptune;
-    private CheckboxMenuItem mnu_environment_itm_pluto;
-    private Scrollbar sb_cannon_force;
-    private Scrollbar sb_cannon_angle;
-    private Label lbl_cannon_force;
-    private Label lbl_cannon_angle;
-    private Label lbl_time;
-    private Label lbl_score_ball;
-    private Label lbl_score_player;
+    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed;
+    private MenuItem[] mnu_control_itms;                        private final byte run     = 0, pause = 1, restart = 2, quit  = 3,              CONTROLS = 4;
+    private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, SIZES    = 5;
+    private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, SPEEDS   = 5;
+    private CheckboxMenuItem[] mnu_environment_itms;            private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, PLANETS = 9;
+    private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;
+    private Scrollbar sb_cannon_force, sb_cannon_angle;
 
     // Update flags corresponding to control events. 
     // For use in thread loop, to update a game value before ticking the engine.
@@ -74,9 +45,6 @@ public class uitest {
     private double next_size;
     private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
 
-    private void init_ui() {
-    }
-
     public uitest(Dimension initial_size) {
         // Frame
         window = new Frame();
@@ -86,35 +54,39 @@ public class uitest {
         window.setLayout(new BorderLayout());
         // Elements of frame 
         menubar = new MenuBar();
-        mnu_control             = menubar.add(new Menu("Control"));
-        mnu_control_itm_run     = mnu_control.add(new MenuItem("Run"));
-        mnu_control_itm_pause   = mnu_control.add(new MenuItem("Pause"));
-        mnu_control_itm_restart = mnu_control.add(new MenuItem("Restart"));
+        mnu_control               = menubar.add(new Menu("Control"));
+        mnu_control_itms          = new MenuItem[4];
+        mnu_control_itms[run]     = mnu_control.add(new MenuItem("Run"));
+        mnu_control_itms[pause]   = mnu_control.add(new MenuItem("Pause"));
+        mnu_control_itms[restart] = mnu_control.add(new MenuItem("Restart"));
         mnu_control.addSeparator();
-        mnu_control_itm_quit    = mnu_control.add(new MenuItem("Quit"));
-        mnu_parameters                     = menubar.add(new Menu("Parameters"));
-        mnu_parameters_mnu_size            = (Menu)mnu_parameters.add(new Menu("Size"));  // Possibly buggy cast
-        mnu_parameters_mnu_size_itm_xsmall = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xsmall"));
-        mnu_parameters_mnu_size_itm_small  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("small"));
-        mnu_parameters_mnu_size_itm_medium = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("medium"));
-        mnu_parameters_mnu_size_itm_large  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("large"));
-        mnu_parameters_mnu_size_itm_xlarge = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xlarge"));
-        mnu_parameters_mnu_speed            = (Menu)mnu_parameters.add(new Menu("Speed"));
-        mnu_parameters_mnu_speed_itm_xslow  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xslow"));
-        mnu_parameters_mnu_speed_itm_slow   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("slow"));
-        mnu_parameters_mnu_speed_itm_normal = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("normal"));
-        mnu_parameters_mnu_speed_itm_fast   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("fast"));
-        mnu_parameters_mnu_speed_itm_xfast  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xfast"));
+        mnu_control_itms[quit]    = mnu_control.add(new MenuItem("Quit"));
+        mnu_parameters                       = menubar.add(new Menu("Parameters"));
+        mnu_parameters_mnu_size              = (Menu)mnu_parameters.add(new Menu("Size"));  // Possibly buggy cast
+        mnu_parameters_mnu_size_itms         = new CheckboxMenuItem[5];
+        mnu_parameters_mnu_size_itms[xsmall] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xsmall"));
+        mnu_parameters_mnu_size_itms[small]  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("small"));
+        mnu_parameters_mnu_size_itms[medium] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("medium"));
+        mnu_parameters_mnu_size_itms[large]  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("large"));
+        mnu_parameters_mnu_size_itms[xlarge] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xlarge"));
+        mnu_parameters_mnu_speed              = (Menu)mnu_parameters.add(new Menu("Speed"));
+        mnu_parameters_mnu_speed_itms         = new CheckboxMenuItem[5];
+        mnu_parameters_mnu_speed_itms[xslow]  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xslow"));
+        mnu_parameters_mnu_speed_itms[slow]   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("slow"));
+        mnu_parameters_mnu_speed_itms[normal] = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("normal"));
+        mnu_parameters_mnu_speed_itms[fast]   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("fast"));
+        mnu_parameters_mnu_speed_itms[xfast]  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xfast"));
         mnu_environment = menubar.add(new Menu("Environment"));
-        mnu_environment_itm_mercury = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury"));
-        mnu_environment_itm_venus   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Venus"));
-        mnu_environment_itm_earth   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Earth"));
-        mnu_environment_itm_mars    = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mars"));
-        mnu_environment_itm_jupiter = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Jupiter"));
-        mnu_environment_itm_saturn  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Saturn"));
-        mnu_environment_itm_uranus  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
-        mnu_environment_itm_neptune = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
-        mnu_environment_itm_pluto   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
+        mnu_environment_itms          = new CheckboxMenuItem[9];
+        mnu_environment_itms[mercury] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury"));
+        mnu_environment_itms[venus]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Venus"));
+        mnu_environment_itms[earth]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Earth"));
+        mnu_environment_itms[mars]    = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mars"));
+        mnu_environment_itms[jupiter] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Jupiter"));
+        mnu_environment_itms[saturn]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Saturn"));
+        mnu_environment_itms[uranus]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
+        mnu_environment_itms[neptune] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
+        mnu_environment_itms[pluto]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
         pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
         pnl_controls = (Panel)window.add("South", (new Panel()));
         Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);
@@ -124,6 +96,10 @@ public class uitest {
         Label lbl_time         = new Label("Time: ?s");
         Label lbl_score_ball   = new Label("Bubble: ");
         Label lbl_score_player = new Label("You: ");
+        
+        for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
        
         // Setup panels
         pnl_display.setBackground(Color.gray);
@@ -155,6 +131,89 @@ public class uitest {
         new uitest(new Dimension(600, 600));
     }
 
+    private void quit() {
+        for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.removeItemListener(this);
+        for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.removeItemListener(this);
+        for (CheckboxMenuItem mi : mnu_environment_itms) mi.removeItemListener(this);
+    }
+
+
+    public void adjustmentValueChanged(AdjustmentEvent e) {
+
+    }
+
+    public void actionPerformed(ActionEvent e) {
+
+    }
+
+    private boolean handle_size_menu_item(Object item) {
+        boolean handled = false;
+        for (int i = 0; !handled && i < SIZES; i++) {
+            if (item == mnu_parameters_mnu_size_itms[i]) {
+                switch (i) {
+                    case xsmall: System.out.println("xslow"); break;
+                    case small: System.out.println("slow"); break;
+                    case medium: System.out.println("medium"); break;
+                    case large: System.out.println("fast"); break;
+                    case xlarge: System.out.println("xfast"); break;
+                    default: System.out.println("err: bad menu item offset");
+                }
+                handled = true;
+            }
+        }
+        return handled;
+    }
+    private boolean handle_speed_menu_item(Object item) {
+        boolean handled = false;
+        for (int i = 0; !handled && i < SPEEDS; i++) {
+            if (item == mnu_parameters_mnu_speed_itms[i]) {
+                switch (i) {
+                    case xslow: System.out.println("xslow"); break;
+                    case slow: System.out.println("slow"); break;
+                    case normal: System.out.println("medium"); break;
+                    case fast: System.out.println("fast"); break;
+                    case xfast: System.out.println("xfast"); break;
+                    default: System.out.println("err: bad menu item offset");
+                }
+                handled = true;
+            }
+        }
+        return handled;
+    }
+    private boolean handle_environment_menu_item(Object item) {
+        boolean handled = false;
+        for (int i = 0; !handled && i < PLANETS; i++) {
+            if (item == mnu_environment_itms[i]) {
+                switch (i) {
+                    case mercury: System.out.println("xslow"); break;
+                    case venus: System.out.println("slow"); break;
+                    case earth: System.out.println("medium"); break;
+                    case mars: System.out.println("fast"); break;
+                    case jupiter: System.out.println("xfast"); break;
+                    case saturn: System.out.println("xfast"); break;
+                    case uranus: System.out.println("xfast"); break;
+                    case neptune: System.out.println("xfast"); break;
+                    case pluto: System.out.println("xfast"); quit(); break;
+                    default: System.out.println("err: bad menu item offset");
+                }
+                handled = true;
+            }
+        }
+        return handled;
+    }
+
+    public void itemStateChanged(ItemEvent e) {
+        Object source = e.getSource();
+        if (!handle_size_menu_item(source)) 
+        if (!handle_speed_menu_item(source))
+        handle_environment_menu_item(source);
+    }
+
+    // @todo would be far better to use an array for these radio settings and just iterate that in itemStateChanged instead of doing this
+    // Or if we can get the parent menu of the MenuItem, then iterate that, we could use that to clear.
+    //private void clear_radio_parameters_size() { mnu_parameters_mnu_size_itm_xsmall = mnu_parameters_mnu_size_itm_small = mnu_parameters_mnu_size_itm_medium = mnu_parameters_mnu_size_itm_large = mnu_parameters_mnu_size_itm_xlarge = false; }
+    //private void clear_radio_parameters_speed() { mnu_parameters_mnu_speed_itm_xslow = mnu_parameters_mnu_speed_itm_slow = mnu_parameters_mnu_speed_itm_normal = mnu_parameters_mnu_speed_itm_fast = mnu_parameters_mnu_speed_itm_xfast = false; }
+    //private void clear_radio_environment() { mnu_environment_itm_mercury = mnu_environment_itm_venus = mnu_environment_itm_earth = mnu_environment_itm_mars = mnu_environment_itm_jupiter = mnu_environment_itm_saturn = mnu_environment_itm_uranus = mnu_environment_itm_neptune = mnu_environment_itm_pluto = false; }
 
 
     // Right now for testing, just have the canvas resize with frame (using this as componenet listener). Keep game world size static to see how the renderer handles that.
