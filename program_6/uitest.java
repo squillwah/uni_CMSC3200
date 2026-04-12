@@ -388,24 +388,24 @@ abstract class Renderer {
         redraw = 0; 
         resolution = res.getSize();
     }
-    
-    // Draw logic for given layer. 
-    // Overridden by game, called by MBC during paint.
+   
+    // Define how a layer should be drawn.
     public abstract void draw(int layer, Graphics g);
 
-    // Flag given layer for redraw.
-    // For example, after balls have been moved or a rectangle was added.
+    // Flag layer for redraw.
     public void redraw(int layer) { 
         redraw |= layer; 
     }
+
+    public int redraw_status() { return redraw; }
+    public void redraw_clear() { redraw = 0; }
+
     // Check layers flagged for redraw, clear redraw.
     //public int redraws() {    // @todo !? is there a good reason to have this atomic?
     //    int layers = redraw; 
     //    redraw = 0; 
     //    return layers; 
     //}
-    public int redraws() { return redraw; }
-    public void redraws_clear() { redraw = 0; }
 
     // Get resolution (dimensions of layer buffers).
     public int res_x() { return resolution.width; }
@@ -424,9 +424,6 @@ class RenderComposer {
     private Graphics gfx;
     private BufferedImage composedbuff;
     private BufferedImage[] layerbuffs;
-    int draws;
-    //private BufferedImage debugbuff;
-    //public int debug_lvl;
 
     public RenderComposer(Renderer rudolph) {
         set_renderer(rudolph);
@@ -434,7 +431,6 @@ class RenderComposer {
    
     // There could be a use for changing the renderer. 
     public void set_renderer(Renderer rudolph) {
-        draws = 0;
         r = rudolph;
         System.out.println(rudolph);
 
@@ -446,8 +442,7 @@ class RenderComposer {
 
     // Check redraw requests of Renderer, update layers accordingly.
     private void update() {
-        int draws = r.redraws();    // ! .redraws() clears the code nvmnd not anymore
-        r.redraws_clear();
+        int draws = r.redraw_status(); r.redraw_clear();
         for (int i = 0; i < r.LAYER_COUNT; i++) {
             if ((draws & r.LAYERS[i]) > 0) { // Again, could just be 2^i instead of LAYERS[i].
                 layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
@@ -478,10 +473,10 @@ class RenderComposer {
     }
 
     // Expose some renderer data, primarily for debug info in MultiBufferedCanvas. Lil sloppy.
-    public int res_x() { return r.res_x(); }
-    public int res_y() { return r.res_y(); }
-    public int layer_count() { return r.LAYER_COUNT; }
-    public int draw_code() { return r.redraws(); }//return draws; }
+    public int info_res_x() { return r.res_x(); }
+    public int info_res_y() { return r.res_y(); }
+    public int info_layer_count() { return r.LAYER_COUNT; }
+    public int info_redraw_status() { return r.redraw_status(); }
 }
 
 class MultiBufferedCanvas extends Canvas {
@@ -491,9 +486,11 @@ class MultiBufferedCanvas extends Canvas {
     private RenderComposer composer;
     private BufferedImage backbuff;
     public int debug_lvl;   // 1-3 levels (1 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
+    private String debug_msg;
 
     public MultiBufferedCanvas(Renderer r) {
         debug_lvl = 1;
+        debug_msg = "";
         System.out.println(r);
         setBackground(Color.white);
         composer = new RenderComposer(r);
@@ -527,15 +524,15 @@ class MultiBufferedCanvas extends Canvas {
         g.drawImage(backbuff, 0, 0, null);
         switch (debug_lvl) {    // Hopefully no performance issues. @todo: Compare with and without this code block.
             case 1: 
-                g.setColor(Color.red); 
-                g.drawString("Drawing Layers: " + Integer.toBinaryString(composer.draw_code()), 12, 20 );
+                debug_msg += "Draw Status: " + Integer.toBinaryString(composer.info_redraw_status()) + " | "; // drawString does not handle newlines
             case 2:
-                g.setColor(Color.red); 
-                g.drawString("Render Layers: " + composer.layer_count(), 12, 40);
+                debug_msg += "Layer Count: " + composer.info_layer_count() + " | ";
             case 3: 
-                g.setColor(Color.red); 
-                g.drawString("Renderer Resolution: " + composer.res_x() + "x" + composer.res_y(), 12, 60);
-                g.drawString("Canvas Resolution: " + getWidth() + "x" + getHeight(), 12, 80);
+                debug_msg += "Renderer Resolution: " + composer.info_res_x() + "x" + composer.info_res_y() + " | ";
+                debug_msg += "Canvas Resolution: " + getWidth() + "x" + getHeight();
+                g.setColor(new Color(0,0,0,200)); g.fillRect(0,0, getWidth(), 25);    // @todo make sure margins/border (red border) issues don't look weird, just in general. 
+                g.setColor(Color.red); g.drawString("[" + debug_msg + "]", 12, 15 );
+                debug_msg = "";
         }
     }
 
