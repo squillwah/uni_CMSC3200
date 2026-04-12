@@ -399,11 +399,13 @@ abstract class Renderer {
         redraw |= layer; 
     }
     // Check layers flagged for redraw, clear redraw.
-    public int redraws() { 
-        int layers = redraw; 
-        redraw = 0; 
-        return layers; 
-    }
+    //public int redraws() {    // @todo !? is there a good reason to have this atomic?
+    //    int layers = redraw; 
+    //    redraw = 0; 
+    //    return layers; 
+    //}
+    public int redraws() { return redraw; }
+    public void redraws_clear() { redraw = 0; }
 
     // Get resolution (dimensions of layer buffers).
     public int res_x() { return resolution.width; }
@@ -422,6 +424,9 @@ class RenderComposer {
     private Graphics gfx;
     private BufferedImage composedbuff;
     private BufferedImage[] layerbuffs;
+    int draws;
+    //private BufferedImage debugbuff;
+    //public int debug_lvl;
 
     public RenderComposer(Renderer rudolph) {
         set_renderer(rudolph);
@@ -429,6 +434,7 @@ class RenderComposer {
    
     // There could be a use for changing the renderer. 
     public void set_renderer(Renderer rudolph) {
+        draws = 0;
         r = rudolph;
         System.out.println(rudolph);
 
@@ -440,7 +446,8 @@ class RenderComposer {
 
     // Check redraw requests of Renderer, update layers accordingly.
     private void update() {
-        int draws = r.redraws();
+        int draws = r.redraws();    // ! .redraws() clears the code nvmnd not anymore
+        r.redraws_clear();
         for (int i = 0; i < r.LAYER_COUNT; i++) {
             if ((draws & r.LAYERS[i]) > 0) { // Again, could just be 2^i instead of LAYERS[i].
                 layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
@@ -469,6 +476,12 @@ class RenderComposer {
         update();
         return composedbuff;
     }
+
+    // Expose some renderer data, primarily for debug info in MultiBufferedCanvas. Lil sloppy.
+    public int res_x() { return r.res_x(); }
+    public int res_y() { return r.res_y(); }
+    public int layer_count() { return r.LAYER_COUNT; }
+    public int draw_code() { return r.redraws(); }//return draws; }
 }
 
 class MultiBufferedCanvas extends Canvas {
@@ -477,15 +490,17 @@ class MultiBufferedCanvas extends Canvas {
     private static final long SerialVersionUID = 12412410L;
     private RenderComposer composer;
     private BufferedImage backbuff;
+    public int debug_lvl;   // 1-3 levels (1 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
 
     public MultiBufferedCanvas(Renderer r) {
+        debug_lvl = 1;
         System.out.println(r);
         setBackground(Color.white);
         composer = new RenderComposer(r);
     }
     public MultiBufferedCanvas() {
         // Anonymous class for empty renderer, debugging.
-        this(new Renderer(1, new Dimension(100, 100)) { 
+        this(new Renderer(1, new Dimension(256, 256)) { 
             { redraw(1); } // 'Instance initializer', to flag empty layer for redraw.
             public void draw(int layer, Graphics g) { 
                 g.setColor(Color.magenta);
@@ -510,6 +525,18 @@ class MultiBufferedCanvas extends Canvas {
 
     public void paint(Graphics g) {
         g.drawImage(backbuff, 0, 0, null);
+        switch (debug_lvl) {    // Hopefully no performance issues. @todo: Compare with and without this code block.
+            case 1: 
+                g.setColor(Color.red); 
+                g.drawString("Drawing Layers: " + Integer.toBinaryString(composer.draw_code()), 12, 20 );
+            case 2:
+                g.setColor(Color.red); 
+                g.drawString("Render Layers: " + composer.layer_count(), 12, 40);
+            case 3: 
+                g.setColor(Color.red); 
+                g.drawString("Renderer Resolution: " + composer.res_x() + "x" + composer.res_y(), 12, 60);
+                g.drawString("Canvas Resolution: " + getWidth() + "x" + getHeight(), 12, 80);
+        }
     }
 
 //    // Probably unnecessary, since we're only setting size with setSize. Or we should do check in that. Or different new method.
