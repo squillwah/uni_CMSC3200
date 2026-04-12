@@ -20,6 +20,17 @@ import java.awt.image.BufferedImage;
 
 
 // Different fonts for menubar? Styling?
+// Derive framerate from frametime in canvas, for debug display?
+// Have another debug info layer built into CannonBallRenderer
+//  - Could override the Renderer redraw_status and redraw_clear to set the debug layer bit depending on a flag.
+
+//todo:
+// Fix gridbag conpan weights
+// Add debug menu as option in menubar
+// Connect MouseListener to Engine
+// Implement Engine tick() (rudimentery at first, just test out mouse drawrect)
+// Implement Thread in main class, to tick and render, and any other polls of Engine info to keep GUI accurate.
+
 
 
 public class uitest implements ActionListener, AdjustmentListener, ItemListener, WindowListener, ComponentListener {
@@ -62,7 +73,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         window = new Frame();
         window.setTitle("CannonBubbles");
         window.setMinimumSize(window_min_size);
-        window.setBackground(Color.black);
+        window.setBackground(Color.black);//new Color(10,10,10));//Color.black);
         window.setLayout(new BorderLayout());
         //window.setBounds(10, 10, window.getWidth(), window.getHeight());
        
@@ -71,7 +82,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         pnl_display.setBackground(Color.gray);
         pnl_display.setLayout(new BorderLayout());
         pnl_controls = (Panel)window.add("South", (new Panel()));
-        pnl_controls.setBackground(Color.lightGray);
+        pnl_controls.setBackground(new Color(158, 137, 79));//99, 123, 145));
         pnl_controls.setLayout(new GridBagLayout());
         
         // Menubar, MenuItems: 
@@ -114,14 +125,20 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         GridBagConstraints gbc = new GridBagConstraints(); // @todo configure this gridbag stuff
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1;
+        gbc.ipady = 2;
 
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_force, gbc);
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
-        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_score_ball   = new Label("Bubble: ", Label.CENTER);     pnl_controls.add(lbl_score_ball, gbc);
-        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = 1; Label lbl_time         = new Label("Time: ?s", Label.CENTER);     pnl_controls.add(lbl_time, gbc);
-        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_score_player = new Label("You: ", Label.CENTER);        pnl_controls.add(lbl_score_player, gbc);
-        gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_angle, gbc);
-        gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_force, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
+        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,10,0,0); Label lbl_score_ball   = new Label("Bubble: ", Label.CENTER);     pnl_controls.add(lbl_score_ball, gbc);
+        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = .75; gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_time         = new Label("Time: ?s", Label.CENTER);     pnl_controls.add(lbl_time, gbc);
+        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,0,0,10); Label lbl_score_player = new Label("Player: ", Label.CENTER);        pnl_controls.add(lbl_score_player, gbc);
+        gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_angle, gbc);
+        gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
+
+        sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  // @todo ! We could have a Color pallete class that stores all these specific colors for components, then change that class and refresh when the environment/background is changed.
+        sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
+        //lbl_cannon_angle.setBackground(Color.lightGray);
+        //lbl_cannon_angle.setForeground(Color.darkGray);
         
         //  Attach UI Listeners  (may want to do all listeners as last step in constructor @todo)
         for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
@@ -485,15 +502,22 @@ class MultiBufferedCanvas extends Canvas {
     private static final long SerialVersionUID = 12412410L;
     private RenderComposer composer;
     private BufferedImage backbuff;
-    public int debug_lvl;   // 1-3 levels (1 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
+
+    // For the debug status info bar
+    public int debug_lvl;   // 1-3 levels (3 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
     private String debug_msg;
+    private long time_of_last_frame;
+    private int frametime;
 
     public MultiBufferedCanvas(Renderer r) {
-        debug_lvl = 1;
-        debug_msg = "";
         System.out.println(r);
         setBackground(Color.white);
         composer = new RenderComposer(r);
+        
+        debug_lvl = 3;
+        debug_msg = "";
+        time_of_last_frame = System.currentTimeMillis();
+        frametime = 0;
     }
     public MultiBufferedCanvas() {
         // Anonymous class for empty renderer, debugging.
@@ -523,11 +547,14 @@ class MultiBufferedCanvas extends Canvas {
     public void paint(Graphics g) {
         g.drawImage(backbuff, 0, 0, null);
         switch (debug_lvl) {    // Hopefully no performance issues. @todo: Compare with and without this code block.
-            case 1: 
-                debug_msg += "Draw Status: " + Integer.toBinaryString(composer.info_redraw_status()) + " | "; // drawString does not handle newlines
+            case 3: 
+                frametime = (int)(System.currentTimeMillis()-time_of_last_frame);
+                time_of_last_frame += frametime;
+                debug_msg += "Frametime: " + frametime + "ms | ";
             case 2:
                 debug_msg += "Layer Count: " + composer.info_layer_count() + " | ";
-            case 3: 
+                debug_msg += "Draw Status: " + Integer.toBinaryString(composer.info_redraw_status()) + " | "; // drawString does not handle newlines
+            case 1: 
                 debug_msg += "Renderer Resolution: " + composer.info_res_x() + "x" + composer.info_res_y() + " | ";
                 debug_msg += "Canvas Resolution: " + getWidth() + "x" + getHeight();
                 g.setColor(new Color(0,0,0,200)); g.fillRect(0,0, getWidth(), 25);    // @todo make sure margins/border (red border) issues don't look weird, just in general. 
