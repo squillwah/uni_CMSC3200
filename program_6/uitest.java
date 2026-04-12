@@ -7,55 +7,49 @@ import java.awt.image.BufferedImage;
 
 public class uitest implements ActionListener, AdjustmentListener, ItemListener {
     private static final long SerialVersionUID = 124987123L;
-   
-    // Frame and panels
+     
+    private final Dimension window_min_size = new Dimension(640, 480);
+    
+    // Offsets for MenuItem arrays.
+    private final byte run     = 0, pause = 1, restart = 2, quit  = 3, NUM_CONTROLS = 4; 
+    private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, NUM_SIZES    = 5;
+    private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
+    private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
+
+    // Frame and panels.
     private Frame window;
     private Panel pnl_display, pnl_controls;
-
+    
     // The game logic, drawing system.
     private CannonBallEngine engine;
-//    private MultiBufferedCanvas display;
-
-    // Elements of UI: MenuItems, ScrollBars, Labels
+    private MultiBufferedCanvas display;
+    
+    // Elements of UI: MenuItems, ScrollBars, Labels.
     private MenuBar menubar;
     private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed;
-    private MenuItem[] mnu_control_itms;                        private final byte run     = 0, pause = 1, restart = 2, quit  = 3,              NUM_CONTROLS = 4;   // Array access offset constants.
-    private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, NUM_SIZES    = 5;
-    private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
-    private CheckboxMenuItem[] mnu_environment_itms;            private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
+    private MenuItem[] mnu_control_itms;                        
+    private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    
+    private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   
+    private CheckboxMenuItem[] mnu_environment_itms;            
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
     private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 // @todo sometime maybe idk, Menu and Menubar support a getMenu and getItem Count method, we could use that to dynamically traverse the menubar structure to find things instead of defining it all here and in constructor.
 
-    // Update flags corresponding to control events. 
-    // For use in thread loop, to update a game value before ticking the engine.
-    // (If we updated immediately on action event, we risk changing a value during a tick, which would be no good indeed).
-    private boolean running;
-    private boolean e_dragging;
-    private boolean e_dragstop;
-    private boolean e_add_rect;
-    private boolean e_del_rect;
-    private boolean e_fire_cannon;
-    private boolean e_update_cannon_force;
-    private boolean e_update_cannon_angle;
-    // Related data with update events.
-    private Rectangle dragbox;
-    private double next_force;
-    private double next_angle;
-    private double next_speed;      // This begs the question, should the Engine just take a double value to set as ball speed, or should it know about speed and size presets?
-    private double next_size;
-    private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
-
-    public uitest(Dimension initial_size) {
+    public uitest(/*Dimension initial_size*/) {
+        //window_min_size = initial_size.getSize();     // Window shouldn't get smaller than rects, but also should be infinitely small. We'll need to compare this against the game min size and canvas min size as well on componentResized.
+        
+        // Engine, Renderer
         engine = new CannonBallEngine();
+        display = new MultiBufferedCanvas();
         
         // Frame
         window = new Frame();
         window.setTitle("CannonBubbles");
-        window.setMinimumSize(initial_size);
+        window.setMinimumSize(window_min_size);
         window.setBackground(Color.black);
         window.setLayout(new BorderLayout());
-        // Menubar, MenuItems. 
-        menubar = new MenuBar();
+        // UI Initialization
+        //  Menubar, MenuItems. 
+        menubar = new MenuBar();    // Mayhaps the menubar would benefit from it's own class? Who cares.
         mnu_control               = menubar.add(new Menu("Control"));
         mnu_control_itms          = new MenuItem[4];
         mnu_control_itms[run]     = mnu_control.add(new MenuItem("Run"));
@@ -89,20 +83,19 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         mnu_environment_itms[uranus]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
         mnu_environment_itms[neptune] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
         mnu_environment_itms[pluto]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
-        // Panels
+        //  Panels
         pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
         pnl_controls = (Panel)window.add("South", (new Panel()));
-        // Scrolls
+        //  Scrolls
         Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);
         Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);
-        // Labels
+        //  Labels
         Label lbl_cannon_force = new Label("Force: ?px/s");
         Label lbl_cannon_angle = new Label("Angle: ?deg");
         Label lbl_time         = new Label("Time: ?s");
         Label lbl_score_ball   = new Label("Bubble: ");
         Label lbl_score_player = new Label("You: ");
-       
-        // Attach Listeners 
+        //  Attach UI Listeners  (may want to do all listeners as last step in constructor @todo)
         for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
@@ -139,17 +132,25 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         engine.set_gravity(10);
         engine.set_bubble_size(10);
         engine.set_bubble_speed(10);
+        // @todo is there a better way to set these defaults using the state of the Engine? Perhaps polling this data from Engine on each loop of the Thread, and setting the UI accordingly?
 
+        // Set game world size and canvas size
+//        engine.set_world_size()     // They should probably have their own internal minimum size, both for their initializations and to compare against on set_size()
+//        display.setSize()
 
-        //pnl_display.add("Center", display);
+        pnl_display.add("Center", display);
         //display.setSize(initial_size);
         
         window.validate(); //? 
         window.setVisible(true);
+
+        display.setSize(pnl_display.getSize());
+        display.repaint();
     }
 
     public static void main(String[] args) {
-        new uitest(new Dimension(600, 600));
+        //new uitest(new Dimension(600, 600));
+        new uitest();
     }
 
     private void exit() {
@@ -192,17 +193,20 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
     }
 
     // Return index of object in CheckboxMenuItem array. -1 if absent.
-    private int find_mitem(/*Checkbox*/MenuItem[] radios, int size, Object item) {
+    private int find_mitem(/*Checkbox*/MenuItem[] items, int size, Object item) {
         int i;
-        for (i = 0; i < size && item != radios[i]; i++);
+        for (i = 0; i < size && item != items[i]; i++);
         if (!(i < size)) i = -1;
         return i;
     }
 
-    // Tick given radio on and clear all others in array.
-    private void set_mradio(CheckboxMenuItem[] radios, CheckboxMenuItem radio) {
-        for (CheckboxMenuItem r : radios) r.setState(false);
-        radio.setState(true);
+    // Tick given radio on and clear all others in array. Using the offset constant as the 'radio' itself.
+    private void set_mradio(CheckboxMenuItem[] radios, int size, int radio) {//CheckboxMenuItem radio) {
+        //for (CheckboxMenuItem r : radios) r.setState(false);
+        int i;
+        for (i = 0; i < radio; i++) radios[i].setState(false);
+        for (i = radio+1; i < size; i++) radios[i].setState(false);
+        radios[radio].setState(true); // Of course assuming radio is in radios.
     }
   
     public void itemStateChanged(ItemEvent e) {
@@ -210,7 +214,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         //if (item instanceof CheckboxMenuItem) 
         int radio;
         if ((radio = find_mitem(mnu_parameters_mnu_size_itms, NUM_SIZES, item)) > -1) {
-            set_mradio(mnu_parameters_mnu_size_itms, (CheckboxMenuItem)item);
+            set_mradio(mnu_parameters_mnu_size_itms, NUM_SIZES, radio);//(CheckboxMenuItem)item);
             switch (radio) {
                 case xsmall: engine.set_bubble_size(5); break;
                 case small:  engine.set_bubble_size(10); break;
@@ -221,7 +225,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
             } 
         } else 
         if ((radio = find_mitem(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, item)) > -1) {
-            set_mradio(mnu_parameters_mnu_speed_itms, (CheckboxMenuItem)item);
+            set_mradio(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, radio);//(CheckboxMenuItem)item);
             switch (radio) {
                 case xslow:  engine.set_bubble_speed(5); break;     // Could do away with the offsets, have another parallel array of the settings, and just iterate 0->NUM_whatever. Or since they're parallel, just use the return of radio (cause that'll be the index in the value array). That could automate all the creations and adding of the MenuItems to one NUM_ITEMS number, though setting up names for the items and the related setting values would all still be manual. Would also make the planet gravity values a little unintuitive, because they have no direct relation (speeds, sizes go up). You would need to know that they're planets, and in the order from the sun.
                 case slow:   engine.set_bubble_speed(10); break;    // Although the offsets do have their benefits, say if we wanted to do a specific thing for a specific setting, like changing a color or graphic. It's nice to be able to tell explicity which setting, and not treat them all the same.
@@ -232,7 +236,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
             } 
         } else 
         if ((radio = find_mitem(mnu_environment_itms, NUM_PLANETS, item)) > -1) {
-            set_mradio(mnu_environment_itms, (CheckboxMenuItem)item);
+            set_mradio(mnu_environment_itms, NUM_PLANETS, radio);//(CheckboxMenuItem)item);
             switch (radio) {
                 case mercury: engine.set_gravity(10); break;    // How many meters is a pixel?
                 case venus:   engine.set_gravity(11); break;
@@ -250,10 +254,6 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
 
     // @todo would be far better to use an array for these radio settings and just iterate that in itemStateChanged instead of doing this
     // Or if we can get the parent menu of the MenuItem, then iterate that, we could use that to clear.
-    //private void clear_radio_parameters_size() { mnu_parameters_mnu_size_itm_xsmall = mnu_parameters_mnu_size_itm_small = mnu_parameters_mnu_size_itm_medium = mnu_parameters_mnu_size_itm_large = mnu_parameters_mnu_size_itm_xlarge = false; }
-    //private void clear_radio_parameters_speed() { mnu_parameters_mnu_speed_itm_xslow = mnu_parameters_mnu_speed_itm_slow = mnu_parameters_mnu_speed_itm_normal = mnu_parameters_mnu_speed_itm_fast = mnu_parameters_mnu_speed_itm_xfast = false; }
-    //private void clear_radio_environment() { mnu_environment_itm_mercury = mnu_environment_itm_venus = mnu_environment_itm_earth = mnu_environment_itm_mars = mnu_environment_itm_jupiter = mnu_environment_itm_saturn = mnu_environment_itm_uranus = mnu_environment_itm_neptune = mnu_environment_itm_pluto = false; }
-
 
     // Right now for testing, just have the canvas resize with frame (using this as componenet listener). Keep game world size static to see how the renderer handles that.
 }
@@ -263,6 +263,26 @@ class CannonBallEngine {
     private boolean paused; // If we have paused here, but the main loop is in main, and all the setting of rects and changing of sizes is of course done here, then pausing may cause issues with setting those during pause.
                             // Unless, pause doesn't stop ticks from doing anything entirely, it just skips the velocity/collision parsing stuff. Still allows for changing size, speed vars, and adding/deling rects. And moving the cannon. Ig. It should be that the cannon can fire multiple bullets, with a configurable rate of fire. But that's only during not pause, obv. Should we allow angle adjustment during a pause? Could be a setting. What does rubric say?
 
+    // Update flags corresponding to control events. 
+    // For use in thread loop, to update a game value before ticking the engine.
+    // (If we updated immediately on action event, we risk changing a value during a tick, which would be no good indeed).
+    private boolean running;
+    private boolean e_dragging;
+    private boolean e_dragstop;
+    private boolean e_add_rect;
+    private boolean e_del_rect;
+    private boolean e_fire_cannon;
+    private boolean e_update_cannon_force;
+    private boolean e_update_cannon_angle;
+
+    // To avoid concurrency issues (with tick() being called by a thread), each of these gets two values.
+    // One for the setters (which can be changed whenever), and one for tick() (which is only update to next_... once per tick).
+    private Rectangle dragbox;
+    private double next_force;
+    private double next_angle;
+    private double next_speed;      // This begs the question, should the Engine just take a double value to set as ball speed, or should it know about speed and size presets?
+    private double next_size;
+    private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
 
     public CannonBallEngine() {
         paused = true;
@@ -288,6 +308,229 @@ class CannonBallEngine {
         set_pause(true);
     }
 }
+
+// RN
+//  Adding back the Engine functionality.
+//  Creating the RenderComposer, to sit between Renderer and MultiBufferedCanvas
+//  Linking Mouse and Keyboard into Engine, for dragbox, cannonfires, and game buttons
+//  Readding balls, so we can have something to move around in tick() for testing.
+
+
+// Abstract class for Game to extend (and define rendering logic with).
+abstract class Renderer { 
+    private Dimension resolution;   // The resolution thing is an interesting and sticky problem. Should the internal rendering be normalized and adjusted to fit in this, resizing everything with window? That probably goes aginst the lesson plan.
+    public final int LAYER_COUNT;
+    public final int[] LAYERS;      // Array of bitstrings, each layer being a unique bit. For ease of access to layer i code. Could just be a function that returns 2^i, given that's all the layer codes are.
+    private int redraw;             // Flag for layers that need redrawing. Sum of layer codes.
+    
+    public Renderer(int layer_count, Dimension res) { 
+        LAYER_COUNT = Math.min(8, Math.max(1, layer_count));    // Arbitrary 1 -> 8 layer limit. Really the max is 32, with the bit codes.
+        LAYERS = new int[LAYER_COUNT];
+        int layer_code = 1; //0b00000001
+        for (int i = 0; i < LAYER_COUNT; i++) {
+            LAYERS[i] = layer_code;
+            layer_code *= 2;    //0b00000010 -> 0b00000100 -> ...
+        }
+        redraw = 0; 
+        resolution = res.getSize();
+    }
+    
+    // Draw logic for given layer. 
+    // Overridden by game, called by MBC during paint.
+    public abstract void draw(int layer, Graphics g);
+
+    // Flag given layer for redraw.
+    // For example, after balls have been moved or a rectangle was added.
+    public void redraw(int layer) { 
+        redraw |= layer; 
+    }
+    // Check layers flagged for redraw, clear redraw.
+    public int redraws() { 
+        int layers = redraw; 
+        redraw = 0; 
+        return layers; 
+    }
+
+    // Get resolution (dimensions of layer buffers).
+    public int res_x() { return resolution.width; }
+    public int res_y() { return resolution.height; }
+
+    //private MultiBufferedCanvas;    // Instead of passing the canvas in Game for it to set renderer, we could have it call repaint through the renderer. Though this is probably a bad idea.
+    //public void set_canvas() 
+    //public void repaint()
+}
+
+// Create and manage BufferedImage layers for a Renderer. Bake the final image.
+class RenderComposer {
+    private static final long SerialVersionUID = 1111L; // Are these needed everywhere? @todo Ask pyz about his compiler settings.
+    
+    private Renderer r;
+    private Graphics gfx;
+    private BufferedImage composedbuff;
+    private BufferedImage[] layerbuffs;
+
+    public RenderComposer(Renderer rudolph) {
+        set_renderer(rudolph);
+    }
+   
+    // There could be a use for changing the renderer. 
+    public void set_renderer(Renderer rudolph) {
+        r = rudolph;
+        System.out.println(rudolph);
+
+        // Init empty layers.
+        layerbuffs = new BufferedImage[r.LAYER_COUNT];
+        BufferedImage composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+        for (int i = 0; i < r.LAYER_COUNT; i++) layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+    }
+
+    // Check redraw requests of Renderer, update layers accordingly.
+    private void update() {
+        int draws = r.redraws();
+        for (int i = 0; i < r.LAYER_COUNT; i++) {
+            if ((draws & r.LAYERS[i]) > 0) { // Again, could just be 2^i instead of LAYERS[i].
+                layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+                gfx = layerbuffs[i].getGraphics();
+                r.draw(r.LAYERS[i], gfx);
+                System.out.println("draw");
+                gfx.dispose();
+            }
+        }
+        if (draws > 0) compose(); // Only compose layers if there was a redraw.
+    }
+
+    // Bake layerbuffs onto composedbuff.
+    private void compose() {
+        composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB); // Is transparent, leaving it up to the layers or image recipient to draw the background. 
+        gfx = composedbuff.getGraphics();
+        //gfx.fillOval(50, 50, 10, 10);
+        for (BufferedImage layer : layerbuffs) {
+            gfx.drawImage(layer, 0, 0, null);
+            System.out.println("drawg" + layer);
+        }
+        gfx.dispose();
+    }
+
+    public BufferedImage recompose() {
+        update();
+        return composedbuff;
+    }
+}
+
+class MultiBufferedCanvas extends Canvas {
+    private static final long SerialVersionUID = 12412410L;
+    private RenderComposer composer;
+    private BufferedImage backbuff;
+
+    public MultiBufferedCanvas(Renderer r) {
+        System.out.println(r);
+        setBackground(Color.white);
+        composer = new RenderComposer(r);
+    }
+    public MultiBufferedCanvas() {
+        // Anonymous class for empty renderer, debugging.
+        this(new Renderer(1, new Dimension(100, 100)) { 
+            { redraw(1); } // 'Instance initializer', to flag empty layer for redraw.
+            public void draw(int layer, Graphics g) { 
+                g.setColor(Color.magenta);
+                g.fillRect(0,0,res_x()-1,res_y()-1);
+                g.setColor(Color.black);    // Colors support transparency!
+                g.fillRect(3,3,res_x()-7,res_y()-7);
+                g.setColor(Color.red);
+                g.drawString("there's nothing", 7, res_y()/2 );     // ? i wonder why before this was drawing outside the renderer dimensions. Maybe image overdraw still gets drawn if the image is drawn on a larger image?
+            } 
+        });
+        //this(empty);
+    }
+   
+    // Changing the renderer could have use. Example: game over screens, a scoreboard, or something. That's if we wanted more than a layer for those.
+    public void set_renderer(Renderer r) {
+        composer.set_renderer(r);
+    }
+
+    public void update(Graphics g) {
+        backbuff = composer.recompose();
+        paint(g);
+    }
+
+    public void paint(Graphics g) {
+        g.drawImage(backbuff, 0, 0, null);
+    }
+}
+
+
+
+
+
+
+
+//class MultiBufferedCanvas extends Canvas {
+//    private static final long SerialVersionUID = 12412410L;
+//
+//    private Image backbuff;
+//    private Renderer renderer;
+//    private BufferedImage[] layerbuffs;
+//    private Graphics gfx;
+//    
+//    public MultiBufferedCanvas(/*Dimension size*/, Renderer r) {
+//        //setSize(size);    // Sizes of renderer, canvas, and game world are seperate. We'll need to make sure they stay in sync, unless we want them out of it.
+//        setBackground(Color.white);
+//        set_renderer(r);
+//    }
+//    public MultiBufferedCanvas() {
+//        // A default renderer, when none given.
+//        this(new Renderer(1, new Dimension(100, 100)) { 
+//            public void draw(int layer, Graphics g) { 
+//                g.setColor(Color.red);
+//                g.drawString("there's nothing", res_x()/2, res_y()/2 ); 
+//            } 
+//        });
+//        renderer.redraw(renderer.LAYERS[0]);
+//    }
+//
+//    public void set_renderer(Renderer r) {
+//        renderer = r;
+//        layerbuffs = new BufferedImage[renderer.LAYER_COUNT];
+//        for (int i = 0; i < renderer.LAYER_COUNT; i++) 
+//            layerbuffs[i] = new BufferedImage(renderer.res_x(), renderer.res_y(), BufferedImage.TYPE_INT_ARGB);  // Init empty layers
+//    }
+//
+//    public void update(Graphics g) {
+//        // Iterate through layers, redraw if marked for redraw.
+//        int draws = renderer.redraws();
+//        for (int i = 0; i < renderer.LAYER_COUNT; i++) {
+//            if ((draws & renderer.LAYERS[i]) > 0) {
+//                layerbuffs[i] = new BufferedImage(renderer.res_x(), renderer.res_y(), BufferedImage.TYPE_INT_ARGB);
+//                gfx = layerbuffs[i].getGraphics();
+//                renderer.draw(renderer.LAYERS[i], gfx);
+//                System.out.println("draw");
+//                gfx.dispose();
+//                //g.drawImage(layerbuffs[0], 0, 0, null);
+//                //return;
+//            }
+//        }
+//        if (draws > 0) paint(g);  // Only recompose layers if there was a redraw
+//    }
+//
+//    public void paint(Graphics g) {
+//        backbuff = createImage(renderer.res_x(), renderer.res_y());    // Blank, to wipe last frame and preserve first layer.
+//        gfx = backbuff.getGraphics();
+//        //gfx.fillOval(50, 50, 10, 10);
+//        for (BufferedImage layer : layerbuffs) {
+//            gfx.drawImage(layer, 0, 0, null);
+//            System.out.println("drawg" + layer);
+//        }
+//        gfx.dispose();
+//        g.drawImage(backbuff, 0, 0, null);
+//        //g.drawImage(layerbuffs[0], 0, 0, null);
+//    }
+//}
+
+
+
+
+
+
 
 /*
 // Manages the single game thread, handles all input events affecting how the game plays.       bad idea probably just same as frame class. we need access to the gui objects to handle the events right.
@@ -319,9 +562,9 @@ class CannonBallGame implements Runnable, AdjustmentListener, ActionEventListene
             try { Thread.sleep(1); }
             catch (InterruptedException e) {}
         }
-    }
+    }*/
 
-
+/*
 // Does the logic of moving the balls, physics and collisions and stuff. Also defines how to render all that with a Renderer.
 class CannonBallEngine {
     private Dimension world_size;
@@ -488,112 +731,5 @@ class CannonBallEngine {
             redraw(l_dragbox);
         }
     }
-}
+}*/
 
-// Abstract class for Game to extend (and define rendering logic with).
-abstract class Renderer { 
-    private Dimension resolution;   // The resolution thing is an interesting and sticky problem. Should the internal rendering be normalized and adjusted to fit in this, resizing everything with window? That probably goes aginst the lesson plan.
-    public final int LAYER_COUNT;
-    public final int[] LAYERS;      // Array of bitstrings, each layer being a unique bit
-    private int redraw;             // Flag for layers that need redrawing. Sum of layer codes.
-    
-    public Renderer(int layer_count, Dimension res) { 
-        LAYER_COUNT = Math.min(8, Math.max(1, layer_count));    // 1 -> 8 layer limit
-        LAYERS = new int[LAYER_COUNT];
-        int layer_code = 1; //0b00000001
-        for (int i = 0; i < LAYER_COUNT; i++) {
-            LAYERS[i] = layer_code;
-            layer_code *= 2;    //0b00000010 -> 0b00000100 -> ...
-        }
-        redraw = 0; 
-        resolution = res.getSize();
-    }
-    
-    // Draw logic for given layer. 
-    // Overridden by game, called by MBC during paint.
-    public abstract void draw(int layer, Graphics g);
-
-    // Flag given layer for redraw.
-    // For example, after balls have been moved or a rectangle was added.
-    public void redraw(int layer) { 
-        redraw |= layer; 
-    }
-    // Check layers flagged for redraw, clear redraw.
-    public int redraws() { 
-        int layers = redraw; 
-        redraw = 0; 
-        return layers; 
-    }
-
-    // Get resolution (dimensions of layer buffers).
-    public int res_x() { return resolution.width; }
-    public int res_y() { return resolution.height; }
-
-    //private MultiBufferedCanvas;    // Instead of passing the canvas in Game for it to set renderer, we could have it call repaint through the renderer. Though this is probably a bad idea.
-    //public void set_canvas() 
-    //public void repaint()
-}
-
-class MultiBufferedCanvas extends Canvas {
-    private static final long SerialVersionUID = 12412410L;
-
-    private Image backbuff;
-    private Renderer renderer;
-    private BufferedImage[] layerbuffs;
-    private Graphics gfx;
-    
-    public MultiBufferedCanvas(/*Dimension size, Renderer r) {
-        //setSize(size);    // Sizes of renderer, canvas, and game world are seperate. We'll need to make sure they stay in sync, unless we want them out of it.
-        setBackground(Color.white);
-        set_renderer(r);
-    }
-    public MultiBufferedCanvas() {
-        // A default renderer, when none given.
-        this(new Renderer(1, new Dimension(100, 100)) { 
-            public void draw(int layer, Graphics g) { 
-                g.setColor(Color.red);
-                g.drawString("there's nothing", res_x()/2, res_y()/2 ); 
-            } 
-        });
-        renderer.redraw(renderer.LAYERS[0]);
-    }
-
-    public void set_renderer(Renderer r) {
-        renderer = r;
-        layerbuffs = new BufferedImage[renderer.LAYER_COUNT];
-        for (int i = 0; i < renderer.LAYER_COUNT; i++) 
-            layerbuffs[i] = new BufferedImage(renderer.res_x(), renderer.res_y(), BufferedImage.TYPE_INT_ARGB);  // Init empty layers
-    }
-
-    public void update(Graphics g) {
-        // Iterate through layers, redraw if marked for redraw.
-        int draws = renderer.redraws();
-        for (int i = 0; i < renderer.LAYER_COUNT; i++) {
-            if ((draws & renderer.LAYERS[i]) > 0) {
-                layerbuffs[i] = new BufferedImage(renderer.res_x(), renderer.res_y(), BufferedImage.TYPE_INT_ARGB);
-                gfx = layerbuffs[i].getGraphics();
-                renderer.draw(renderer.LAYERS[i], gfx);
-                System.out.println("draw");
-                gfx.dispose();
-                //g.drawImage(layerbuffs[0], 0, 0, null);
-                //return;
-            }
-        }
-        if (draws > 0) paint(g);  // Only recompose layers if there was a redraw
-    }
-
-    public void paint(Graphics g) {
-        backbuff = createImage(renderer.res_x(), renderer.res_y());    // Blank, to wipe last frame and preserve first layer.
-        gfx = backbuff.getGraphics();
-        //gfx.fillOval(50, 50, 10, 10);
-        for (BufferedImage layer : layerbuffs) {
-            gfx.drawImage(layer, 0, 0, null);
-            System.out.println("drawg" + layer);
-        }
-        gfx.dispose();
-        g.drawImage(backbuff, 0, 0, null);
-        //g.drawImage(layerbuffs[0], 0, 0, null);
-    }
-}
-
-*/
