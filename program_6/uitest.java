@@ -5,7 +5,23 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 
-public class uitest implements ActionListener, AdjustmentListener, ItemListener {
+
+// If globals become necessary, we can do something like this:
+
+//public class CannonVsBall {
+//    public static final Dimension window_min_size = new Dimension(640, 480);
+//    public static final Dimension canvas_min_size = new Dimension(500, 500);  // Should be smaller than window_min_size, to account for menubar, margins & control panel.
+//    public static final Dimension gworld_min_size = new Dimension(500, 500);  // Should be no bigger than canvas_min_size, so the game world doesn't overdraw on small canvases.
+//
+//    public static void main(String[] args) {
+//        new uitest();
+//    }
+//}
+
+
+
+
+public class uitest implements ActionListener, AdjustmentListener, ItemListener, WindowListener, ComponentListener {
     private static final long SerialVersionUID = 124987123L;
      
     private final Dimension window_min_size = new Dimension(640, 480);
@@ -47,6 +63,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         window.setMinimumSize(window_min_size);
         window.setBackground(Color.black);
         window.setLayout(new BorderLayout());
+        //window.setBounds(10, 10, window.getWidth(), window.getHeight());
         // UI Initialization
         //  Menubar, MenuItems. 
         menubar = new MenuBar();    // Mayhaps the menubar would benefit from it's own class? Who cares.
@@ -84,8 +101,12 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         mnu_environment_itms[neptune] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
         mnu_environment_itms[pluto]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
         //  Panels
-        pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
-        pnl_controls = (Panel)window.add("South", (new Panel()));
+        //pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
+        //pnl_controls = (Panel)window.add("South", (new Panel()));
+        pnl_display  = new Panel();  // Hopefully this cast doesn't cause issue.
+        pnl_controls = new Panel();
+        window.add("Center", pnl_display);  // Hopefully this cast doesn't cause issue.
+        window.add("South", pnl_controls);
         //  Scrolls
         Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);
         Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);
@@ -103,7 +124,8 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
        
         // Setup panels
         pnl_display.setBackground(Color.gray);
-        pnl_display.add("Center", (new Canvas()));
+        pnl_display.setLayout(new BorderLayout());
+        //pnl_display.add("Center", (new Canvas()));
         pnl_controls.setBackground(Color.lightGray);
         pnl_controls.setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints(); // @todo configure this gridbag stuff
@@ -138,13 +160,17 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
 //        engine.set_world_size()     // They should probably have their own internal minimum size, both for their initializations and to compare against on set_size()
 //        display.setSize()
 
+        //display.setSize(1000,1000);
         pnl_display.add("Center", display);
         //display.setSize(initial_size);
         
         window.validate(); //? 
         window.setVisible(true);
 
-        display.setSize(pnl_display.getSize());
+        window.addWindowListener(this);
+        window.addComponentListener(this);
+
+        //display.setSize(pnl_display.getSize());
         display.repaint();
     }
 
@@ -158,6 +184,8 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.removeItemListener(this);
+        window.removeWindowListener(this);
+        window.removeComponentListener(this);
         window.dispose();
         System.exit(0);
     }
@@ -165,6 +193,8 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
 
 
     // ! the critical consideration is whether or not to have all these listeners as part of this main frame class, or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
+    // there is an ugly seperation between awt UI objects and the mouse/keyboard inputs to the game. Whatever. AWT UI objects all act externally to the Engine, mouse events and keyboard events get processed in the engine.
+
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
 
@@ -256,6 +286,22 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener 
     // Or if we can get the parent menu of the MenuItem, then iterate that, we could use that to clear.
 
     // Right now for testing, just have the canvas resize with frame (using this as componenet listener). Keep game world size static to see how the renderer handles that.
+
+    public void windowClosing(WindowEvent e) { exit(); }
+    public void componentResized(ComponentEvent e) { 
+        // Because border layout, display resizes automatically to fit frame. 
+        // So, only need to set game world size to match.
+        //  ! This also probably means that a min_canvas_size constant is irrelevant
+        //    Only need a min_game_world_size (which changes based on rectangle placement (but should still itself have a min, so can't be zero and break))
+        //    Then in the main loop, if a rectangle was placed (or just if min_world_size was updated), set the frame minimumSize to be the max of it's min_window_size and the min_world_size.
+        //display.setSize(pnl_display.getSize()); 
+        System.out.println(display.getSize());
+        System.out.println(window.getSize());
+    }
+    
+    // Unimplemented WindowListener, ComponenetLister:
+    public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
+    public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
 }
 
 class CannonBallEngine {
@@ -311,7 +357,12 @@ class CannonBallEngine {
 
 // RN
 //  Adding back the Engine functionality.
-//  Creating the RenderComposer, to sit between Renderer and MultiBufferedCanvas
+//  
+//  X Creating the RenderComposer, to sit between Renderer and MultiBufferedCanvas
+//  Doing the component resizing, getting that to work nicely with the canvas.
+//    - For setting proper min sizes based on rectangles, we'll probably have to check the engine on each frame for a rectangle added flag (or something), and then set min sizes.
+//    - Honestly though, it's really only the frame that needs its min size to match the rects right? Still probably, at least the engine should know of it's min size (rectangle bounds).
+//
 //  Linking Mouse and Keyboard into Engine, for dragbox, cannonfires, and game buttons
 //  Readding balls, so we can have something to move around in tick() for testing.
 
@@ -418,6 +469,8 @@ class RenderComposer {
 }
 
 class MultiBufferedCanvas extends Canvas {
+    private final Dimension CANVAS_MIN_SIZE = new Dimension(500, 500);
+    
     private static final long SerialVersionUID = 12412410L;
     private RenderComposer composer;
     private BufferedImage backbuff;
@@ -440,7 +493,6 @@ class MultiBufferedCanvas extends Canvas {
                 g.drawString("there's nothing", 7, res_y()/2 );     // ? i wonder why before this was drawing outside the renderer dimensions. Maybe image overdraw still gets drawn if the image is drawn on a larger image?
             } 
         });
-        //this(empty);
     }
    
     // Changing the renderer could have use. Example: game over screens, a scoreboard, or something. That's if we wanted more than a layer for those.
@@ -456,6 +508,11 @@ class MultiBufferedCanvas extends Canvas {
     public void paint(Graphics g) {
         g.drawImage(backbuff, 0, 0, null);
     }
+
+//    // Probably unnecessary, since we're only setting size with setSize. Or we should do check in that. Or different new method.
+//    public void setMinumumSize(Dimension dim) {
+//        super.setMinimumSize(new Dimension(Math.max(CANVAS_MIN_SIZE.width, dim.width), Math.max(CANVAS_MIN_SIZE.height, dim.height)));
+//    }
 }
 
 
