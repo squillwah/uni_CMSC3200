@@ -19,6 +19,7 @@ import java.awt.image.BufferedImage;
 //}
 
 
+// Different fonts for menubar? Styling?
 
 
 public class uitest implements ActionListener, AdjustmentListener, ItemListener, WindowListener, ComponentListener {
@@ -53,19 +54,27 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
     public uitest(/*Dimension initial_size*/) {
         //window_min_size = initial_size.getSize();     // Window shouldn't get smaller than rects, but also should be infinitely small. We'll need to compare this against the game min size and canvas min size as well on componentResized.
         
-        // Engine, Renderer
+        // Engine, Display:
         engine = new CannonBallEngine();
         display = new MultiBufferedCanvas();
         
-        // Frame
+        // Frame:
         window = new Frame();
         window.setTitle("CannonBubbles");
         window.setMinimumSize(window_min_size);
         window.setBackground(Color.black);
         window.setLayout(new BorderLayout());
         //window.setBounds(10, 10, window.getWidth(), window.getHeight());
-        // UI Initialization
-        //  Menubar, MenuItems. 
+       
+        // Panels:
+        pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
+        pnl_display.setBackground(Color.gray);
+        pnl_display.setLayout(new BorderLayout());
+        pnl_controls = (Panel)window.add("South", (new Panel()));
+        pnl_controls.setBackground(Color.lightGray);
+        pnl_controls.setLayout(new GridBagLayout());
+        
+        // Menubar, MenuItems: 
         menubar = new MenuBar();    // Mayhaps the menubar would benefit from it's own class? Who cares.
         mnu_control               = menubar.add(new Menu("Control"));
         mnu_control_itms          = new MenuItem[4];
@@ -100,22 +109,20 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         mnu_environment_itms[uranus]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
         mnu_environment_itms[neptune] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
         mnu_environment_itms[pluto]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
-        //  Panels
-        //pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
-        //pnl_controls = (Panel)window.add("South", (new Panel()));
-        pnl_display  = new Panel();  // Hopefully this cast doesn't cause issue.
-        pnl_controls = new Panel();
-        window.add("Center", pnl_display);  // Hopefully this cast doesn't cause issue.
-        window.add("South", pnl_controls);
-        //  Scrolls
-        Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);
-        Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);
-        //  Labels
-        Label lbl_cannon_force = new Label("Force: ?px/s");
-        Label lbl_cannon_angle = new Label("Angle: ?deg");
-        Label lbl_time         = new Label("Time: ?s");
-        Label lbl_score_ball   = new Label("Bubble: ");
-        Label lbl_score_player = new Label("You: ");
+        
+        // Conpan Scrolls, Labels:
+        GridBagConstraints gbc = new GridBagConstraints(); // @todo configure this gridbag stuff
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1;
+
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_force, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
+        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_score_ball   = new Label("Bubble: ", Label.CENTER);     pnl_controls.add(lbl_score_ball, gbc);
+        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = 1; Label lbl_time         = new Label("Time: ?s", Label.CENTER);     pnl_controls.add(lbl_time, gbc);
+        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_score_player = new Label("You: ", Label.CENTER);        pnl_controls.add(lbl_score_player, gbc);
+        gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1; Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_angle, gbc);
+        gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1; Label lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
+        
         //  Attach UI Listeners  (may want to do all listeners as last step in constructor @todo)
         for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.addItemListener(this);
@@ -123,19 +130,12 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
        
         // Setup panels
-        pnl_display.setBackground(Color.gray);
-        pnl_display.setLayout(new BorderLayout());
         //pnl_display.add("Center", (new Canvas()));
-        pnl_controls.setBackground(Color.lightGray);
-        pnl_controls.setLayout(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints(); // @todo configure this gridbag stuff
-        pnl_controls.add(sb_cannon_force, gbc);
-        pnl_controls.add(sb_cannon_angle, gbc);
-        pnl_controls.add(lbl_cannon_force, gbc);
-        pnl_controls.add(lbl_cannon_angle, gbc);
-        pnl_controls.add(lbl_time, gbc);
-        pnl_controls.add(lbl_score_ball, gbc);
-        pnl_controls.add(lbl_score_player, gbc);
+        
+        
+        
+        
+        
 
         // Add things to frame
         window.setMenuBar(menubar);
@@ -359,9 +359,12 @@ class CannonBallEngine {
 //  Adding back the Engine functionality.
 //  
 //  X Creating the RenderComposer, to sit between Renderer and MultiBufferedCanvas
-//  Doing the component resizing, getting that to work nicely with the canvas.
+//  X Doing the component resizing, getting that to work nicely with the canvas.
 //    - For setting proper min sizes based on rectangles, we'll probably have to check the engine on each frame for a rectangle added flag (or something), and then set min sizes.
 //    - Honestly though, it's really only the frame that needs its min size to match the rects right? Still probably, at least the engine should know of it's min size (rectangle bounds).
+//
+//  Getting control panel looking good and attached to Engine.
+//  Adding debug overlay to make sure rendering pipeline workin right.
 //
 //  Linking Mouse and Keyboard into Engine, for dragbox, cannonfires, and game buttons
 //  Readding balls, so we can have something to move around in tick() for testing.
