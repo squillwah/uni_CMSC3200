@@ -33,7 +33,7 @@ import java.awt.image.BufferedImage;
 
 
 
-public class uitest implements ActionListener, AdjustmentListener, ItemListener, WindowListener, ComponentListener {
+public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
     private static final long SerialVersionUID = 124987123L;
      
     private final Dimension window_min_size = new Dimension(640, 480);
@@ -43,31 +43,37 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
     private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, NUM_SIZES    = 5;
     private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
     private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
+    private final byte nodebug = 0, db1 = 1, db2 = 2, db3 = 3, NUM_DEBUG_LEVELS = 4;
 
     // Frame and panels.
     private Frame window;
     private Panel pnl_display, pnl_controls;
     
-    // The game logic, drawing system.
+    // The game logic, drawing system, thread.
     private CannonBallEngine engine;
     private MultiBufferedCanvas display;
+    private Thread main_thread;
+    private boolean main_thread_running;
     
     // Elements of UI: MenuItems, ScrollBars, Labels.
     private MenuBar menubar;
-    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed;
+    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo;
     private MenuItem[] mnu_control_itms;                        
     private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    
     private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   
-    private CheckboxMenuItem[] mnu_environment_itms;            
+    private CheckboxMenuItem[] mnu_environment_itms;
+    private CheckboxMenuItem[] mnu_debuginfo_itms;
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
     private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 // @todo sometime maybe idk, Menu and Menubar support a getMenu and getItem Count method, we could use that to dynamically traverse the menubar structure to find things instead of defining it all here and in constructor.
 
     public uitest(/*Dimension initial_size*/) {
         //window_min_size = initial_size.getSize();     // Window shouldn't get smaller than rects, but also should be infinitely small. We'll need to compare this against the game min size and canvas min size as well on componentResized.
         
-        // Engine, Display:
+        // Engine, Display, Thread:
         engine = new CannonBallEngine();
         display = new MultiBufferedCanvas();
+        main_thread = null;
+        main_thread_running = false;
         
         // Frame:
         window = new Frame();
@@ -96,21 +102,21 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         mnu_control_itms[quit]    = mnu_control.add(new MenuItem("Quit"));
         mnu_parameters                       = menubar.add(new Menu("Parameters"));
         mnu_parameters_mnu_size              = (Menu)mnu_parameters.add(new Menu("Size"));  // Possibly buggy cast
-        mnu_parameters_mnu_size_itms         = new CheckboxMenuItem[5];
+        mnu_parameters_mnu_size_itms         = new CheckboxMenuItem[NUM_SIZES];
         mnu_parameters_mnu_size_itms[xsmall] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xsmall"));
         mnu_parameters_mnu_size_itms[small]  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("small"));
         mnu_parameters_mnu_size_itms[medium] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("medium"));
         mnu_parameters_mnu_size_itms[large]  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("large"));
         mnu_parameters_mnu_size_itms[xlarge] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xlarge"));
         mnu_parameters_mnu_speed              = (Menu)mnu_parameters.add(new Menu("Speed"));
-        mnu_parameters_mnu_speed_itms         = new CheckboxMenuItem[5];
+        mnu_parameters_mnu_speed_itms         = new CheckboxMenuItem[NUM_SPEEDS];
         mnu_parameters_mnu_speed_itms[xslow]  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xslow"));
         mnu_parameters_mnu_speed_itms[slow]   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("slow"));
         mnu_parameters_mnu_speed_itms[normal] = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("normal"));
         mnu_parameters_mnu_speed_itms[fast]   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("fast"));
         mnu_parameters_mnu_speed_itms[xfast]  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xfast"));
         mnu_environment = menubar.add(new Menu("Environment"));
-        mnu_environment_itms          = new CheckboxMenuItem[9];
+        mnu_environment_itms          = new CheckboxMenuItem[NUM_PLANETS];
         mnu_environment_itms[mercury] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury")); // @todo Could we think of a way to do all this in the Engine, and attach the Engine as listener? Just pass the menubar or menuitem back to this frame somehow? What about the Scrolls too?
         mnu_environment_itms[venus]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Venus"));
         mnu_environment_itms[earth]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Earth"));
@@ -120,6 +126,12 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         mnu_environment_itms[uranus]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
         mnu_environment_itms[neptune] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
         mnu_environment_itms[pluto]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
+        mnu_debuginfo = menubar.add(new Menu("Info"));
+        mnu_debuginfo_itms          = new CheckboxMenuItem[NUM_DEBUG_LEVELS];
+        mnu_debuginfo_itms[nodebug] = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("none"));
+        mnu_debuginfo_itms[db1]     = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 1"));
+        mnu_debuginfo_itms[db2]     = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 2"));
+        mnu_debuginfo_itms[db3]     = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 3"));
         
         // Conpan Scrolls, Labels:
         GridBagConstraints gbc = new GridBagConstraints(); // @todo configure this gridbag stuff
@@ -145,6 +157,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.addItemListener(this);
        
         // Setup panels
         //pnl_display.add("Center", (new Canvas()));
@@ -168,6 +181,7 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         mnu_parameters_mnu_size_itms[medium].setState(true);    // @todo Should we add randomness here? What about an extra menuitem on each, that disables all radios and applies a random size, speed, or gravity?
         mnu_parameters_mnu_speed_itms[normal].setState(true);
         mnu_environment_itms[earth].setState(true);
+        mnu_debuginfo_itms[nodebug].setState(true);
         engine.set_gravity(10);
         engine.set_bubble_size(10);
         engine.set_bubble_speed(10);
@@ -188,7 +202,8 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
         window.addComponentListener(this);
 
         //display.setSize(pnl_display.getSize());
-        display.repaint();
+        //display.repaint();
+        start_thread();
     }
 
     public static void main(String[] args) {
@@ -197,16 +212,57 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
     }
 
     private void exit() {
+        stop_thread();
         for (MenuItem mi : mnu_control_itms) mi.removeActionListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.removeItemListener(this);
+        for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.removeItemListener(this);
         window.removeWindowListener(this);
         window.removeComponentListener(this);
         window.dispose();
         System.exit(0);
     }
+    
+    private void start_thread() {
+        if (main_thread == null) {
+            main_thread_running = true;
+            main_thread = new Thread(this);
+            main_thread.start();
+        }
+    }
+    private void stop_thread() {
+        if (main_thread != null) {
+            main_thread_running = false;
+            main_thread.interrupt();
+            main_thread = null;
+        }
+    }
 
+    public void run() {
+        while(main_thread_running) {
+            display.repaint();
+            try { Thread.sleep(0, 500000); } // Nanoseconds, one half of a millescond.
+            //try { Thread.sleep(16); }   // This is the frame limiter !!! @todo add a MenuBar option to change it.
+            catch (InterruptedException e) {}
+        }
+    }
+
+
+    // Should everything be started with thread start? Like the frame (setting visible) too?
+
+    // The THREAD
+    //class GameThread implements Runnable { 
+    //    boolean running;
+    //    public GameThread() { running = false; }
+    //    public void run() {
+    //        while (running) {
+    //            display.repaint();
+    //            try { Thread.sleep(1); }
+    //            catch (InterruptedException e) {}
+    //        }
+    //    }
+    //}
 
 
     // ! the critical consideration is whether or not to have all these listeners as part of this main frame class, or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
@@ -296,6 +352,12 @@ public class uitest implements ActionListener, AdjustmentListener, ItemListener,
                 case pluto:   engine.set_gravity(18); exit(); break;
                 default: System.out.println("err: bad env menu item offset, can't match: " + item); break;
             }
+        } else
+        if ((radio = find_mitem(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, item)) > -1) { 
+            set_mradio(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, radio);
+            display.debug_lvl = radio;  // It so happens that the debug level and MenuItem offset align. Do not rely on this, may cause issues if changes are made.
+            //switch (radio) {
+            //    case nodebug: display.debug_lvl = 0
         }
     }
 
@@ -503,25 +565,33 @@ class MultiBufferedCanvas extends Canvas {
     private RenderComposer composer;
     private BufferedImage backbuff;
 
-    // For the debug status info bar
+    // For debug info bar
     public int debug_lvl;   // 1-3 levels (3 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
     private String debug_msg;
-    private long time_of_last_frame;
+    //private Graphics debug_gfx;
+    //private BufferedImage debug_buff;
+    
+    private long time_of_last_frame; // Nanoseconds
     private int frametime;
+    private int framerate;
 
     public MultiBufferedCanvas(Renderer r) {
         System.out.println(r);
         setBackground(Color.white);
         composer = new RenderComposer(r);
         
-        debug_lvl = 3;
+        debug_lvl = 0;
         debug_msg = "";
-        time_of_last_frame = System.currentTimeMillis();
+        //debug_buff = new BufferedImage(CANVAS_MIN_SIZE.width, 25, BufferedImage.TYPE_INT_ARGB);
+        //debug_gfx = debug_buff.getGraphics();
+
+        time_of_last_frame = System.nanoTime();
         frametime = 0;
+        framerate = 0;
     }
     public MultiBufferedCanvas() {
         // Anonymous class for empty renderer, debugging.
-        this(new Renderer(1, new Dimension(256, 256)) { 
+        this(new Renderer(1, new Dimension(1280,720)) {//256, 256)) { 
             { redraw(1); } // 'Instance initializer', to flag empty layer for redraw.
             public void draw(int layer, Graphics g) { 
                 g.setColor(Color.magenta);
@@ -548,19 +618,34 @@ class MultiBufferedCanvas extends Canvas {
         g.drawImage(backbuff, 0, 0, null);
         switch (debug_lvl) {    // Hopefully no performance issues. @todo: Compare with and without this code block.
             case 3: 
-                frametime = (int)(System.currentTimeMillis()-time_of_last_frame);
+                frametime = (int)(System.nanoTime()-time_of_last_frame);
                 time_of_last_frame += frametime;
-                debug_msg += "Frametime: " + frametime + "ms | ";
+                debug_msg += "Frametime: " + (frametime+1)/1000000 + "ms | ";
+                debug_msg += "Framerate: " + 1000000000/(frametime+1) + "fps | "; // +1 to avoid div by zero. Makes slight inaccuracy but who cares.
             case 2:
                 debug_msg += "Layer Count: " + composer.info_layer_count() + " | ";
                 debug_msg += "Draw Status: " + Integer.toBinaryString(composer.info_redraw_status()) + " | "; // drawString does not handle newlines
             case 1: 
                 debug_msg += "Renderer Resolution: " + composer.info_res_x() + "x" + composer.info_res_y() + " | ";
                 debug_msg += "Canvas Resolution: " + getWidth() + "x" + getHeight();
-                g.setColor(new Color(0,0,0,200)); g.fillRect(0,0, getWidth(), 25);    // @todo make sure margins/border (red border) issues don't look weird, just in general. 
+               
+                // Doing this copy stuff is soooo laggy. Faster to draw straight to g. Just gotta deal with the flickering. Maybe it's creating the Graphics so many times over that lags?
+                // Copy backbuff to a new buffer, to avoid drawing directly into the backbuff reference (which reaches back into RenderComposer).
+                //  Could make RenderComposer.recompose() return a copy instead, but that's overhead for only this special case.
+                //debug_buff = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+                
+                //backbuff = new BufferedImage(backbuff.getColorModel(), backbuff.copyData(null), backbuff.getColorModel().isAlphaPremultiplied(), null); // !!!! Doing this over drawImage might be a lot more performant. @todo replace RenderComposer drawImages with this?
+                //debug_gfx = backbuff.getGraphics();
+                //debug_gfx.drawImage(backbuff, 0, 0, null);
+                //g.setColor(new Color(0,0,0,200)); g.fillRect(0,0, getWidth(), 25);    // @todo make sure margins/border (red border) issues don't look weird, just in general. 
                 g.setColor(Color.red); g.drawString("[" + debug_msg + "]", 12, 15 );
+                //debug_gfx.setColor(new Color(0,0,0,200)); debug_gfx.fillRect(0,0, getWidth(), 25);    // @todo make sure margins/border (red border) issues don't look weird, just in general. 
+                //debug_gfx.setColor(Color.red); debug_gfx.drawString("[" + debug_msg + "]", 12, 15 );
                 debug_msg = "";
+                //debug_gfx.dispose();
         }
+        //g.drawImage(backbuff, 0, 0, null);
+        //g.drawImage(debug_buff, 0, 0, null);
     }
 
 //    // Probably unnecessary, since we're only setting size with setSize. Or we should do check in that. Or different new method.
