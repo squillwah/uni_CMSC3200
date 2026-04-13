@@ -140,18 +140,20 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         gbc.weightx = 1;
         gbc.ipady = 2;
 
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_force, gbc);
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
-        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,10,0,0); Label lbl_score_ball   = new Label("Bubble: ", Label.CENTER);     pnl_controls.add(lbl_score_ball, gbc);
-        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = .75; gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_time         = new Label("Time: ?s", Label.CENTER);     pnl_controls.add(lbl_time, gbc);
-        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,0,0,10); Label lbl_score_player = new Label("Player: ", Label.CENTER);        pnl_controls.add(lbl_score_player, gbc);
-        gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_angle, gbc);
-        gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
-
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_force  = new Scrollbar(Scrollbar.HORIZONTAL);     pnl_controls.add(sb_cannon_force, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
+        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,10,0,0);   lbl_score_ball   = new Label("Bubble: ", Label.CENTER);     pnl_controls.add(lbl_score_ball, gbc);
+        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = .75; gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); lbl_time         = new Label("Time: ?s", Label.CENTER);     pnl_controls.add(lbl_time, gbc);
+        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,0,0,10);   lbl_score_player = new Label("Player: ", Label.CENTER);     pnl_controls.add(lbl_score_player, gbc);
+        gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_angle  = new Scrollbar(Scrollbar.HORIZONTAL, 45, 1, 0, 91);     pnl_controls.add(sb_cannon_angle, gbc);    //  added more info for scrollbars, @TODO ADD FOR OTHER
+        gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_angle = new Label("Angle: 45deg", Label.CENTER); pnl_controls.add(lbl_cannon_angle, gbc);
         sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  // @todo ! We could have a Color pallete class that stores all these specific colors for components, then change that class and refresh when the environment/background is changed.
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
         //lbl_cannon_angle.setBackground(Color.lightGray);
         //lbl_cannon_angle.setForeground(Color.darkGray);
+        //  attach listeners
+        sb_cannon_angle.addAdjustmentListener(this);
+        sb_cannon_force.addAdjustmentListener(this);
         
         //  Attach UI Listeners  (may want to do all listeners as last step in constructor @todo)
         for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
@@ -163,7 +165,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         // Setup panels
         //pnl_display.add("Center", (new Canvas()));
         
-        
+
         
         
         
@@ -273,7 +275,14 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
 
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
+        Object src = e.getSource();
 
+        if (src == sb_cannon_angle) {
+            int angle = sb_cannon_angle.getValue();
+            engine.set_cannon_angle(angle);
+            lbl_cannon_angle.setText("Angle: " + angle + "deg");
+            display.repaint();
+        }
     }
 
     public void actionPerformed(ActionEvent e) {
@@ -459,6 +468,12 @@ class CannonBallEngine {
     }
     public void set_gravity(double ppsps) {
         System.out.println("Gravity: " + ppsps);
+    }
+    public void set_cannon_angle(double deg) {
+        if (cannon != null) {
+        cannon.set_angle(deg);
+        r.redraw(r.l_cannon);
+        }
     }
     public void set_pause(boolean p) {
         paused = p;
