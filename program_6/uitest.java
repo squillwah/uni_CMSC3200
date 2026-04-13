@@ -416,6 +416,10 @@ class CannonBallEngine {
 
     private CannonBallRenderer r;
 
+
+    testball test = new testball();
+
+
     public CannonBallEngine() {
         paused = true;
         world_size = MIN_WORLD_SIZE.getSize();
@@ -448,8 +452,24 @@ class CannonBallEngine {
     }
     public Renderer renderer() { return r; }
 
+    class testball {
+        int x = 4;
+        int y = 4;
+
+        public void move() {
+            x += 1;
+            y += 1;
+        }
+    }
+
     public void tick(double delta_t) {
-        r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
+        if (!paused) {
+            test.move();
+            if (test.x > world_size.width) test.x = 4;
+            if (test.y > world_size.height) test.y = 4;
+            //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
+            r.redraw(r.l_bubbles);
+        }
     }
     
     // Renderer for the game.
@@ -505,6 +525,8 @@ class CannonBallEngine {
     
         private void draw_bubbles(Graphics g) {
             // @todo draw the bubbles (moving targets) here
+            g.setColor(Color.magenta);
+            g.fillOval(test.x, test.y, 20, 20);
         }
     
         private void draw_balloids(Graphics g) {
@@ -616,14 +638,19 @@ abstract class Renderer {
 // How best to do? Could make as part of the redraw bitcode, that would give reason for the code array too, cause the codes won't be directly related to powers of 2.
 
 // Create and manage BufferedImage layers for a Renderer. Bake the final image.
+//  ! Not designed for concurrency. Ensure that the Renderer and RenderComposer are not being accessed/modified concurrently.
 class RenderComposer {
     private static final long SerialVersionUID = 1111L; // Are these needed everywhere? @todo Ask pyz about his compiler settings.
-    
+   
+    private final Color TRANSPARENT = new Color(0,0,0,0);
+
     int draws;  // Holds the code of layers to draw in update.
     private Renderer r;
     private Graphics gfx;
-    private BufferedImage composedbuff;
+    private BufferedImage composedbuff; // @ todo use volatile instead?
+    private Graphics2D composedbuff_gfx;    // Graphics 2D is necessary for transparent clearing.
     private BufferedImage[] layerbuffs;
+    private Graphics2D[] layerbuffs_gfx;
 
     public RenderComposer(Renderer rudolph) {
         set_renderer(rudolph);
@@ -636,20 +663,53 @@ class RenderComposer {
 
         // Init empty layers.
         layerbuffs = new BufferedImage[r.LAYER_COUNT];
-        BufferedImage composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
-        for (int i = 0; i < r.LAYER_COUNT; i++) layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+        layerbuffs_gfx = new Graphics2D[r.LAYER_COUNT];
+        generate_buffers();
+    }
+
+    // Generate all buffers once, fitting to the resolution of the set Renderer.
+    private void generate_buffers() {
+        composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+        composedbuff_gfx = composedbuff.createGraphics();//getGraphics();
+        composedbuff_gfx.setBackground(TRANSPARENT);    // For clearRect
+        for (int i = 0; i < r.LAYER_COUNT; i++) {
+            layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+            layerbuffs_gfx[i] = layerbuffs[i].createGraphics(); //getGraphics();
+            layerbuffs_gfx[i].setBackground(TRANSPARENT);
+        } 
+    }
+    // Dispose and nullify all buffers and graphics. 
+    public void dispose_buffers() {
+        composedbuff_gfx.dispose(); // @bug potential if we ever try to dispose without generating first. Easy fix is a condition, but I don't see how that bug could happen rn. The RenderComposer always needs a Renderer set, from construction till destruction. 
+        composedbuff_gfx = null;
+        composedbuff = null;
+        for (int i = 0; i < r.LAYER_COUNT; i++) {
+            layerbuffs_gfx[i].dispose();
+            layerbuffs_gfx[i] = null;
+            layerbuffs[i] = null;
+        }
     }
 
     // Check redraw requests of Renderer, update layers accordingly.
     private void update() {
         draws = r.redraw_status(); r.redraw_clear();
+        // Regenerate buffers to correct size on Renderer resolution changes.
+        if (r.reschange_status()) {
+            dispose_buffers();
+            generate_buffers(); // @bug Hopefully no concurrency issues arise (Renderer changing resolution rapidly from an AWT event), r.res_x/y() in the generate method giving different answers per buffer. I think with the way we've threading set up, and the way the Renderer's resolution is only changed in Engine during tick (i think), this should be a problem.
+            r.reschange_clear();
+        }
         for (int i = 0; i < r.LAYER_COUNT; i++) {
             if ((draws & r.LAYERS[i]) > 0) { // Again, could just be 2^i instead of LAYERS[i].
-                layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
-                gfx = layerbuffs[i].getGraphics();
-                r.draw(r.LAYERS[i], gfx);
+                //layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+                //gfx = layerbuffs[i].getGraphics();
+                //r.draw(r.LAYERS[i], gfx);A
+                //layerbuffs_gfx[i].setColor(TRANSPARENT);
+                layerbuffs_gfx[i].clearRect(0, 0, r.res_x(), r.res_y()); // @bug ! Again, hopefully Renderer resolution isn't change during this.
+                                                                    // Also, we could just allow the Renderer to wipe at their own discretion.
+                r.draw(r.LAYERS[i], layerbuffs_gfx[i]);
                 //System.out.println("draw");
-                gfx.dispose();
+                //gfx.dispose();
             }
         }
         if (draws != 0) compose(); // Only compose layers if there was a redraw. (!= 0 instead of >0, because all bits set == -1)
@@ -657,14 +717,17 @@ class RenderComposer {
 
     // Bake layerbuffs onto composedbuff.
     private void compose() {
-        composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB); // Is transparent, leaving it up to the layers or image recipient to draw the background. 
-        gfx = composedbuff.getGraphics();
+        //composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB); // Is transparent, leaving it up to the layers or image recipient to draw the background. 
+        //gfx = composedbuff.getGraphics();
         //gfx.fillOval(50, 50, 10, 10);
+        //composedbuff_gfx.setColor(Color.white);
+        composedbuff_gfx.clearRect(0, 0, r.res_x(), r.res_y());
         for (BufferedImage layer : layerbuffs) {
-            gfx.drawImage(layer, 0, 0, null);
+            //gfx.drawImage(layer, 0, 0, null);
+            composedbuff_gfx.drawImage(layer, 0, 0, null);
             //System.out.println("drawg" + layer);
         }
-        gfx.dispose();
+        //gfx.dispose();
         //System.out.println("composin");
     }
 
@@ -690,6 +753,7 @@ class MultiBufferedCanvas extends Canvas {
     // For debug info bar
     public int debug_lvl;   // 1-3 levels (3 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
     private String debug_msg;
+    private int debug_update;
     //private Graphics debug_gfx;
     //private BufferedImage debug_buff;
     
@@ -704,6 +768,7 @@ class MultiBufferedCanvas extends Canvas {
         
         debug_lvl = 3;
         debug_msg = "";
+        debug_update = 0;
         //debug_buff = new BufferedImage(CANVAS_MIN_SIZE.width, 25, BufferedImage.TYPE_INT_ARGB);
         //debug_gfx = debug_buff.getGraphics();
 
@@ -754,6 +819,9 @@ class MultiBufferedCanvas extends Canvas {
             case 1: 
                 debug_msg += "Renderer Resolution: " + composer.info_res_x() + "x" + composer.info_res_y() + " | ";
                 debug_msg += "Canvas Resolution: " + getWidth() + "x" + getHeight();
+                //debug_update++;
+                //if (debug_update > 10) {    // Only update every ten frames @todo move this debug message into its own buffer layer, probably just implement the backbuff here seperately in Canvas, then render this on top always whenever debug on. Then we can better do the frame frequency limit, and not have the flicker.
+                //    debug_update = 0;
                
                 // Doing this copy stuff is soooo laggy. Faster to draw straight to g. Just gotta deal with the flickering. Maybe it's creating the Graphics so many times over that lags?
                 // Copy backbuff to a new buffer, to avoid drawing directly into the backbuff reference (which reaches back into RenderComposer).
@@ -764,9 +832,10 @@ class MultiBufferedCanvas extends Canvas {
                 //debug_gfx = backbuff.getGraphics();
                 //debug_gfx.drawImage(backbuff, 0, 0, null);
                 //g.setColor(new Color(0,0,0,200)); g.fillRect(0,0, getWidth(), 25);    // @todo make sure margins/border (red border) issues don't look weird, just in general. 
-                g.setColor(Color.red); g.drawString("[" + debug_msg + "]", 12, 15 );
+                    g.setColor(Color.red); g.drawString("[" + debug_msg + "]", 12, 15 );
                 //debug_gfx.setColor(new Color(0,0,0,200)); debug_gfx.fillRect(0,0, getWidth(), 25);    // @todo make sure margins/border (red border) issues don't look weird, just in general. 
                 //debug_gfx.setColor(Color.red); debug_gfx.drawString("[" + debug_msg + "]", 12, 15 );
+                //} 
                 debug_msg = "";
                 //debug_gfx.dispose();
         }
