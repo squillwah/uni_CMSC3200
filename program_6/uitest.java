@@ -110,7 +110,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         mnu_control_itms                        = new MenuItem[4];
         mnu_control_itms[run]                   = mnu_control.add(new MenuItem("Run", new MenuShortcut(KeyEvent.VK_R)));
         mnu_control_itms[pause]                 = mnu_control.add(new MenuItem("Pause", new MenuShortcut(KeyEvent.VK_P)));
-        mnu_control_itms[restart]               = mnu_control.add(new MenuItem("Restart", new MenuShortcut(KeyEvent.VK_R, true))); 
+        mnu_control_itms[restart]               = mnu_control.add(new MenuItem("Restart", new MenuShortcut(KeyEvent.VK_P, true))); 
         mnu_control.addSeparator();
         mnu_control_itms[quit]                  = mnu_control.add(new MenuItem("Quit", new MenuShortcut(KeyEvent.VK_Q, true)));
         mnu_parameters                          = menubar.add(new Menu("Parameters"));
@@ -241,12 +241,25 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     }
 
     public void run() {
+        double delta_t = 0;                             //@ todo could feed this into display for frametime
+        int paintlimiter = 0; 
+        long frame_start_t = System.nanoTime();
         while(main_thread_running) {
-            engine.tick(0.0);
-            display.repaint();
+            delta_t = (System.nanoTime() - frame_start_t) / 1000000000.0; // Double value, in seconds.
+            frame_start_t = System.nanoTime();
+            System.out.println(delta_t + " " + frame_start_t);
+
+            engine.tick(delta_t);
+            display.debug_inform_ticktime(delta_t);
+           
+            if (paintlimiter > 2) {     // Dunno if actually helps anything.
+                display.repaint();
+                paintlimiter = 0;
+            } paintlimiter++;
+
             //try { Thread.sleep(1000); }
             //try { Thread.sleep(0, 500000); } // Nanoseconds, one half of a millescond.
-            try { Thread.sleep(8); }   // This is the frame limiter !!! @todo add a MenuBar option to change it.
+            try { Thread.sleep(4); }   // This is the frame limiter !!! @todo add a MenuBar option to change it.
             catch (InterruptedException e) {}
         }
     }
@@ -394,7 +407,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
 
 class CannonBallEngine {
     private final Dimension MIN_WORLD_SIZE = new Dimension(256, 256);
-    private final double PIXELS_PER_METER = .5;    // ! This also acts as a "zoom", changing the size of everything.
+    private final double PIXELS_PER_METER = 5;    // ! This also acts as a "zoom", changing the size of everything.
 
     //@todo
     // We have a consideration to make, if we want to define MIN/MAXs for sizes, speeds, etc. or just let the calling methods handle all that.
@@ -433,13 +446,17 @@ class CannonBallEngine {
     // Because events (which change engine values) can occur concurrently with the Thread (and thus during a tick()),
     // each mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
 
+
+    boolean restart;
+
     // In radians. Degrees only for method interface.
     private double[] cannon_angle;
+    // In pixels, pixels per second, and pixels per second per second. (Meter conversion is done in set_...)
     private double[] cannon_force;      // Only accounting for one cannon in the game, so it really doesn't need the overhead of an object right now. Unlike balloids, rects, or bubbles, of which there will be many.
-    private int[] bubble_size; 
+    private double[] bubble_size;   // All as doubles, do any rounding up (for a pixel) in CannonBallRenderer
     private double[] bubble_speed; 
     private double[] world_gravity; 
-    private Dimension[] world_size; // Still pixels.
+    private Dimension[] world_size; // Still in pixels.
 
 
     //private Vector<Rectangle> rects; 
@@ -452,12 +469,13 @@ class CannonBallEngine {
     public CannonBallEngine() {
         cannon_angle = new double[]{0, 3.14};
         cannon_force = new double[]{0, PIXELS_PER_METER*2};          // !! The method interfaces take meters as measurement, but internally it's all pixel values. Also, it's PER SECOND velocity.
-        bubble_size  = new int[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball will need to be huge, to adhere to normal gravity and velocities.
+        bubble_size  = new double[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball will need to be huge, to adhere to normal gravity and velocities.
         bubble_speed = new double[]{0, PIXELS_PER_METER};           // One meter (in pixels) PER SECOND
         world_gravity = new double[]{0, 9.8*PIXELS_PER_METER};
         world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
 
         paused = true;
+        restart = false;
         r = new CannonBallRenderer(MIN_WORLD_SIZE); // ? Is this copied over, or is it now the same object? Will changing world size now change Renderer resolution?
         r.redraw(~0); // debug, draw everything
 
@@ -470,7 +488,7 @@ class CannonBallEngine {
     }
     public void set_bubble_size(int m) {
         System.out.println("Size: " + m);
-        bubble_size[1] = (int)(m * PIXELS_PER_METER) + 1; // Safety pixel.
+        bubble_size[1] = m * PIXELS_PER_METER;
     }
     public void set_bubble_speed(double mps) {
         System.out.println("Speed: " + mps);
@@ -490,6 +508,7 @@ class CannonBallEngine {
     public void restart() {
         System.out.println("Restart");
         set_pause(true);
+        restart = true;
     }
     public Renderer renderer() { return r; }
 
@@ -503,11 +522,12 @@ class CannonBallEngine {
     class testball {
         double x = (Math.random()*world_size[0].width);
         double y = (Math.random()*world_size[0].height);
+        double vy = 0;
 
-        public void move() {
-            x += 1;
-            y += 1;
-        }
+        //public void move() {
+        //    x += 1;
+        //    y += 1;
+        //}
     }
 
     public void tick(double delta_t) {
@@ -517,6 +537,7 @@ class CannonBallEngine {
         //    e_world_size_changed = false;
         //    r.redraw(~0);
         //}
+
 
         // Update engine values
         // Not all require redraws.
@@ -540,13 +561,24 @@ class CannonBallEngine {
         
         if (!paused) {
             for (testball test : tests) {
-                test.x += bubble_speed[0];  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
-                test.y += bubble_speed[0]; 
+                test.x += bubble_speed[0]*delta_t;  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
+                test.vy += world_gravity[0]*delta_t;
+                test.y += test.vy*delta_t;
                 if (test.x+bubble_size[0] > world_size[0].width) test.x = (Math.random()*world_size[0].width);
-                if (test.y+bubble_size[0] > world_size[0].height) test.y = (Math.random()*world_size[0].height);
+                if (test.y+bubble_size[0] > world_size[0].height) test.vy = -test.vy;//test.y = (Math.random()*world_size[0].height);
             }
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
+        } else if (restart) {
+            // Reset the state of the game
+            // Could use an init_game_state() or something 
+            for (testball test: tests) {
+                test.x = test.y = MIN_WORLD_SIZE.height/2;
+                test.vy = 0;
+            }
+            r.redraw(r.l_bubbles);
+            r.redraw(r.l_cannon);     // We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
+            restart = false;
         }
     }
     
@@ -605,7 +637,7 @@ class CannonBallEngine {
             // @todo draw the bubbles (moving targets) here
             for (testball test : tests) {
                 g.setColor(Color.magenta);
-                g.fillOval(BORDER+(int)test.x, BORDER+(int)test.y, bubble_size[0], bubble_size[0]);
+                g.fillOval(BORDER+(int)test.x, BORDER+(int)test.y, (int)bubble_size[0]+1, (int)bubble_size[0]+1);   // Safety pixel.
             }
         }
     
@@ -849,15 +881,15 @@ class MultiBufferedCanvas extends Canvas {
     //private BufferedImage debug_buff;
     
     private long time_of_last_frame; // Nanoseconds
-    private int frametime;
-    private int framerate;
+    private double frametime;
+    private double ticktime;
 
     public MultiBufferedCanvas(Renderer r) {
         System.out.println(r);
         setBackground(new Color(10, 10, 10));
         composer = new RenderComposer(r);
         
-        debug_lvl = 3;
+        debug_lvl = 0;
         debug_msg = "";
         //debug_update = 0;
         //debug_buff = new BufferedImage(CANVAS_MIN_SIZE.width, 25, BufferedImage.TYPE_INT_ARGB);
@@ -865,7 +897,7 @@ class MultiBufferedCanvas extends Canvas {
 
         time_of_last_frame = System.nanoTime();
         frametime = 0;
-        framerate = 0;
+        ticktime = 0;
     }
     public MultiBufferedCanvas() {
         // Anonymous class for empty renderer, debugging.
@@ -902,8 +934,9 @@ class MultiBufferedCanvas extends Canvas {
             case 3: 
                 frametime = (int)(System.nanoTime()-time_of_last_frame);
                 time_of_last_frame += frametime;
-                debug_msg += "Frametime: " + (frametime+1)/1000000 + "ms | ";
-                debug_msg += "Framerate: " + 1000000000/(frametime+1) + "fps | "; // +1 to avoid div by zero. Makes slight inaccuracy but who cares.
+                debug_msg += "Ticktime: ~" + (int)(ticktime*1000) + "ms | ";
+                debug_msg += "Frametime: ~" + (int)(frametime/1000000) + "ms | ";
+                debug_msg += "Framerate: ~" + (int)(1000000000/frametime) + "fps | "; 
             case 2:
                 debug_msg += "Layer Count: " + composer.info_layer_count() + " | ";
                 debug_msg += "Draw Status: " + Integer.toBinaryString(composer.info_redraw_status()) + " | "; // drawString does not handle newlines
@@ -933,6 +966,8 @@ class MultiBufferedCanvas extends Canvas {
         //g.drawImage(backbuff, 0, 0, null);
         //g.drawImage(debug_buff, 0, 0, null);
     }
+
+    public void debug_inform_ticktime(double tt) { ticktime = tt; }
 
 //    // Probably unnecessary, since we're only setting size with setSize. Or we should do check in that. Or different new method.
 //    public void setMinumumSize(Dimension dim) {
