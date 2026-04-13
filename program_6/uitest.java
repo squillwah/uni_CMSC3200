@@ -36,6 +36,8 @@ import java.awt.image.VolatileImage;
 // Implement Thread in main class, to tick and render, and any other polls of Engine info to keep GUI accurate.
 //
 // ! Preserve the creating and destroying of graphics and buffers for only on resolution change. Important for performance.
+//
+// Compare all the frame settings in constructor with last program, to make sure we're not missing anything.
 
 
 
@@ -43,13 +45,21 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     private static final long SerialVersionUID = 124987123L;
      
     private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
+    // Window shouldn't get smaller than rects, but also should be infinitely small. 
+    //  We'll need to compare this against the game min size and canvas min size as well on componentResized.
     
-    // Offsets for MenuItem arrays.
+    // Offsets for MenuItem and value arrays.
     private final byte run     = 0, pause = 1, restart = 2, quit  = 3, NUM_CONTROLS = 4; 
     private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, NUM_SIZES    = 5;
     private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
     private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
     private final byte nodebug = 0, db1 = 1, db2 = 2, db3 = 3, NUM_DEBUG_LEVELS = 4;
+
+    private final int SIZES[] = {10, 20, 30, 50, 80};  // Meters     // Pixel radius, from center point. True diameter = 2x+1.
+    private final int SPEEDS[] = {1, 2, 3, 5, 8};      // Pixels per second. *Applied as both components, so true diagonal vel is slightly higher. @todo or should it be meters per second? If we're translating pixels to meters with a constant, it should be. Same with size.
+    private final double GRAVITIES[] = {3.7, 8.87, 9.80665, 3.71, 24.79, 10.4, 8.87, 11.15, 0.620};  // Meters per second per second. (Pixels in a meter?)
+    // @todo Add more gravity/environment options, create a constant to define the relation between pixels and meters.
+    
 
     // Frame and panels.
     private Frame window;
@@ -70,81 +80,74 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     private CheckboxMenuItem[] mnu_environment_itms;
     private CheckboxMenuItem[] mnu_debuginfo_itms;
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
-    private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 // @todo sometime maybe idk, Menu and Menubar support a getMenu and getItem Count method, we could use that to dynamically traverse the menubar structure to find things instead of defining it all here and in constructor.
+    private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 
+    // @todo sometime maybe idk, Menu and Menubar support a getMenu and getItem Count method, 
+    // we could use that to dynamically traverse the menubar structure to find things instead of 
+    // defining it all here and in constructor.
 
-    public uitest(/*Dimension initial_size*/) {
-        //window_min_size = initial_size.getSize();     // Window shouldn't get smaller than rects, but also should be infinitely small. We'll need to compare this against the game min size and canvas min size as well on componentResized.
-        
+    public uitest() {
         // Engine, Display, Thread:
         engine = new CannonBallEngine();
         display = new MultiBufferedCanvas(engine.renderer());
         main_thread = null;
         main_thread_running = false;
-        
         // Frame:
         window = new Frame();
         window.setTitle("CannonBubbles");
         window.setMinimumSize(MIN_WINDOW_SIZE);
-        window.setBackground(Color.black);//new Color(10,10,10));//Color.black);
+        window.setBackground(Color.black);
         window.setLayout(new BorderLayout());
-        //window.setBounds(10, 10, window.getWidth(), window.getHeight());
-       
         // Panels:
-        pnl_display  = (Panel)window.add("Center", (new Panel()));  // Hopefully this cast doesn't cause issue.
+        pnl_display = (Panel)window.add("Center", (new Panel()));  
         pnl_display.setBackground(Color.gray);
         pnl_display.setLayout(new BorderLayout());
         pnl_controls = (Panel)window.add("South", (new Panel()));
-        pnl_controls.setBackground(new Color(158, 137, 79));//99, 123, 145));
+        pnl_controls.setBackground(new Color(158, 137, 79));
         pnl_controls.setLayout(new GridBagLayout());
-        
         // Menubar, MenuItems: 
-        menubar = new MenuBar();    // Mayhaps the menubar would benefit from it's own class? Who cares.
-        mnu_control               = menubar.add(new Menu("Control"));
-        mnu_control_itms          = new MenuItem[4];
-        mnu_control_itms[run]     = mnu_control.add(new MenuItem("Run"));
-        mnu_control_itms[pause]   = mnu_control.add(new MenuItem("Pause"));
-        mnu_control_itms[restart] = mnu_control.add(new MenuItem("Restart"));
+        menubar                                 = new MenuBar();
+        mnu_control                             = menubar.add(new Menu("Control"));
+        mnu_control_itms                        = new MenuItem[4];
+        mnu_control_itms[run]                   = mnu_control.add(new MenuItem("Run", new MenuShortcut(KeyEvent.VK_R)));
+        mnu_control_itms[pause]                 = mnu_control.add(new MenuItem("Pause", new MenuShortcut(KeyEvent.VK_P)));
+        mnu_control_itms[restart]               = mnu_control.add(new MenuItem("Restart", new MenuShortcut(KeyEvent.VK_R, true))); 
         mnu_control.addSeparator();
-        mnu_control_itms[quit]    = mnu_control.add(new MenuItem("Quit"));
-        mnu_parameters                       = menubar.add(new Menu("Parameters"));
-        mnu_parameters_mnu_size              = (Menu)mnu_parameters.add(new Menu("Size"));  // Possibly buggy cast
-        mnu_parameters_mnu_size_itms         = new CheckboxMenuItem[NUM_SIZES];
-        mnu_parameters_mnu_size_itms[xsmall] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xsmall"));
-        mnu_parameters_mnu_size_itms[small]  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("small"));
-        mnu_parameters_mnu_size_itms[medium] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("medium"));
-        mnu_parameters_mnu_size_itms[large]  = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("large"));
-        mnu_parameters_mnu_size_itms[xlarge] = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xlarge"));
-        mnu_parameters_mnu_speed              = (Menu)mnu_parameters.add(new Menu("Speed"));
-        mnu_parameters_mnu_speed_itms         = new CheckboxMenuItem[NUM_SPEEDS];
-        mnu_parameters_mnu_speed_itms[xslow]  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xslow"));
-        mnu_parameters_mnu_speed_itms[slow]   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("slow"));
-        mnu_parameters_mnu_speed_itms[normal] = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("normal"));
-        mnu_parameters_mnu_speed_itms[fast]   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("fast"));
-        mnu_parameters_mnu_speed_itms[xfast]  = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xfast"));
-        mnu_environment = menubar.add(new Menu("Environment"));
-        mnu_environment_itms          = new CheckboxMenuItem[NUM_PLANETS];
-        mnu_environment_itms[mercury] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury")); // @todo Could we think of a way to do all this in the Engine, and attach the Engine as listener? Just pass the menubar or menuitem back to this frame somehow? What about the Scrolls too?
-        mnu_environment_itms[venus]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Venus"));
-        mnu_environment_itms[earth]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Earth"));
-        mnu_environment_itms[mars]    = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mars"));
-        mnu_environment_itms[jupiter] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Jupiter"));
-        mnu_environment_itms[saturn]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Saturn"));
-        mnu_environment_itms[uranus]  = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
-        mnu_environment_itms[neptune] = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
-        mnu_environment_itms[pluto]   = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
-        mnu_debuginfo = menubar.add(new Menu("Info"));
-        mnu_debuginfo_itms          = new CheckboxMenuItem[NUM_DEBUG_LEVELS];
-        mnu_debuginfo_itms[nodebug] = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("none"));
-        mnu_debuginfo_itms[db1]     = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 1"));
-        mnu_debuginfo_itms[db2]     = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 2"));
-        mnu_debuginfo_itms[db3]     = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 3"));
-        
+        mnu_control_itms[quit]                  = mnu_control.add(new MenuItem("Quit", new MenuShortcut(KeyEvent.VK_Q, true)));
+        mnu_parameters                          = menubar.add(new Menu("Parameters"));
+        mnu_parameters_mnu_size                 = (Menu)mnu_parameters.add(new Menu("Size"));
+        mnu_parameters_mnu_size_itms            = new CheckboxMenuItem[NUM_SIZES];
+        mnu_parameters_mnu_size_itms[xsmall]    = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xsmall"));
+        mnu_parameters_mnu_size_itms[small]     = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("small"));
+        mnu_parameters_mnu_size_itms[medium]    = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("medium"));
+        mnu_parameters_mnu_size_itms[large]     = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("large"));
+        mnu_parameters_mnu_size_itms[xlarge]    = (CheckboxMenuItem)mnu_parameters_mnu_size.add(new CheckboxMenuItem("xlarge"));
+        mnu_parameters_mnu_speed                = (Menu)mnu_parameters.add(new Menu("Speed"));
+        mnu_parameters_mnu_speed_itms           = new CheckboxMenuItem[NUM_SPEEDS];
+        mnu_parameters_mnu_speed_itms[xslow]    = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xslow"));
+        mnu_parameters_mnu_speed_itms[slow]     = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("slow"));
+        mnu_parameters_mnu_speed_itms[normal]   = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("normal"));
+        mnu_parameters_mnu_speed_itms[fast]     = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("fast"));
+        mnu_parameters_mnu_speed_itms[xfast]    = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xfast"));
+        mnu_environment                         = menubar.add(new Menu("Environment"));
+        mnu_environment_itms                    = new CheckboxMenuItem[NUM_PLANETS];
+        mnu_environment_itms[mercury]           = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury")); // @todo Could we think of a way to do all this in the Engine, and attach the Engine as listener? Just pass the menubar or menuitem back to this frame somehow? What about the Scrolls too?
+        mnu_environment_itms[venus]             = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Venus"));
+        mnu_environment_itms[earth]             = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Earth"));
+        mnu_environment_itms[mars]              = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mars"));
+        mnu_environment_itms[jupiter]           = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Jupiter"));
+        mnu_environment_itms[saturn]            = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Saturn"));
+        mnu_environment_itms[uranus]            = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Uranus"));
+        mnu_environment_itms[neptune]           = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Neptune"));
+        mnu_environment_itms[pluto]             = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("PLUTO"));
+        mnu_debuginfo                           = menubar.add(new Menu("Info"));
+        mnu_debuginfo_itms                      = new CheckboxMenuItem[NUM_DEBUG_LEVELS];
+        mnu_debuginfo_itms[nodebug]             = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("none"));
+        mnu_debuginfo_itms[db1]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 1"));
+        mnu_debuginfo_itms[db2]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 2"));
+        mnu_debuginfo_itms[db3]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 3"));
         // Conpan Scrolls, Labels:
-        GridBagConstraints gbc = new GridBagConstraints(); // @todo configure this gridbag stuff
+        GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1;
-        gbc.ipady = 2;
-
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);      pnl_controls.add(sb_cannon_force, gbc);
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
         gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5;  gbc.ipady = 1; gbc.insets = new Insets(5,10,0,0);   lbl_score_ball = new Label("Bubble: ", Label.CENTER);       pnl_controls.add(lbl_score_ball, gbc);
@@ -152,11 +155,12 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5;  gbc.ipady = 1; gbc.insets = new Insets(5,0,0,10);   lbl_score_player = new Label("Player: ", Label.CENTER);     pnl_controls.add(lbl_score_player, gbc);
         gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);      pnl_controls.add(sb_cannon_angle, gbc);
         gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
-
         sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  // @todo ! We could have a Color pallete class that stores all these specific colors for components, then change that class and refresh when the environment/background is changed.
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
-        //lbl_cannon_angle.setBackground(Color.lightGray);
-        //lbl_cannon_angle.setForeground(Color.darkGray);
+        // Add things to frame
+        window.setMenuBar(menubar);
+        window.add("Center", pnl_display);
+        window.add("South", pnl_controls);
         
         //  Attach UI Listeners  (may want to do all listeners as last step in constructor @todo)
         for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
@@ -165,32 +169,23 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.addItemListener(this);
        
-        // Setup panels
-        //pnl_display.add("Center", (new Canvas()));
-        
-        
-        
-        
-        
-
-        // Add things to frame
-        window.setMenuBar(menubar);
-        window.add("Center", pnl_display);
-        window.add("South", pnl_controls);
-
-
         // Set radio defaults
         //set_radio(mnu_parameters_mnu_size_itms, mnu_parameters_mnu_size_itms[medium]);
         //set_radio(mnu_parameters_mnu_speed_itms, mnu_parameters_mnu_speed_itms[normal]);
         //set_radio(mnu_environment_itms, mnu_environment_itms[earth]);
+        //set_mradio(mnu_control_itms, NUM_CONTROLS, pause);
         mnu_control_itms[pause].setEnabled(false);
-        mnu_parameters_mnu_size_itms[medium].setState(true);    // @todo Should we add randomness here? What about an extra menuitem on each, that disables all radios and applies a random size, speed, or gravity?
-        mnu_parameters_mnu_speed_itms[normal].setState(true);
-        mnu_environment_itms[earth].setState(true);
-        mnu_debuginfo_itms[nodebug].setState(true);
-        engine.set_gravity(10);
-        engine.set_bubble_size(10);
-        engine.set_bubble_speed(10);
+        set_mradio(mnu_parameters_mnu_size_itms, NUM_SIZES, medium);
+        set_mradio(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, normal);
+        set_mradio(mnu_environment_itms, NUM_PLANETS, earth);
+        set_mradio(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, nodebug);
+        //mnu_parameters_mnu_size_itms[medium].setState(true);    // @todo Should we add randomness here? What about an extra menuitem on each, that disables all radios and applies a random size, speed, or gravity?
+        //mnu_parameters_mnu_speed_itms[normal].setState(true);
+        //mnu_environment_itms[earth].setState(true);
+        //mnu_debuginfo_itms[nodebug].setState(true);
+        engine.set_gravity(GRAVITIES[earth]);
+        engine.set_bubble_size(SIZES[medium]);
+        engine.set_bubble_speed(SPEEDS[normal]);
         // @todo is there a better way to set these defaults using the state of the Engine? Perhaps polling this data from Engine on each loop of the Thread, and setting the UI accordingly?
 
         // Set game world size and canvas size
@@ -326,40 +321,43 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         int radio;
         if ((radio = find_mitem(mnu_parameters_mnu_size_itms, NUM_SIZES, item)) > -1) {
             set_mradio(mnu_parameters_mnu_size_itms, NUM_SIZES, radio);//(CheckboxMenuItem)item);
-            switch (radio) {
-                case xsmall: engine.set_bubble_size(5); break;
-                case small:  engine.set_bubble_size(10); break;
-                case medium: engine.set_bubble_size(20); break;         // Could also have set_bubble_size(5, x), to specify the middle size and a range smaller/bigger for randomness. Or that random variation could just be hardset as some constant or constant adjusted for size.
-                case large:  engine.set_bubble_size(40); break;
-                case xlarge: engine.set_bubble_size(80); break;
-                default: System.out.println("err: bad size menu item offset, can't match: " + item); break;
-            } 
+            engine.set_bubble_size(SIZES[radio]); 
+            //switch (radio) {
+            //    case xsmall: engine.set_bubble_size(5); break;
+            //    case small:  engine.set_bubble_size(10); break;
+            //    case medium: engine.set_bubble_size(20); break;         // Could also have set_bubble_size(5, x), to specify the middle size and a range smaller/bigger for randomness. Or that random variation could just be hardset as some constant or constant adjusted for size.
+            //    case large:  engine.set_bubble_size(40); break;
+            //    case xlarge: engine.set_bubble_size(80); break;
+            //    default: System.out.println("err: bad size menu item offset, can't match: " + item); break;
+            //} 
         } else 
         if ((radio = find_mitem(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, item)) > -1) {
             set_mradio(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, radio);//(CheckboxMenuItem)item);
-            switch (radio) {
-                case xslow:  engine.set_bubble_speed(5); break;     // Could do away with the offsets, have another parallel array of the settings, and just iterate 0->NUM_whatever. Or since they're parallel, just use the return of radio (cause that'll be the index in the value array). That could automate all the creations and adding of the MenuItems to one NUM_ITEMS number, though setting up names for the items and the related setting values would all still be manual. Would also make the planet gravity values a little unintuitive, because they have no direct relation (speeds, sizes go up). You would need to know that they're planets, and in the order from the sun.
-                case slow:   engine.set_bubble_speed(10); break;    // Although the offsets do have their benefits, say if we wanted to do a specific thing for a specific setting, like changing a color or graphic. It's nice to be able to tell explicity which setting, and not treat them all the same.
-                case normal: engine.set_bubble_speed(20); break;    
-                case fast:   engine.set_bubble_speed(40); break;
-                case xfast:  engine.set_bubble_speed(80); break;
-                default: System.out.println("err: bad speed menu item offset, can't match: " + item); break;
-            } 
+            engine.set_bubble_speed(SPEEDS[radio]);
+            //switch (radio) {
+            //    case xslow:  engine.set_bubble_speed(5); break;     // Could do away with the offsets, have another parallel array of the settings, and just iterate 0->NUM_whatever. Or since they're parallel, just use the return of radio (cause that'll be the index in the value array). That could automate all the creations and adding of the MenuItems to one NUM_ITEMS number, though setting up names for the items and the related setting values would all still be manual. Would also make the planet gravity values a little unintuitive, because they have no direct relation (speeds, sizes go up). You would need to know that they're planets, and in the order from the sun.
+            //    case slow:   engine.set_bubble_speed(10); break;    // Although the offsets do have their benefits, say if we wanted to do a specific thing for a specific setting, like changing a color or graphic. It's nice to be able to tell explicity which setting, and not treat them all the same.
+            //    case normal: engine.set_bubble_speed(20); break;    
+            //    case fast:   engine.set_bubble_speed(40); break;
+            //    case xfast:  engine.set_bubble_speed(80); break;
+            //    default: System.out.println("err: bad speed menu item offset, can't match: " + item); break;
+            //} 
         } else 
         if ((radio = find_mitem(mnu_environment_itms, NUM_PLANETS, item)) > -1) {
             set_mradio(mnu_environment_itms, NUM_PLANETS, radio);//(CheckboxMenuItem)item);
-            switch (radio) {
-                case mercury: engine.set_gravity(10); break;    // How many meters is a pixel?
-                case venus:   engine.set_gravity(11); break;
-                case earth:   engine.set_gravity(12); break;
-                case mars:    engine.set_gravity(13); break;
-                case jupiter: engine.set_gravity(14); break;
-                case saturn:  engine.set_gravity(15); break;
-                case uranus:  engine.set_gravity(16); break;
-                case neptune: engine.set_gravity(17); break;
-                case pluto:   engine.set_gravity(18); exit(); break;
-                default: System.out.println("err: bad env menu item offset, can't match: " + item); break;
-            }
+            engine.set_gravity(GRAVITIES[radio]);
+            //switch (radio) {
+            //    case mercury: engine.set_gravity(10); break;    // How many meters is a pixel?
+            //    case venus:   engine.set_gravity(11); break;
+            //    case earth:   engine.set_gravity(12); break;
+            //    case mars:    engine.set_gravity(13); break;
+            //    case jupiter: engine.set_gravity(14); break;
+            //    case saturn:  engine.set_gravity(15); break;
+            //    case uranus:  engine.set_gravity(16); break;
+            //    case neptune: engine.set_gravity(17); break;
+            //    case pluto:   engine.set_gravity(18); exit(); break;
+            //    default: System.out.println("err: bad env menu item offset, can't match: " + item); break;
+            //}
         } else
         if ((radio = find_mitem(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, item)) > -1) { 
             set_mradio(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, radio);
@@ -384,7 +382,9 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         //display.setSize(pnl_display.getSize()); 
         //System.out.println(display.getSize());
         //System.out.println(window.getSize());
-        engine.set_world_size(display.getSize());
+        engine.set_world_size(new Dimension(pnl_display.getWidth()-2, pnl_display.getHeight()-2));   
+        // Border jank. Engine adjusts it's renderer display to be +2 pixels on each axis to account for the border.
+        //  So, to keep the renderer displaying inside the canvas, shrink the world size by 2 pixels.
     }
     
     // Unimplemented WindowListener, ComponenetLister:
@@ -393,7 +393,12 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
 }
 
 class CannonBallEngine {
-    private final Dimension MIN_WORLD_SIZE = new Dimension(500, 500);
+    private final Dimension MIN_WORLD_SIZE = new Dimension(256, 256);
+    private final double PIXELS_PER_METER = .5;    // ! This also acts as a "zoom", changing the size of everything.
+
+    //@todo
+    // We have a consideration to make, if we want to define MIN/MAXs for sizes, speeds, etc. or just let the calling methods handle all that.
+    // Right now, for simplicity, I'm going to have faith in the callers.
     
     private boolean paused; // If we have paused here, but the main loop is in main, and all the setting of rects and changing of sizes is of course done here, then pausing may cause issues with setting those during pause.
                             // Unless, pause doesn't stop ticks from doing anything entirely, it just skips the velocity/collision parsing stuff. Still allows for changing size, speed vars, and adding/deling rects. And moving the cannon. Ig. It should be that the cannon can fire multiple bullets, with a configurable rate of fire. But that's only during not pause, obv. Should we allow angle adjustment during a pause? Could be a setting. What does rubric say?
@@ -419,39 +424,61 @@ class CannonBallEngine {
     private double next_size;
     private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
 
-    private Dimension world_size;
+    //private Dimension world_size;
     private Dimension next_world_size;
     private boolean e_world_size_changed = false;
 
     private CannonBallRenderer r;
-    
+
+    // Because events (which change engine values) can occur concurrently with the Thread (and thus during a tick()),
+    // each mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
+
+    // In radians. Degrees only for method interface.
+    private double[] cannon_angle;
+    private double[] cannon_force;      // Only accounting for one cannon in the game, so it really doesn't need the overhead of an object right now. Unlike balloids, rects, or bubbles, of which there will be many.
+    private int[] bubble_size; 
+    private double[] bubble_speed; 
+    private double[] world_gravity; 
+    private Dimension[] world_size; // Still pixels.
+
+
+    //private Vector<Rectangle> rects; 
+    //private Vector<Circle>                  // @todo create classes for balloids and bubbles, which use the java shapes internally for size, position, and collision detection.
 
 
     testball[] tests = new testball[100];
 
 
     public CannonBallEngine() {
+        cannon_angle = new double[]{0, 3.14};
+        cannon_force = new double[]{0, PIXELS_PER_METER*2};          // !! The method interfaces take meters as measurement, but internally it's all pixel values. Also, it's PER SECOND velocity.
+        bubble_size  = new int[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball will need to be huge, to adhere to normal gravity and velocities.
+        bubble_speed = new double[]{0, PIXELS_PER_METER};           // One meter (in pixels) PER SECOND
+        world_gravity = new double[]{0, 9.8*PIXELS_PER_METER};
+        world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
 
         paused = true;
-        world_size = MIN_WORLD_SIZE.getSize();
-        r = new CannonBallRenderer(world_size); // ? Is this copied over, or is it now the same object? Will changing world size now change Renderer resolution?
+        r = new CannonBallRenderer(MIN_WORLD_SIZE); // ? Is this copied over, or is it now the same object? Will changing world size now change Renderer resolution?
         r.redraw(~0); // debug, draw everything
 
-        world_size = new Dimension(1280, 720);  // Testing resolution change.
-        r.set_resolution(world_size);
-        r.redraw(~0); // debug, draw everything (not needed here cause thread doesn't start until after this init)
+        //world_size = new Dimension(1280, 720);  // Testing resolution change.
+        //r.set_resolution(world_size);
+        //r.redraw(~0); // debug, draw everything (not needed here cause thread doesn't start until after this init)
         
         for (int i = 0; i < 100; i++)
             tests[i] = new testball();
     }
-    public void set_bubble_size(int px) {
-        System.out.println("Size: " + px);
+    public void set_bubble_size(int m) {
+        System.out.println("Size: " + m);
+        bubble_size[1] = (int)(m * PIXELS_PER_METER) + 1; // Safety pixel.
     }
-    public void set_bubble_speed(double pps) {
-        System.out.println("Speed: " + pps);
+    public void set_bubble_speed(double mps) {
+        System.out.println("Speed: " + mps);
+        bubble_speed[1] = mps * PIXELS_PER_METER;
     }
-    public void set_gravity(double ppsps) {
-        System.out.println("Gravity: " + ppsps);
+    public void set_gravity(double mpsps) {
+        System.out.println("Gravity: " + mpsps);
+        world_gravity[1] = mpsps * PIXELS_PER_METER;
     }
     public void set_pause(boolean p) {
         paused = p;
@@ -468,13 +495,14 @@ class CannonBallEngine {
 
     public void set_world_size(Dimension dim) {
         // Instead of all the next_... whatevers, we could have each var a double array.
-        next_world_size = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
-        e_world_size_changed = true;
+        //next_world_size = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
+        //e_world_size_changed = true;
+        world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
     }
 
     class testball {
-        int x = (int)(Math.random()*world_size.width);
-        int y = (int)(Math.random()*world_size.height);
+        double x = (Math.random()*world_size[0].width);
+        double y = (Math.random()*world_size[0].height);
 
         public void move() {
             x += 1;
@@ -483,18 +511,39 @@ class CannonBallEngine {
     }
 
     public void tick(double delta_t) {
-        if (e_world_size_changed) {
-            world_size = next_world_size;
-            r.set_resolution(world_size);
-            e_world_size_changed = false;
-            r.redraw(~0);
-        }
+        //if (e_world_size_changed) {
+        //    world_size = next_world_size;
+        //    r.set_resolution(world_size);
+        //    e_world_size_changed = false;
+        //    r.redraw(~0);
+        //}
 
+        // Update engine values
+        // Not all require redraws.
+        cannon_force[0] = cannon_force[1];
+        world_gravity[0] = world_gravity[1];
+        bubble_speed[0] = bubble_speed[1];
+        if (cannon_angle[0] != cannon_angle[1]) {  // Should we calculate cannon vertexes in the layer draw, or store them every time it's changed here?
+            cannon_angle[0] = cannon_angle[1]; 
+            r.redraw(r.l_cannon);
+        }
+        if (bubble_size[0] != bubble_size[1]) {
+            bubble_size[0] = bubble_size[1];
+            r.redraw(r.l_bubbles);
+        }
+        if (!world_size[0].equals(world_size[1])) {
+            world_size[0] = world_size[1];
+            r.set_resolution(world_size[0]);
+            System.out.println("setting resolution: " + world_size[0]);
+            r.redraw(~0); // Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. @todo could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all the time (which we should check), this might not be an issue
+        }
+        
         if (!paused) {
             for (testball test : tests) {
-                test.move();
-                if (test.x > world_size.width) test.x = (int)(Math.random()*world_size.width);
-                if (test.y > world_size.height) test.y = (int)(Math.random()*world_size.height);
+                test.x += bubble_speed[0];  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
+                test.y += bubble_speed[0]; 
+                if (test.x+bubble_size[0] > world_size[0].width) test.x = (Math.random()*world_size[0].width);
+                if (test.y+bubble_size[0] > world_size[0].height) test.y = (Math.random()*world_size[0].height);
             }
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
@@ -512,7 +561,7 @@ class CannonBallEngine {
         private Rectangle dragbox;
         public CannonBallRenderer(Dimension resolution) {
             //super(6, new Dimension(resolution.width+BORDER*2, resolution.height+BORDER*2));  // !!! Account for borders, which are not part of world size (to make collision checking etc. in tick more better)
-            super(6, new Dimension(resolution.width+1*2, resolution.height+1*2));  // !!! Account for borders, which are not part of world size (to make collision checking etc. in tick more better)
+            super(6, new Dimension(resolution.width+2, resolution.height+2));  // !!! Account for borders, which are not part of world size (to make collision checking etc. in tick more better)
             l_background = LAYERS[0];   // Six layers
             l_statics    = LAYERS[1];
             l_bubbles    = LAYERS[2];
@@ -541,7 +590,7 @@ class CannonBallEngine {
             //g.drawRect(0, 0, res_x(), res_y());
             g.setColor(Color.darkGray);
             g.fillRect(0, 0, res_x(), res_y()); // Fill background, otherwise last frame stays.
-            g.setColor(Color.gray);
+            g.setColor(Color.blue);
             g.drawRect(0, 0, res_x()-1, res_y()-1);     // it is indeed limited to rendered res, even when overlayed (rect gets cutoff)
             //System.out.println("background");
         }
@@ -556,7 +605,7 @@ class CannonBallEngine {
             // @todo draw the bubbles (moving targets) here
             for (testball test : tests) {
                 g.setColor(Color.magenta);
-                g.fillOval(test.x, test.y, 20, 20);
+                g.fillOval(BORDER+(int)test.x, BORDER+(int)test.y, bubble_size[0], bubble_size[0]);
             }
         }
     
@@ -577,7 +626,7 @@ class CannonBallEngine {
 
         // Expose this to rest of class, so render resolution (size) can be changed to match the world size 1:1
         public void set_resolution(Dimension res) {
-            super.set_resolution(res);
+            super.set_resolution(new Dimension(res.width+2, res.height+2));
         }
 
         //public void set_dragbox(Rectangle box) {    // Little jank. do dragbox in engine
