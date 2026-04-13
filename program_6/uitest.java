@@ -12,6 +12,11 @@ import java.awt.image.VolatileImage;
 // Requires additional management (see RenderComposer.vi_validate()), as VRAM makes no promises.
 
 
+// COMMENT GRAVE
+//  ignore
+//  will delete later
+// -------------------
+
 // If globals become necessary, we can do something like this:
 
 //public class CannonVsBall {
@@ -71,6 +76,17 @@ import java.awt.image.VolatileImage;
         //    Only need a min_game_world_size (which changes based on rectangle placement (but should still itself have a min, so can't be zero and break))
         //    Then in the main loop, if a rectangle was placed (or just if min_world_size was updated), set the frame minimumSize to be the max of it's min_window_size and the min_world_size.
 
+    // @todo possible randomness for set size/speed Could also have set_bubble_size(5, x), to specify the middle size and a range smaller/bigger for randomness. Or that random variation could just be hardset as some constant or constant adjusted for size.
+
+            //    // Could do away with the offsets, have another parallel array of the settings, and just iterate 0->NUM_whatever. Or since they're parallel, just use the return of radio (cause that'll be the index in the value array). That could automate all the creations and adding of the MenuItems to one NUM_ITEMS number, though setting up names for the items and the related setting values would all still be manual. Would also make the planet gravity values a little unintuitive, because they have no direct relation (speeds, sizes go up). You would need to know that they're planets, and in the order from the sun.
+            //    // Although the offsets do have their benefits, say if we wanted to do a specific thing for a specific setting, like changing a color or graphic. It's nice to be able to tell explicity which setting, and not treat them all the same.
+    
+    // ! the critical consideration is whether or not to have all these listeners as part of this main frame class, 
+    // or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
+    // There is an ugly seperation between awt UI objects and the mouse/keyboard inputs to the game. 
+    // Whatever. AWT UI objects all act externally to the Engine, mouse events and keyboard events get processed in the engine.
+
+
 public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
     private static final long SerialVersionUID = 124987123L;
     private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
@@ -103,6 +119,8 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     private CheckboxMenuItem[] mnu_debuginfo_itms;
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
     private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 
+
+    public static void main(String[] args) { new uitest(); }
 
     public uitest() {
         // Engine, Display, Thread:
@@ -205,9 +223,6 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         start_thread();
     }
 
-    public static void main(String[] args) {
-        new uitest();
-    }
 
     private void exit() {
         stop_thread();
@@ -244,7 +259,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         while(main_thread_running) {
             delta_t = (System.nanoTime() - frame_start_t) / 1000000000.0; // Seconds.
             frame_start_t = System.nanoTime();
-            System.out.println(delta_t + " " + frame_start_t);
+            //System.out.println(delta_t + " " + frame_start_t);
 
             engine.tick(delta_t);
             display.debug_inform_ticktime(delta_t);
@@ -259,10 +274,6 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         }
     }
 
-    // ! the critical consideration is whether or not to have all these listeners as part of this main frame class, 
-    // or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
-    // There is an ugly seperation between awt UI objects and the mouse/keyboard inputs to the game. 
-    // Whatever. AWT UI objects all act externally to the Engine, mouse events and keyboard events get processed in the engine.
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
 
@@ -284,7 +295,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
                 mnu_control_itms[pause].setEnabled(false);
                 break;
             case quit:
-                exit();
+                window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING)); // A place for everything.
                 break;
             default: System.out.println("err: bad control menu item offset, can't match: " + item); break;
         }
@@ -312,60 +323,54 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         if ((radio = find_mitem(mnu_parameters_mnu_size_itms, NUM_SIZES, item)) > -1) {
             set_mradio(mnu_parameters_mnu_size_itms, NUM_SIZES, radio);
             engine.set_bubble_size(SIZES[radio]); 
-            //switch (radio) {
-            //    case xsmall: engine.set_bubble_size(5); break;
-            //    case small:  engine.set_bubble_size(10); break;
-            //    case medium: engine.set_bubble_size(20); break;         // Could also have set_bubble_size(5, x), to specify the middle size and a range smaller/bigger for randomness. Or that random variation could just be hardset as some constant or constant adjusted for size.
-            //    case large:  engine.set_bubble_size(40); break;
-            //    case xlarge: engine.set_bubble_size(80); break;
-            //    default: System.out.println("err: bad size menu item offset, can't match: " + item); break;
-            //} 
         } else 
         if ((radio = find_mitem(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, item)) > -1) {
-            set_mradio(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, radio);//(CheckboxMenuItem)item);
+            set_mradio(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, radio);
             engine.set_bubble_speed(SPEEDS[radio]);
-            //switch (radio) {
-            //    case xslow:  engine.set_bubble_speed(5); break;     // Could do away with the offsets, have another parallel array of the settings, and just iterate 0->NUM_whatever. Or since they're parallel, just use the return of radio (cause that'll be the index in the value array). That could automate all the creations and adding of the MenuItems to one NUM_ITEMS number, though setting up names for the items and the related setting values would all still be manual. Would also make the planet gravity values a little unintuitive, because they have no direct relation (speeds, sizes go up). You would need to know that they're planets, and in the order from the sun.
-            //    case slow:   engine.set_bubble_speed(10); break;    // Although the offsets do have their benefits, say if we wanted to do a specific thing for a specific setting, like changing a color or graphic. It's nice to be able to tell explicity which setting, and not treat them all the same.
-            //    case normal: engine.set_bubble_speed(20); break;    
-            //    case fast:   engine.set_bubble_speed(40); break;
-            //    case xfast:  engine.set_bubble_speed(80); break;
-            //    default: System.out.println("err: bad speed menu item offset, can't match: " + item); break;
-            //} 
         } else 
         if ((radio = find_mitem(mnu_environment_itms, NUM_PLANETS, item)) > -1) {
-            set_mradio(mnu_environment_itms, NUM_PLANETS, radio);//(CheckboxMenuItem)item);
+            set_mradio(mnu_environment_itms, NUM_PLANETS, radio);
             engine.set_gravity(GRAVITIES[radio]);
-            //switch (radio) {
-            //    case mercury: engine.set_gravity(10); break;    // How many meters is a pixel?
-            //    case venus:   engine.set_gravity(11); break;
-            //    case earth:   engine.set_gravity(12); break;
-            //    case mars:    engine.set_gravity(13); break;
-            //    case jupiter: engine.set_gravity(14); break;
-            //    case saturn:  engine.set_gravity(15); break;
-            //    case uranus:  engine.set_gravity(16); break;
-            //    case neptune: engine.set_gravity(17); break;
-            //    case pluto:   engine.set_gravity(18); exit(); break;
-            //    default: System.out.println("err: bad env menu item offset, can't match: " + item); break;
-            //}
+            // @todo if we want different colors or render settings (or any other special stuff) for planets, either use a switch (check previous commits) or more parallel arrays.
         } else
         if ((radio = find_mitem(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, item)) > -1) { 
             set_mradio(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, radio);
-            display.debug_lvl = radio;  // It so happens that the debug level and MenuItem offset align. Do not rely on this, may cause issues if changes are made.
-            //switch (radio) {
-            //    case nodebug: display.debug_lvl = 0
+            display.debug_lvl = radio;  // It so happens that the debug level and MenuItem offset align. Do not rely on this, will cause issues if that's changed.
         }
     }
-
-    public void windowClosing(WindowEvent e) { exit(); }
+    
+    public void windowOpened(WindowEvent e) { 
+        switch ((int)(Math.random()/.25)) {
+            case 0: System.out.println("Would you like to play a game?"); break;
+            case 1: System.out.println("Life? Don't talk to me about life."); break;
+            case 2: System.out.println("todo: quote 3"); break;
+            case 3: System.out.println("todo: quote 4"); break;
+            default: System.out.println("Not in the mood. Go away."); exit(); break;
+        }
+    }
+    public void windowClosing(WindowEvent e) { 
+        switch ((int)(Math.random()/.25)) {
+            case 0: System.out.println("So soon?"); break;
+            case 1: System.out.println("We'd only just begun..."); break;
+            case 2: System.out.println("Come back!"); break;
+            case 3: System.out.println("Daisy..  Daisy..."); break;
+            default: System.out.println("Bagh! Good riddance I say..."); break;
+        }
+        exit(); 
+    }
+    //public boolean was_paused = false;  // @todo Have pause on unfocus/iconification be an option in menubar.
+    public void windowActivated(WindowEvent e) {} //engine.set_pause(was_paused); } 
+    public void windowDeactivated(WindowEvent e) {} //was_paused = engine.is_paused(); engine.set_pause(true); } 
+    public void windowIconified(WindowEvent e) {} 
+    public void windowDeiconified(WindowEvent e) {}
     public void componentResized(ComponentEvent e) { 
-        // To account for the window border, the engine's Renderer creates buffers +2 pixels on each axis larger than the world size.
+        // To account for the window border, the engine's Renderer creates buffers +2 pixels larger than world_size on each axis.
         // So, to keep the images in the canvas, shrink the world size -2 pixels on each axis.
         engine.set_world_size(new Dimension(pnl_display.getWidth()-2, pnl_display.getHeight()-2));   
     }
     
     // Unimplemented WindowListener, ComponenetLister:
-    public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
+    public void windowClosed(WindowEvent e) {} 
     public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
 }
 
