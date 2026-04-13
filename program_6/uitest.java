@@ -4,7 +4,12 @@
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-import java.awt.image.VolatileImage;
+
+import java.awt.image.VolatileImage;    
+// https://docs.oracle.com/javase/8/docs/api/java/awt/image/VolatileImage.html
+// Hardware accelerated images, uses GPU/VRAM for buffer drawing/storage.
+// For major performance benefit with multiple transparent buffer layers.
+// Requires additional management (see RenderComposer.vi_validate()), as VRAM makes no promises.
 
 
 // If globals become necessary, we can do something like this:
@@ -140,13 +145,13 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         gbc.weightx = 1;
         gbc.ipady = 2;
 
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); Scrollbar sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_force, gbc);
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
-        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,10,0,0); Label lbl_score_ball   = new Label("Bubble: ", Label.CENTER);     pnl_controls.add(lbl_score_ball, gbc);
-        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = .75; gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_time         = new Label("Time: ?s", Label.CENTER);     pnl_controls.add(lbl_time, gbc);
-        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5; gbc.ipady = 1; gbc.insets = new Insets(5,0,0,10); Label lbl_score_player = new Label("Player: ", Label.CENTER);        pnl_controls.add(lbl_score_player, gbc);
-        gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); Scrollbar sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);  pnl_controls.add(sb_cannon_angle, gbc);
-        gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;  gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10); Label lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);      pnl_controls.add(sb_cannon_force, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_force = new Label("Force: ?px/s", Label.CENTER); pnl_controls.add(lbl_cannon_force, gbc);
+        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5;  gbc.ipady = 1; gbc.insets = new Insets(5,10,0,0);   lbl_score_ball = new Label("Bubble: ", Label.CENTER);       pnl_controls.add(lbl_score_ball, gbc);
+        gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = .75; gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_time = new Label("Time: ?s", Label.CENTER);             pnl_controls.add(lbl_time, gbc);
+        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5;  gbc.ipady = 1; gbc.insets = new Insets(5,0,0,10);   lbl_score_player = new Label("Player: ", Label.CENTER);     pnl_controls.add(lbl_score_player, gbc);
+        gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);      pnl_controls.add(sb_cannon_angle, gbc);
+        gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
 
         sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  // @todo ! We could have a Color pallete class that stores all these specific colors for components, then change that class and refresh when the environment/background is changed.
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
@@ -673,9 +678,11 @@ class RenderComposer {
     int draws;  // Holds the code of layers to draw in update.
     private Renderer r;
     private Graphics gfx;
-    private VolatileImage composedbuff; // @ todo use volatile instead?
+    //private VolatileImage composedbuff; // @ todo use volatile instead?
+    private BufferedImage composedbuff; // @ todo use volatile instead?
     private Graphics2D composedbuff_gfx;    // Graphics 2D is necessary for transparent clearing.
-    private VolatileImage[] layerbuffs;
+    //private VolatileImage[] layerbuffs;
+    private BufferedImage[] layerbuffs;
     private Graphics2D[] layerbuffs_gfx;
     private GraphicsConfiguration gc;
 
@@ -690,19 +697,21 @@ class RenderComposer {
         System.out.println(rudolph);
 
         // Init empty layers.
-        layerbuffs = new VolatileImage[r.LAYER_COUNT];
+        //layerbuffs = new VolatileImage[r.LAYER_COUNT];
+        layerbuffs = new BufferedImage[r.LAYER_COUNT];
         layerbuffs_gfx = new Graphics2D[r.LAYER_COUNT];
         generate_buffers();
     }
 
     // Generate all buffers once, fitting to the resolution of the set Renderer.
     private void generate_buffers() {
-        composedbuff = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+        //composedbuff = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+        composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
         composedbuff_gfx = composedbuff.createGraphics();//getGraphics();
         composedbuff_gfx.setBackground(TRANSPARENT);    // For clearRect
         for (int i = 0; i < r.LAYER_COUNT; i++) {
-            //layerbuffs[i] = new VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
-            layerbuffs[i] = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+            layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+            //layerbuffs[i] = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
             layerbuffs_gfx[i] = layerbuffs[i].createGraphics(); //getGraphics();
             layerbuffs_gfx[i].setBackground(TRANSPARENT);
         } 
@@ -751,7 +760,8 @@ class RenderComposer {
         //gfx.fillOval(50, 50, 10, 10);
         //composedbuff_gfx.setColor(Color.white);
         composedbuff_gfx.clearRect(0, 0, r.res_x(), r.res_y());
-        for (VolatileImage layer : layerbuffs) {
+        //for (VolatileImage layer : layerbuffs) {
+        for (BufferedImage layer : layerbuffs) {
             //gfx.drawImage(layer, 0, 0, null);
             composedbuff_gfx.drawImage(layer, 0, 0, null);
             //System.out.println("drawg" + layer);
@@ -760,7 +770,8 @@ class RenderComposer {
         //System.out.println("composin");
     }
 
-    public VolatileImage recompose() {
+    //public VolatileImage recompose() {
+    public BufferedImage recompose() {
         update();
         return composedbuff;
     }
@@ -777,8 +788,8 @@ class MultiBufferedCanvas extends Canvas {
     
     private static final long SerialVersionUID = 12412410L;
     private RenderComposer composer;
-    //private BufferedImage backbuff;
-    private VolatileImage backbuff;
+    private BufferedImage backbuff;
+    //private VolatileImage backbuff;
 
     // For debug info bar
     public int debug_lvl;   // 1-3 levels (3 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
