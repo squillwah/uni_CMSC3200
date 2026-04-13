@@ -39,38 +39,60 @@ import java.awt.image.VolatileImage;
 //
 // Compare all the frame settings in constructor with last program, to make sure we're not missing anything.
 
+// @todo Add more gravity/environment options, create a constant to define the relation between pixels and meters.
 
-
-public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
-    private static final long SerialVersionUID = 124987123L;
-     
-    private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
     // Window shouldn't get smaller than rects, but also should be infinitely small. 
     //  We'll need to compare this against the game min size and canvas min size as well on componentResized.
     
+    // @todo sometime maybe idk, Menu and Menubar support a getMenu and getItem Count method, 
+    // we could use that to dynamically traverse the menubar structure to find things instead of 
+    // defining it all here and in constructor.
+        
+    // @todo Could we think of a way to do all this (creating and attaching MenuItems) in the Engine, and attach 
+    // the Engine as listener? Just pass the menubar or menuitem back to this frame somehow? What about the Scrolls too?
+    
+    // @todo ! We could have a Color pallete class that stores all these specific colors for components, then change that class and refresh when the environment/background is changed.
+        
+    // @todo Should we add randomness here (MenuItem defaults)? What about an extra menuitem on each, that disables all radios and applies a random size, speed, or gravity?
+        
+    // @todo is there a better way to set these defaults using the state of the Engine? Perhaps polling this data from Engine on each loop of the Thread, and setting the UI accordingly?
+    //
+    // @ todo poll cannon angle and force values on each run() iteration, to keep UI scrolls in sync.
+    
+    // This is the frame limiter !!! @todo add a MenuBar option to change it.
+    
+    // Should everything be started with thread start? Like the frame (setting visible) too?
+    
+    //if (item instanceof CheckboxMenuItem) 
+        
+        // Because border layout, display resizes automatically to fit frame. 
+        // So, only need to set game world size to match.
+        //  ! This also probably means that a min_canvas_size constant is irrelevant
+        //    Only need a min_game_world_size (which changes based on rectangle placement (but should still itself have a min, so can't be zero and break))
+        //    Then in the main loop, if a rectangle was placed (or just if min_world_size was updated), set the frame minimumSize to be the max of it's min_window_size and the min_world_size.
+
+public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
+    private static final long SerialVersionUID = 124987123L;
+    private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
     // Offsets for MenuItem and value arrays.
     private final byte run     = 0, pause = 1, restart = 2, quit  = 3, NUM_CONTROLS = 4; 
     private final byte xsmall  = 0, small = 1, medium  = 2, large = 3, xlarge  = 4, NUM_SIZES    = 5;
     private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
     private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
     private final byte nodebug = 0, db1 = 1, db2 = 2, db3 = 3, NUM_DEBUG_LEVELS = 4;
-
-    private final int SIZES[] = {10, 20, 30, 50, 80};  // Meters     // Pixel radius, from center point. True diameter = 2x+1.
-    private final int SPEEDS[] = {1, 2, 3, 5, 8};      // Pixels per second. *Applied as both components, so true diagonal vel is slightly higher. @todo or should it be meters per second? If we're translating pixels to meters with a constant, it should be. Same with size.
-    private final double GRAVITIES[] = {3.7, 8.87, 9.80665, 3.71, 24.79, 10.4, 8.87, 11.15, 0.620};  // Meters per second per second. (Pixels in a meter?)
-    // @todo Add more gravity/environment options, create a constant to define the relation between pixels and meters.
-    
+    // Parallel MenuItem value arrays.
+    private final int SIZES[] = {10, 20, 30, 50, 80};                                                   // Radius in meters (expanding from a single center point pixel).
+    private final int SPEEDS[] = {1, 2, 3, 5, 8};                                                       // Meters per second (applied equally to both components).
+    private final double GRAVITIES[] = {3.7, 8.87, 9.80665, 3.71, 24.79, 10.4, 8.87, 11.15, 0.620};     // Meters per second per second. (Pixel -> Meter ratio is defined in Engine)
 
     // Frame and panels.
     private Frame window;
     private Panel pnl_display, pnl_controls;
-    
     // The game logic, drawing system, thread.
     private CannonBallEngine engine;
     private MultiBufferedCanvas display;
     private Thread main_thread;
     private boolean main_thread_running;
-    
     // Elements of UI: MenuItems, ScrollBars, Labels.
     private MenuBar menubar;
     private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo;
@@ -81,9 +103,6 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     private CheckboxMenuItem[] mnu_debuginfo_itms;
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
     private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 
-    // @todo sometime maybe idk, Menu and Menubar support a getMenu and getItem Count method, 
-    // we could use that to dynamically traverse the menubar structure to find things instead of 
-    // defining it all here and in constructor.
 
     public uitest() {
         // Engine, Display, Thread:
@@ -130,7 +149,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         mnu_parameters_mnu_speed_itms[xfast]    = (CheckboxMenuItem)mnu_parameters_mnu_speed.add(new CheckboxMenuItem("xfast"));
         mnu_environment                         = menubar.add(new Menu("Environment"));
         mnu_environment_itms                    = new CheckboxMenuItem[NUM_PLANETS];
-        mnu_environment_itms[mercury]           = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury")); // @todo Could we think of a way to do all this in the Engine, and attach the Engine as listener? Just pass the menubar or menuitem back to this frame somehow? What about the Scrolls too?
+        mnu_environment_itms[mercury]           = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mercury")); 
         mnu_environment_itms[venus]             = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Venus"));
         mnu_environment_itms[earth]             = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Earth"));
         mnu_environment_itms[mars]              = (CheckboxMenuItem)mnu_environment.add(new CheckboxMenuItem("Mars"));
@@ -145,7 +164,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         mnu_debuginfo_itms[db1]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 1"));
         mnu_debuginfo_itms[db2]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 2"));
         mnu_debuginfo_itms[db3]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 3"));
-        // Conpan Scrolls, Labels:
+        // Conpan Scrolls, Labels, add to Panels:
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_force = new Scrollbar(Scrollbar.HORIZONTAL);      pnl_controls.add(sb_cannon_force, gbc);
@@ -155,60 +174,38 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .5;  gbc.ipady = 1; gbc.insets = new Insets(5,0,0,10);   lbl_score_player = new Label("Player: ", Label.CENTER);     pnl_controls.add(lbl_score_player, gbc);
         gbc.gridx = 3; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 2; gbc.insets = new Insets(10,10,0,10); sb_cannon_angle = new Scrollbar(Scrollbar.HORIZONTAL);      pnl_controls.add(sb_cannon_angle, gbc);
         gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
-        sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  // @todo ! We could have a Color pallete class that stores all these specific colors for components, then change that class and refresh when the environment/background is changed.
+        sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
-        // Add things to frame
+        // Add panels to frame, display to panel:
         window.setMenuBar(menubar);
         window.add("Center", pnl_display);
         window.add("South", pnl_controls);
-        
-        //  Attach UI Listeners  (may want to do all listeners as last step in constructor @todo)
-        for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
-        for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.addItemListener(this);
-        for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
-        for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
-        for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.addItemListener(this);
-       
+        pnl_display.add("Center", display);
         // Set radio defaults
-        //set_radio(mnu_parameters_mnu_size_itms, mnu_parameters_mnu_size_itms[medium]);
-        //set_radio(mnu_parameters_mnu_speed_itms, mnu_parameters_mnu_speed_itms[normal]);
-        //set_radio(mnu_environment_itms, mnu_environment_itms[earth]);
-        //set_mradio(mnu_control_itms, NUM_CONTROLS, pause);
         mnu_control_itms[pause].setEnabled(false);
         set_mradio(mnu_parameters_mnu_size_itms, NUM_SIZES, medium);
         set_mradio(mnu_parameters_mnu_speed_itms, NUM_SPEEDS, normal);
         set_mradio(mnu_environment_itms, NUM_PLANETS, earth);
         set_mradio(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, nodebug);
-        //mnu_parameters_mnu_size_itms[medium].setState(true);    // @todo Should we add randomness here? What about an extra menuitem on each, that disables all radios and applies a random size, speed, or gravity?
-        //mnu_parameters_mnu_speed_itms[normal].setState(true);
-        //mnu_environment_itms[earth].setState(true);
-        //mnu_debuginfo_itms[nodebug].setState(true);
         engine.set_gravity(GRAVITIES[earth]);
         engine.set_bubble_size(SIZES[medium]);
         engine.set_bubble_speed(SPEEDS[normal]);
-        // @todo is there a better way to set these defaults using the state of the Engine? Perhaps polling this data from Engine on each loop of the Thread, and setting the UI accordingly?
-
-        // Set game world size and canvas size
-//        engine.set_world_size()     // They should probably have their own internal minimum size, both for their initializations and to compare against on set_size()
-//        display.setSize()
-
-        //display.setSize(1000,1000);
-        pnl_display.add("Center", display);
-        //display.setSize(initial_size);
-        
-        window.validate(); //? 
-        window.setVisible(true);
-
+        display.debug_lvl = 0;
+        // Attach Listeners  
+        for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
+        for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.addItemListener(this);
         window.addWindowListener(this);
         window.addComponentListener(this);
-
-        //display.setSize(pnl_display.getSize());
-        //display.repaint();
+        // Start
+        window.validate();
+        window.setVisible(true);
         start_thread();
     }
 
     public static void main(String[] args) {
-        //new uitest(new Dimension(600, 600));
         new uitest();
     }
 
@@ -241,11 +238,11 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     }
 
     public void run() {
-        double delta_t = 0;                             //@ todo could feed this into display for frametime
         int paintlimiter = 0; 
+        double delta_t = 0;
         long frame_start_t = System.nanoTime();
         while(main_thread_running) {
-            delta_t = (System.nanoTime() - frame_start_t) / 1000000000.0; // Double value, in seconds.
+            delta_t = (System.nanoTime() - frame_start_t) / 1000000000.0; // Seconds.
             frame_start_t = System.nanoTime();
             System.out.println(delta_t + " " + frame_start_t);
 
@@ -257,33 +254,15 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
                 paintlimiter = 0;
             } paintlimiter++;
 
-            //try { Thread.sleep(1000); }
-            //try { Thread.sleep(0, 500000); } // Nanoseconds, one half of a millescond.
-            try { Thread.sleep(4); }   // This is the frame limiter !!! @todo add a MenuBar option to change it.
+            try { Thread.sleep(4); }   // sleep(1000), sleep(0, 500000)
             catch (InterruptedException e) {}
         }
     }
 
-
-    // Should everything be started with thread start? Like the frame (setting visible) too?
-
-    // The THREAD
-    //class GameThread implements Runnable { 
-    //    boolean running;
-    //    public GameThread() { running = false; }
-    //    public void run() {
-    //        while (running) {
-    //            display.repaint();
-    //            try { Thread.sleep(1); }
-    //            catch (InterruptedException e) {}
-    //        }
-    //    }
-    //}
-
-
-    // ! the critical consideration is whether or not to have all these listeners as part of this main frame class, or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
-    // there is an ugly seperation between awt UI objects and the mouse/keyboard inputs to the game. Whatever. AWT UI objects all act externally to the Engine, mouse events and keyboard events get processed in the engine.
-
+    // ! the critical consideration is whether or not to have all these listeners as part of this main frame class, 
+    // or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
+    // There is an ugly seperation between awt UI objects and the mouse/keyboard inputs to the game. 
+    // Whatever. AWT UI objects all act externally to the Engine, mouse events and keyboard events get processed in the engine.
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
 
@@ -312,16 +291,15 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     }
 
     // Return index of object in CheckboxMenuItem array. -1 if absent.
-    private int find_mitem(/*Checkbox*/MenuItem[] items, int size, Object item) {
+    private int find_mitem(MenuItem[] items, int size, Object item) {
         int i;
         for (i = 0; i < size && item != items[i]; i++);
         if (!(i < size)) i = -1;
         return i;
     }
 
-    // Tick given radio on and clear all others in array. Using the offset constant as the 'radio' itself.
-    private void set_mradio(CheckboxMenuItem[] radios, int size, int radio) {//CheckboxMenuItem radio) {
-        //for (CheckboxMenuItem r : radios) r.setState(false);
+    // Tick radio on and clear all others in array. Using the offset constant as the 'radio' itself.
+    private void set_mradio(CheckboxMenuItem[] radios, int size, int radio) {
         int i;
         for (i = 0; i < radio; i++) radios[i].setState(false);
         for (i = radio+1; i < size; i++) radios[i].setState(false);
@@ -330,10 +308,9 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
   
     public void itemStateChanged(ItemEvent e) {
         Object item = e.getSource();
-        //if (item instanceof CheckboxMenuItem) 
         int radio;
         if ((radio = find_mitem(mnu_parameters_mnu_size_itms, NUM_SIZES, item)) > -1) {
-            set_mradio(mnu_parameters_mnu_size_itms, NUM_SIZES, radio);//(CheckboxMenuItem)item);
+            set_mradio(mnu_parameters_mnu_size_itms, NUM_SIZES, radio);
             engine.set_bubble_size(SIZES[radio]); 
             //switch (radio) {
             //    case xsmall: engine.set_bubble_size(5); break;
@@ -380,24 +357,11 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         }
     }
 
-    // @todo would be far better to use an array for these radio settings and just iterate that in itemStateChanged instead of doing this
-    // Or if we can get the parent menu of the MenuItem, then iterate that, we could use that to clear.
-
-    // Right now for testing, just have the canvas resize with frame (using this as componenet listener). Keep game world size static to see how the renderer handles that.
-
     public void windowClosing(WindowEvent e) { exit(); }
     public void componentResized(ComponentEvent e) { 
-        // Because border layout, display resizes automatically to fit frame. 
-        // So, only need to set game world size to match.
-        //  ! This also probably means that a min_canvas_size constant is irrelevant
-        //    Only need a min_game_world_size (which changes based on rectangle placement (but should still itself have a min, so can't be zero and break))
-        //    Then in the main loop, if a rectangle was placed (or just if min_world_size was updated), set the frame minimumSize to be the max of it's min_window_size and the min_world_size.
-        //display.setSize(pnl_display.getSize()); 
-        //System.out.println(display.getSize());
-        //System.out.println(window.getSize());
+        // To account for the window border, the engine's Renderer creates buffers +2 pixels on each axis larger than the world size.
+        // So, to keep the images in the canvas, shrink the world size -2 pixels on each axis.
         engine.set_world_size(new Dimension(pnl_display.getWidth()-2, pnl_display.getHeight()-2));   
-        // Border jank. Engine adjusts it's renderer display to be +2 pixels on each axis to account for the border.
-        //  So, to keep the renderer displaying inside the canvas, shrink the world size by 2 pixels.
     }
     
     // Unimplemented WindowListener, ComponenetLister:
