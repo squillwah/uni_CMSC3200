@@ -25,8 +25,6 @@ import java.awt.image.BufferedImage;
 //  - Could override the Renderer redraw_status and redraw_clear to set the debug layer bit depending on a flag.
 
 //todo:
-// Fix gridbag conpan weights
-// Add debug menu as option in menubar
 // Connect MouseListener to Engine
 // Implement Engine tick() (rudimentery at first, just test out mouse drawrect)
 // Implement Thread in main class, to tick and render, and any other polls of Engine info to keep GUI accurate.
@@ -36,7 +34,7 @@ import java.awt.image.BufferedImage;
 public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
     private static final long SerialVersionUID = 124987123L;
      
-    private final Dimension window_min_size = new Dimension(640, 480);
+    private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
     
     // Offsets for MenuItem arrays.
     private final byte run     = 0, pause = 1, restart = 2, quit  = 3, NUM_CONTROLS = 4; 
@@ -71,14 +69,14 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         
         // Engine, Display, Thread:
         engine = new CannonBallEngine();
-        display = new MultiBufferedCanvas();
+        display = new MultiBufferedCanvas(engine.renderer());
         main_thread = null;
         main_thread_running = false;
         
         // Frame:
         window = new Frame();
         window.setTitle("CannonBubbles");
-        window.setMinimumSize(window_min_size);
+        window.setMinimumSize(MIN_WINDOW_SIZE);
         window.setBackground(Color.black);//new Color(10,10,10));//Color.black);
         window.setLayout(new BorderLayout());
         //window.setBounds(10, 10, window.getWidth(), window.getHeight());
@@ -241,7 +239,9 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
 
     public void run() {
         while(main_thread_running) {
+            engine.tick(0.0);
             display.repaint();
+            //try { Thread.sleep(1000); }
             try { Thread.sleep(0, 500000); } // Nanoseconds, one half of a millescond.
             //try { Thread.sleep(16); }   // This is the frame limiter !!! @todo add a MenuBar option to change it.
             catch (InterruptedException e) {}
@@ -384,6 +384,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
 }
 
 class CannonBallEngine {
+    private final Dimension MIN_WORLD_SIZE = new Dimension(500, 500);
     
     private boolean paused; // If we have paused here, but the main loop is in main, and all the setting of rects and changing of sizes is of course done here, then pausing may cause issues with setting those during pause.
                             // Unless, pause doesn't stop ticks from doing anything entirely, it just skips the velocity/collision parsing stuff. Still allows for changing size, speed vars, and adding/deling rects. And moving the cannon. Ig. It should be that the cannon can fire multiple bullets, with a configurable rate of fire. But that's only during not pause, obv. Should we allow angle adjustment during a pause? Could be a setting. What does rubric say?
@@ -409,8 +410,19 @@ class CannonBallEngine {
     private double next_size;
     private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
 
+    private Dimension world_size;
+
+    private CannonBallRenderer r;
+
     public CannonBallEngine() {
         paused = true;
+        world_size = MIN_WORLD_SIZE.getSize();
+        r = new CannonBallRenderer(world_size); // ? Is this copied over, or is it now the same object? Will changing world size now change Renderer resolution?
+        r.redraw(~0); // debug, draw everything
+
+        world_size = new Dimension(1280, 720);  // Testing resolution change.
+        r.set_resolution(world_size);
+        r.redraw(~0); // debug, draw everything (not needed here cause thread doesn't start until after this init)
     }
     public void set_bubble_size(int px) {
         System.out.println("Size: " + px);
@@ -432,6 +444,91 @@ class CannonBallEngine {
         System.out.println("Restart");
         set_pause(true);
     }
+    public Renderer renderer() { return r; }
+
+    public void tick(double delta_t) {
+        r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
+    }
+    
+    // Renderer for the game.
+    // Implements how/what gets drawn to the graphics.
+    // Used by the MultiBufferedCanvas during paints.                   // @todo should dragbox be done through CannonBallEngine/Game, or through this renderer?
+    class CannonBallRenderer extends Renderer {
+        // Give the render layers more descriptive names.
+        public final int l_background, l_statics, l_bubbles, l_balloids, l_cannon, l_dragbox;
+        public final int BORDER = 1;
+        // Dragbox is done in renderer. Probably shouldn't be.
+        private Rectangle dragbox;
+        public CannonBallRenderer(Dimension resolution) {
+            //super(6, new Dimension(resolution.width+BORDER*2, resolution.height+BORDER*2));  // !!! Account for borders, which are not part of world size (to make collision checking etc. in tick more better)
+            super(6, new Dimension(resolution.width+1*2, resolution.height+1*2));  // !!! Account for borders, which are not part of world size (to make collision checking etc. in tick more better)
+            l_background = LAYERS[0];   // Six layers
+            l_statics    = LAYERS[1];
+            l_bubbles    = LAYERS[2];
+            l_balloids   = LAYERS[3];
+            l_cannon     = LAYERS[4];
+            l_dragbox    = LAYERS[5];
+            dragbox = null;
+        }
+    
+        public void draw(int layer, Graphics g) {
+            //switch (layer) {
+                // Could very easily support drawing multiple layers onto one graphics here (with &), if that ever becomes desirable.
+                if (layer == l_background)      draw_background(g);
+                else if (layer == l_statics)    draw_statics(g);    
+                else if (layer == l_bubbles)    draw_bubbles(g);    
+                else if (layer == l_balloids)   draw_balloids(g);   
+                else if (layer == l_cannon)     draw_cannon(g);     
+                else if (layer == l_dragbox)    draw_dragbox(g);    
+                else System.out.println("err: bad layer code in draw");
+                System.out.println("cbr draw");
+            //}
+        }
+    
+        private void draw_background(Graphics g) {
+            // @todo depending on the planet, can make the background different.
+            //g.drawRect(0, 0, res_x(), res_y());
+            g.setColor(Color.darkGray);
+            g.fillRect(0, 0, res_x(), res_y()); // Fill background, otherwise last frame stays.
+            g.setColor(Color.gray);
+            g.drawRect(0, 0, res_x()-1, res_y()-1);     // it is indeed limited to rendered res, even when overlayed (rect gets cutoff)
+            //System.out.println("background");
+        }
+    
+        private void draw_statics(Graphics g) {
+            g.setColor(Color.blue);
+            g.fillRect(res_x()/2, 30, 40, 40);
+            // @todo draw rectangles here, any other static objects
+        }
+    
+        private void draw_bubbles(Graphics g) {
+            // @todo draw the bubbles (moving targets) here
+        }
+    
+        private void draw_balloids(Graphics g) {
+            // @todo bullets here
+            g.setColor(Color.green);
+            g.drawRect(res_x()/2 + 35, 25, 20, 20);     // it is indeed limited to rendered res, even when overlayed (rect gets cutoff)
+        }
+    
+        private void draw_cannon(Graphics g) {
+            // @todo draw the cannon
+        }
+    
+        private void draw_dragbox(Graphics g) {
+            // @todo draw the dragbox
+            //if (dragbox != null) g.drawRect(dragbox);
+        }
+
+        public void set_resolution(Dimension res) {
+            resolution = res;
+        }
+
+        //public void set_dragbox(Rectangle box) {    // Little jank. do dragbox in engine
+        //    dragbox = box.getRectangle(); 
+        //    redraw(l_dragbox);
+        //}
+    }
 }
 
 // RN
@@ -451,7 +548,7 @@ class CannonBallEngine {
 
 // Abstract class for Game to extend (and define rendering logic with).
 abstract class Renderer { 
-    private Dimension resolution;   // The resolution thing is an interesting and sticky problem. Should the internal rendering be normalized and adjusted to fit in this, resizing everything with window? That probably goes aginst the lesson plan.
+    protected Dimension resolution;   // The resolution thing is an interesting and sticky problem. Should the internal rendering be normalized and adjusted to fit in this, resizing everything with window? That probably goes aginst the lesson plan.
     public final int LAYER_COUNT;
     public final int[] LAYERS;      // Array of bitstrings, each layer being a unique bit. For ease of access to layer i code. Could just be a function that returns 2^i, given that's all the layer codes are.
     private int redraw;             // Flag for layers that need redrawing. Sum of layer codes.
@@ -491,14 +588,22 @@ abstract class Renderer {
     public int res_y() { return resolution.height; }
 
     //private MultiBufferedCanvas;    // Instead of passing the canvas in Game for it to set renderer, we could have it call repaint through the renderer. Though this is probably a bad idea.
-    //public void set_canvas() 
+    //public void set_canvas()  
     //public void repaint()
 }
+
+
+
+// !!! @todo 
+// instead of recreating the graphics each time (if it becomes a lag issue), track when the resolution changes, and only recreate them then.
+// instead of creating new buffers each redraw, keep them and their graphics. just wipe the buffer with transparent pixels and call the layer's draw method.
+// How best to do? Could make as part of the redraw bitcode, that would give reason for the code array too, cause the codes won't be directly related to powers of 2.
 
 // Create and manage BufferedImage layers for a Renderer. Bake the final image.
 class RenderComposer {
     private static final long SerialVersionUID = 1111L; // Are these needed everywhere? @todo Ask pyz about his compiler settings.
     
+    int draws;  // Holds the code of layers to draw in update.
     private Renderer r;
     private Graphics gfx;
     private BufferedImage composedbuff;
@@ -521,7 +626,7 @@ class RenderComposer {
 
     // Check redraw requests of Renderer, update layers accordingly.
     private void update() {
-        int draws = r.redraw_status(); r.redraw_clear();
+        draws = r.redraw_status(); r.redraw_clear();
         for (int i = 0; i < r.LAYER_COUNT; i++) {
             if ((draws & r.LAYERS[i]) > 0) { // Again, could just be 2^i instead of LAYERS[i].
                 layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
@@ -531,7 +636,7 @@ class RenderComposer {
                 gfx.dispose();
             }
         }
-        if (draws > 0) compose(); // Only compose layers if there was a redraw.
+        if (draws != 0) compose(); // Only compose layers if there was a redraw. (!= 0 instead of >0, because all bits set == -1)
     }
 
     // Bake layerbuffs onto composedbuff.
@@ -544,6 +649,7 @@ class RenderComposer {
             System.out.println("drawg" + layer);
         }
         gfx.dispose();
+        System.out.println("composin");
     }
 
     public BufferedImage recompose() {
@@ -555,7 +661,7 @@ class RenderComposer {
     public int info_res_x() { return r.res_x(); }
     public int info_res_y() { return r.res_y(); }
     public int info_layer_count() { return r.LAYER_COUNT; }
-    public int info_redraw_status() { return r.redraw_status(); }
+    public int info_redraw_status() { return draws; } //r.redraw_status(); } return draws from last update, otherwise will always be zero wth the current single thread configuration.
 }
 
 class MultiBufferedCanvas extends Canvas {
@@ -577,10 +683,10 @@ class MultiBufferedCanvas extends Canvas {
 
     public MultiBufferedCanvas(Renderer r) {
         System.out.println(r);
-        setBackground(Color.white);
+        setBackground(new Color(10, 10, 10));
         composer = new RenderComposer(r);
         
-        debug_lvl = 0;
+        debug_lvl = 3;
         debug_msg = "";
         //debug_buff = new BufferedImage(CANVAS_MIN_SIZE.width, 25, BufferedImage.TYPE_INT_ARGB);
         //debug_gfx = debug_buff.getGraphics();
@@ -591,7 +697,7 @@ class MultiBufferedCanvas extends Canvas {
     }
     public MultiBufferedCanvas() {
         // Anonymous class for empty renderer, debugging.
-        this(new Renderer(1, new Dimension(1280,720)) {//256, 256)) { 
+        this(new Renderer(1, new Dimension(256,256)) {//256, 256)) { 
             { redraw(1); } // 'Instance initializer', to flag empty layer for redraw.
             public void draw(int layer, Graphics g) { 
                 g.setColor(Color.magenta);
@@ -610,7 +716,8 @@ class MultiBufferedCanvas extends Canvas {
     }
 
     public void update(Graphics g) {
-        backbuff = composer.recompose();
+        backbuff = composer.recompose(); // !!! @todo Instead, we could draw onto an internal backbuff instead of taking the compose buff. OR! have recompose return void and take a buff to draw onto. That might be the best solution.
+                                         // Then we can do whatever optimizations in RenderComposer or MultiBufferedCanvas we like, in regards to keeping buffer objects/graphics objects (and only recreating them on resolution change).
         paint(g);
     }
 
@@ -857,75 +964,5 @@ class CannonBallEngine {
     public Renderer renderer() { return cbr; }
    
 
-    // Renderer for the game.
-    // Implements how/what gets drawn to the graphics.
-    // Used by the MultiBufferedCanvas during paints.                   // @todo should dragbox be done through CannonBallEngine/Game, or through this renderer?
-    class CannonBallRenderer extends Renderer {
-        // Give the render layers more descriptive names.
-        public final int l_background, l_statics, l_bubbles, l_balloids, l_cannon, l_dragbox;
-        // Dragbox is done in renderer. Probably shouldn't be.
-        private Rectangle dragbox;
-        public CannonBallRenderer(Dimension resolution) {
-            super(6, resolution);
-            l_background = LAYERS[0];   // Six layers
-            l_statics    = LAYERS[1];
-            l_bubbles    = LAYERS[2];
-            l_balloids   = LAYERS[3];
-            l_cannon     = LAYERS[4];
-            l_dragbox    = LAYERS[5];
-            dragbox = null;
-        }
-    
-        public void draw(int layer, Graphics g) {
-            //switch (layer) {
-                // Could very easily support drawing multiple layers onto one graphics here (with &), if that ever becomes desirable.
-                if (layer == l_background)      draw_background(g);
-                else if (layer == l_statics)    draw_statics(g);    
-                else if (layer == l_bubbles)    draw_bubbles(g);    
-                else if (layer == l_balloids)   draw_balloids(g);   
-                else if (layer == l_cannon)     draw_cannon(g);     
-                else if (layer == l_dragbox)    draw_dragbox(g);    
-                else System.out.println("err: bad layer code in draw");
-            //}
-        }
-    
-        private void draw_background(Graphics g) {
-            // @todo depending on the planet, can make the background different.
-            //g.drawRect(0, 0, res_x(), res_y());
-            g.setColor(Color.red);
-            g.drawRect(10, 10, res_x()-20, res_y()-20);     // it is indeed limited to rendered res, even when overlayed (rect gets cutoff)
-            System.out.println("background");
-        }
-    
-        private void draw_statics(Graphics g) {
-            g.setColor(Color.blue);
-            g.fillRect(res_x()/2, 2, 40, 40);
-            // @todo draw rectangles here, any other static objects
-        }
-    
-        private void draw_bubbles(Graphics g) {
-            // @todo draw the bubbles (moving targets) here
-        }
-    
-        private void draw_balloids(Graphics g) {
-            // @todo bullets here
-            g.setColor(Color.green);
-            g.drawRect(res_x()/2 + 35, 0, 20, 20);     // it is indeed limited to rendered res, even when overlayed (rect gets cutoff)
-        }
-    
-        private void draw_cannon(Graphics g) {
-            // @todo draw the cannon
-        }
-    
-        private void draw_dragbox(Graphics g) {
-            // @todo draw the dragbox
-            if (dragbox != null) g.drawRect(dragbox);
-        }
-
-        public void set_dragbox(Rectangle box) {    // Little jank. 
-            dragbox = box.getRectangle(); 
-            redraw(l_dragbox);
-        }
-    }
 }*/
 
