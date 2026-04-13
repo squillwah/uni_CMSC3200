@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.VolatileImage;
+import java.util.Vector;
 
 
 // If globals become necessary, we can do something like this:
@@ -34,7 +35,7 @@ import java.awt.image.VolatileImage;
 
 
 
-public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
+public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener, KeyListener {
     private static final long SerialVersionUID = 124987123L;
      
     private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
@@ -200,6 +201,11 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         
         window.validate(); //? 
         window.setVisible(true);
+
+        //  for key listener
+        window.addKeyListener(this);
+        window.setFocusable(true);
+        window.requestFocus();
 
         window.addWindowListener(this);
         window.addComponentListener(this);
@@ -393,7 +399,12 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
     
     // Unimplemented WindowListener, ComponenetLister:
     public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
-    public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {}
+    public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {} public void keyReleased(KeyEvent e) {} public void keyTyped(KeyEvent e) {}
+    public void keyPressed(KeyEvent e) {
+        if(e.getKeyChar() == KeyEvent.VK_SPACE) {
+            engine.fire_cannon();
+        }
+    }
 }
 
 class CannonBallEngine {
@@ -422,6 +433,7 @@ class CannonBallEngine {
     private double next_speed;      // This begs the question, should the Engine just take a double value to set as ball speed, or should it know about speed and size presets?
     private double next_size;
     private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
+    private double gravity;
 
     private Dimension world_size;
     private Dimension next_world_size;
@@ -433,6 +445,9 @@ class CannonBallEngine {
     private Cannon cannon;
     private final int CANNON_MARGIN_RIGHT = 60;
     private final int CANNON_MARGIN_BOTTOM = 60;
+
+    //  ball stuff
+    private Vector<Balloid> balloids;
     
 
 
@@ -454,6 +469,9 @@ class CannonBallEngine {
             tests[i] = new testball();
 
         //  just doing at the end to have world size
+
+        //  ball storage for updating
+        balloids = new Vector<Balloid>();
         //  TODO MAKE POSITION REALITIVE TO SCREEN
         cannon = new Cannon(
             world_size.width - CANNON_MARGIN_RIGHT,
@@ -468,6 +486,7 @@ class CannonBallEngine {
     }
     public void set_gravity(double ppsps) {
         System.out.println("Gravity: " + ppsps);
+        gravity = ppsps;
     }
     public void set_cannon_angle(double deg) {
         if (cannon != null) {
@@ -502,6 +521,46 @@ class CannonBallEngine {
             x += 1;
             y += 1;
         }
+    }
+
+    class Balloid {
+    double x, y;
+    double vx, vy;
+    int radius;
+
+    public Balloid(double start_x, double start_y, double start_vx, double start_vy) {
+        x = start_x;
+        y = start_y;
+        vx = start_vx;
+        vy = start_vy;
+        radius = 8;
+    }
+
+    public void move(double dt) {
+        x += vx * dt;
+        y += vy * dt;
+        vy += gravity * dt;
+    }
+
+    public boolean out_of_bounds() {
+        return x < -radius || x > world_size.width + radius ||
+               y < -radius || y > world_size.height + radius;
+    }
+}
+
+    public void fire_cannon() {
+        if (cannon == null) return;
+
+        double speed = 250.0;
+
+        double start_x = cannon.tip_x();
+        double start_y = cannon.tip_y();
+
+        double vx = cannon.dir_x() * speed;
+        double vy = cannon.dir_y() * speed;
+
+        balloids.add(new Balloid(start_x, start_y, vx, vy));
+        r.redraw(r.l_balloids);
     }
 
     public void tick(double delta_t) {
@@ -1135,8 +1194,29 @@ class Cannon {
         barrel_width = 12;
     }
 
+    //  helper methods
     public void set_angle(double deg) {
         angle_deg = Math.max(0, Math.min(90, deg));   // clamp angle
+    }
+
+    public double angle_rad() {
+        return Math.toRadians(angle_deg);
+    }
+
+    public double dir_x() {
+        return -Math.cos(angle_rad());
+    }
+
+    public double dir_y() {
+        return -Math.sin(angle_rad());
+    }
+
+    public int tip_x() {
+        return (int)(base_x + dir_x() * barrel_length);
+    }
+
+    public int tip_y() {
+        return (int)(base_y + dir_y() * barrel_length);
     }
 
     public void draw(Graphics g) {
