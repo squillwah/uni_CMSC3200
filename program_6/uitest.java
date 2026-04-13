@@ -419,6 +419,11 @@ class CannonBallEngine {
     private boolean e_world_size_changed = false;
 
     private CannonBallRenderer r;
+
+    //  render obj handing within class to avoid bloating the renderer
+    private Cannon cannon;
+    private final int CANNON_MARGIN_RIGHT = 60;
+    private final int CANNON_MARGIN_BOTTOM = 60;
     
 
 
@@ -438,6 +443,13 @@ class CannonBallEngine {
         
         for (int i = 0; i < 100; i++)
             tests[i] = new testball();
+
+        //  just doing at the end to have world size
+        //  TODO MAKE POSITION REALITIVE TO SCREEN
+        cannon = new Cannon(
+            world_size.width - CANNON_MARGIN_RIGHT,
+            world_size.height - CANNON_MARGIN_BOTTOM
+        );   
     }
     public void set_bubble_size(int px) {
         System.out.println("Size: " + px);
@@ -481,6 +493,9 @@ class CannonBallEngine {
         if (e_world_size_changed) {
             world_size = next_world_size;
             r.set_resolution(world_size);
+            //  cannon resize
+            cannon.base_x = world_size.width - CANNON_MARGIN_RIGHT;
+            cannon.base_y = world_size.height - CANNON_MARGIN_BOTTOM;
             e_world_size_changed = false;
             r.redraw(~0);
         }
@@ -492,6 +507,7 @@ class CannonBallEngine {
                 if (test.y > world_size.height) test.y = (int)(Math.random()*world_size.height);
             }
             r.redraw(r.l_bubbles);
+            r.redraw(r.l_cannon);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
         }
     }
@@ -563,6 +579,7 @@ class CannonBallEngine {
     
         private void draw_cannon(Graphics g) {
             // @todo draw the cannon
+            cannon.draw(g);
         }
     
         private void draw_dragbox(Graphics g) {
@@ -1085,3 +1102,67 @@ class CannonBallEngine {
 
 }*/
 
+class Cannon {
+    int base_x, base_y;        // center of base
+    int base_radius;           
+
+    double angle_deg;          // angle in degrees
+    int barrel_length;         
+    int barrel_width;          
+
+    public Cannon(int x, int y) {
+        base_x = x;
+        base_y = y;
+
+        base_radius = 20;
+        angle_deg = 45;
+        barrel_length = 60;
+        barrel_width = 12;
+    }
+
+    public void set_angle(double deg) {
+        angle_deg = Math.max(0, Math.min(90, deg));   // clamp angle
+    }
+
+    public void draw(Graphics g) {
+
+        // draw base
+        g.setColor(Color.darkGray);
+        g.fillOval(base_x - base_radius, base_y - base_radius,
+                   base_radius * 2, base_radius * 2);
+
+        // convert angle
+        double rad = Math.toRadians(angle_deg);     //  tried to do without radians, thatn was a mess
+
+        // direction vector
+        double dx = -Math.cos(rad);
+        double dy = -Math.sin(rad);
+
+        // perpendicular vector
+        double px = -dy;
+        double py = dx;
+
+        int half_w = barrel_width / 2;
+
+        // rectangle corners
+        int x1 = (int)(base_x + px * half_w);
+        int y1 = (int)(base_y + py * half_w);
+
+        int x2 = (int)(base_x - px * half_w);
+        int y2 = (int)(base_y - py * half_w);
+
+        int x3 = (int)(x2 + dx * barrel_length);
+        int y3 = (int)(y2 + dy * barrel_length);
+
+        int x4 = (int)(x1 + dx * barrel_length);
+        int y4 = (int)(y1 + dy * barrel_length);
+
+        // draw barrel
+        g.setColor(Color.gray);
+        g.fillPolygon(
+            new int[]{x1, x2, x3, x4},
+            new int[]{y1, y2, y3, y4},
+            4
+        );
+    }
+}
