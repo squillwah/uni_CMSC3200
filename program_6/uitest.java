@@ -1142,12 +1142,12 @@ class Cannon {
     public void draw(Graphics g) {
 
         // draw base
-        g.setColor(Color.darkGray);
+        g.setColor(Color.red);
         g.fillOval(base_x - base_radius, base_y - base_radius,
                    base_radius * 2, base_radius * 2);
 
         // convert angle
-        double rad = Math.toRadians(angle_deg);     //  tried to do without radians, thatn was a mess
+        double rad = Math.toRadians(angle_deg);     //  tried to do without radians, that was a mess
 
         // direction vector
         double dx = -Math.cos(rad);
@@ -1173,7 +1173,7 @@ class Cannon {
         int y4 = (int)(y1 + dy * barrel_length);
 
         // draw barrel
-        g.setColor(Color.gray);
+        g.setColor(Color.red);
         g.fillPolygon(
             new int[]{x1, x2, x3, x4},
             new int[]{y1, y2, y3, y4},
