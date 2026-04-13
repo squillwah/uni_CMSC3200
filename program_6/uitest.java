@@ -377,8 +377,9 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         //    Only need a min_game_world_size (which changes based on rectangle placement (but should still itself have a min, so can't be zero and break))
         //    Then in the main loop, if a rectangle was placed (or just if min_world_size was updated), set the frame minimumSize to be the max of it's min_window_size and the min_world_size.
         //display.setSize(pnl_display.getSize()); 
-        System.out.println(display.getSize());
-        System.out.println(window.getSize());
+        //System.out.println(display.getSize());
+        //System.out.println(window.getSize());
+        engine.set_world_size(display.getSize());
     }
     
     // Unimplemented WindowListener, ComponenetLister:
@@ -414,8 +415,11 @@ class CannonBallEngine {
     private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
 
     private Dimension world_size;
+    private Dimension next_world_size;
+    private boolean e_world_size_changed = false;
 
     private CannonBallRenderer r;
+    
 
 
     testball[] tests = new testball[100];
@@ -457,6 +461,12 @@ class CannonBallEngine {
     }
     public Renderer renderer() { return r; }
 
+    public void set_world_size(Dimension dim) {
+        // Instead of all the next_... whatevers, we could have each var a double array.
+        next_world_size = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
+        e_world_size_changed = true;
+    }
+
     class testball {
         int x = (int)(Math.random()*world_size.width);
         int y = (int)(Math.random()*world_size.height);
@@ -468,6 +478,13 @@ class CannonBallEngine {
     }
 
     public void tick(double delta_t) {
+        if (e_world_size_changed) {
+            world_size = next_world_size;
+            r.set_resolution(world_size);
+            e_world_size_changed = false;
+            r.redraw(~0);
+        }
+
         if (!paused) {
             for (testball test : tests) {
                 test.move();
