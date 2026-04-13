@@ -4,6 +4,7 @@
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.VolatileImage;
 
 
 // If globals become necessary, we can do something like this:
@@ -244,8 +245,8 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
             engine.tick(0.0);
             display.repaint();
             //try { Thread.sleep(1000); }
-            try { Thread.sleep(0, 500000); } // Nanoseconds, one half of a millescond.
-            //try { Thread.sleep(16); }   // This is the frame limiter !!! @todo add a MenuBar option to change it.
+            //try { Thread.sleep(0, 500000); } // Nanoseconds, one half of a millescond.
+            try { Thread.sleep(8); }   // This is the frame limiter !!! @todo add a MenuBar option to change it.
             catch (InterruptedException e) {}
         }
     }
@@ -417,10 +418,11 @@ class CannonBallEngine {
     private CannonBallRenderer r;
 
 
-    testball test = new testball();
+    testball[] tests = new testball[100];
 
 
     public CannonBallEngine() {
+
         paused = true;
         world_size = MIN_WORLD_SIZE.getSize();
         r = new CannonBallRenderer(world_size); // ? Is this copied over, or is it now the same object? Will changing world size now change Renderer resolution?
@@ -429,6 +431,9 @@ class CannonBallEngine {
         world_size = new Dimension(1280, 720);  // Testing resolution change.
         r.set_resolution(world_size);
         r.redraw(~0); // debug, draw everything (not needed here cause thread doesn't start until after this init)
+        
+        for (int i = 0; i < 100; i++)
+            tests[i] = new testball();
     }
     public void set_bubble_size(int px) {
         System.out.println("Size: " + px);
@@ -453,8 +458,8 @@ class CannonBallEngine {
     public Renderer renderer() { return r; }
 
     class testball {
-        int x = 4;
-        int y = 4;
+        int x = (int)(Math.random()*world_size.width);
+        int y = (int)(Math.random()*world_size.height);
 
         public void move() {
             x += 1;
@@ -464,11 +469,13 @@ class CannonBallEngine {
 
     public void tick(double delta_t) {
         if (!paused) {
-            test.move();
-            if (test.x > world_size.width) test.x = 4;
-            if (test.y > world_size.height) test.y = 4;
-            //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
+            for (testball test : tests) {
+                test.move();
+                if (test.x > world_size.width) test.x = (int)(Math.random()*world_size.width);
+                if (test.y > world_size.height) test.y = (int)(Math.random()*world_size.height);
+            }
             r.redraw(r.l_bubbles);
+            //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
         }
     }
     
@@ -525,8 +532,10 @@ class CannonBallEngine {
     
         private void draw_bubbles(Graphics g) {
             // @todo draw the bubbles (moving targets) here
-            g.setColor(Color.magenta);
-            g.fillOval(test.x, test.y, 20, 20);
+            for (testball test : tests) {
+                g.setColor(Color.magenta);
+                g.fillOval(test.x, test.y, 20, 20);
+            }
         }
     
         private void draw_balloids(Graphics g) {
@@ -647,12 +656,14 @@ class RenderComposer {
     int draws;  // Holds the code of layers to draw in update.
     private Renderer r;
     private Graphics gfx;
-    private BufferedImage composedbuff; // @ todo use volatile instead?
+    private VolatileImage composedbuff; // @ todo use volatile instead?
     private Graphics2D composedbuff_gfx;    // Graphics 2D is necessary for transparent clearing.
-    private BufferedImage[] layerbuffs;
+    private VolatileImage[] layerbuffs;
     private Graphics2D[] layerbuffs_gfx;
+    private GraphicsConfiguration gc;
 
     public RenderComposer(Renderer rudolph) {
+        gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         set_renderer(rudolph);
     }
    
@@ -662,18 +673,19 @@ class RenderComposer {
         System.out.println(rudolph);
 
         // Init empty layers.
-        layerbuffs = new BufferedImage[r.LAYER_COUNT];
+        layerbuffs = new VolatileImage[r.LAYER_COUNT];
         layerbuffs_gfx = new Graphics2D[r.LAYER_COUNT];
         generate_buffers();
     }
 
     // Generate all buffers once, fitting to the resolution of the set Renderer.
     private void generate_buffers() {
-        composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+        composedbuff = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
         composedbuff_gfx = composedbuff.createGraphics();//getGraphics();
         composedbuff_gfx.setBackground(TRANSPARENT);    // For clearRect
         for (int i = 0; i < r.LAYER_COUNT; i++) {
-            layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+            //layerbuffs[i] = new VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
+            layerbuffs[i] = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
             layerbuffs_gfx[i] = layerbuffs[i].createGraphics(); //getGraphics();
             layerbuffs_gfx[i].setBackground(TRANSPARENT);
         } 
@@ -722,7 +734,7 @@ class RenderComposer {
         //gfx.fillOval(50, 50, 10, 10);
         //composedbuff_gfx.setColor(Color.white);
         composedbuff_gfx.clearRect(0, 0, r.res_x(), r.res_y());
-        for (BufferedImage layer : layerbuffs) {
+        for (VolatileImage layer : layerbuffs) {
             //gfx.drawImage(layer, 0, 0, null);
             composedbuff_gfx.drawImage(layer, 0, 0, null);
             //System.out.println("drawg" + layer);
@@ -731,7 +743,7 @@ class RenderComposer {
         //System.out.println("composin");
     }
 
-    public BufferedImage recompose() {
+    public VolatileImage recompose() {
         update();
         return composedbuff;
     }
@@ -748,12 +760,14 @@ class MultiBufferedCanvas extends Canvas {
     
     private static final long SerialVersionUID = 12412410L;
     private RenderComposer composer;
-    private BufferedImage backbuff;
+    //private BufferedImage backbuff;
+    private VolatileImage backbuff;
 
     // For debug info bar
     public int debug_lvl;   // 1-3 levels (3 being most detailed), any other number is debug disabled. // @todo ! make this a menubar option
     private String debug_msg;
-    private int debug_update;
+    private int debug_update_timer; 
+    private final int debug_update_timer_refresh = 50; // How many milliseconds between debug stat updates?
     //private Graphics debug_gfx;
     //private BufferedImage debug_buff;
     
@@ -768,7 +782,7 @@ class MultiBufferedCanvas extends Canvas {
         
         debug_lvl = 3;
         debug_msg = "";
-        debug_update = 0;
+        //debug_update = 0;
         //debug_buff = new BufferedImage(CANVAS_MIN_SIZE.width, 25, BufferedImage.TYPE_INT_ARGB);
         //debug_gfx = debug_buff.getGraphics();
 
