@@ -28,6 +28,8 @@ import java.awt.image.BufferedImage;
 // Connect MouseListener to Engine
 // Implement Engine tick() (rudimentery at first, just test out mouse drawrect)
 // Implement Thread in main class, to tick and render, and any other polls of Engine info to keep GUI accurate.
+//
+// ! Preserve the creating and destroying of graphics and buffers for only on resolution change. Important for performance.
 
 
 
@@ -481,7 +483,7 @@ class CannonBallEngine {
                 else if (layer == l_cannon)     draw_cannon(g);     
                 else if (layer == l_dragbox)    draw_dragbox(g);    
                 else System.out.println("err: bad layer code in draw");
-                System.out.println("cbr draw");
+                //System.out.println("cbr draw");
             //}
         }
     
@@ -520,8 +522,9 @@ class CannonBallEngine {
             //if (dragbox != null) g.drawRect(dragbox);
         }
 
+        // Expose this to rest of class, so render resolution (size) can be changed to match the world size 1:1
         public void set_resolution(Dimension res) {
-            resolution = res;
+            super.set_resolution(res);
         }
 
         //public void set_dragbox(Rectangle box) {    // Little jank. do dragbox in engine
@@ -548,9 +551,12 @@ class CannonBallEngine {
 
 // Abstract class for Game to extend (and define rendering logic with).
 abstract class Renderer { 
-    protected Dimension resolution;   // The resolution thing is an interesting and sticky problem. Should the internal rendering be normalized and adjusted to fit in this, resizing everything with window? That probably goes aginst the lesson plan.
+    private Dimension resolution;   // The resolution thing is an interesting problem. Should the internal rendering be normalized and adjusted to fit in this, resizing everything with window? That probably goes aginst the lesson plan.
+    private boolean resolution_changed; // Signal when the resolution has changed, for whoever is supplying the buffers to draw to.
+
     public final int LAYER_COUNT;
     public final int[] LAYERS;      // Array of bitstrings, each layer being a unique bit. For ease of access to layer i code. Could just be a function that returns 2^i, given that's all the layer codes are.
+    
     private int redraw;             // Flag for layers that need redrawing. Sum of layer codes.
     
     public Renderer(int layer_count, Dimension res) { 
@@ -563,6 +569,7 @@ abstract class Renderer {
         }
         redraw = 0; 
         resolution = res.getSize();
+        resolution_changed = true;
     }
    
     // Define how a layer should be drawn.
@@ -586,6 +593,15 @@ abstract class Renderer {
     // Get resolution (dimensions of layer buffers).
     public int res_x() { return resolution.width; }
     public int res_y() { return resolution.height; }
+
+    protected void set_resolution(Dimension res) {
+        resolution = res.getSize();
+        resolution_changed = true;
+    }
+
+    // Expose when the resolution's been changed. For a RenderComposer to optimize buffer/graphics creation/destruction.
+    public boolean reschange_status() { return resolution_changed; }
+    public void reschange_clear() { resolution_changed = false; }
 
     //private MultiBufferedCanvas;    // Instead of passing the canvas in Game for it to set renderer, we could have it call repaint through the renderer. Though this is probably a bad idea.
     //public void set_canvas()  
@@ -632,7 +648,7 @@ class RenderComposer {
                 layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
                 gfx = layerbuffs[i].getGraphics();
                 r.draw(r.LAYERS[i], gfx);
-                System.out.println("draw");
+                //System.out.println("draw");
                 gfx.dispose();
             }
         }
@@ -646,10 +662,10 @@ class RenderComposer {
         //gfx.fillOval(50, 50, 10, 10);
         for (BufferedImage layer : layerbuffs) {
             gfx.drawImage(layer, 0, 0, null);
-            System.out.println("drawg" + layer);
+            //System.out.println("drawg" + layer);
         }
         gfx.dispose();
-        System.out.println("composin");
+        //System.out.println("composin");
     }
 
     public BufferedImage recompose() {
@@ -723,6 +739,9 @@ class MultiBufferedCanvas extends Canvas {
 
     public void paint(Graphics g) {
         g.drawImage(backbuff, 0, 0, null);
+        //frametime = (int)(System.nanoTime()-time_of_last_frame);
+        //time_of_last_frame += frametime;
+        //System.out.println(1000000000/frametime);
         switch (debug_lvl) {    // Hopefully no performance issues. @todo: Compare with and without this code block.
             case 3: 
                 frametime = (int)(System.nanoTime()-time_of_last_frame);
