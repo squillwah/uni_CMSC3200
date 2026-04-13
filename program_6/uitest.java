@@ -522,14 +522,17 @@ class CannonBallEngine {
             System.out.println("setting resolution: " + world_size[0]);
             r.redraw(~0); // Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. @todo could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all the time (which we should check), this might not be an issue
         }
-        
+
         if (!paused) {
             for (testball test : tests) {
                 test.x += bubble_speed[0]*delta_t;  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
                 test.vy += world_gravity[0]*delta_t;
                 test.y += test.vy*delta_t;
                 if (test.x+bubble_size[0] > world_size[0].width) test.x = (Math.random()*world_size[0].width);
-                if (test.y+bubble_size[0] > world_size[0].height) test.vy = -test.vy;//test.y = (Math.random()*world_size[0].height);
+                if (test.y+bubble_size[0] > world_size[0].height) {
+                    test.y = world_size[0].height-bubble_size[0]-1; 
+                    test.vy = -test.vy*.5;//test.y = (Math.random()*world_size[0].height);
+                }
             }
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
@@ -600,8 +603,8 @@ class CannonBallEngine {
         private void draw_bubbles(Graphics g) {
             // @todo draw the bubbles (moving targets) here
             for (testball test : tests) {
-                g.setColor(Color.magenta);
-                g.fillOval(BORDER+(int)test.x, BORDER+(int)test.y, (int)bubble_size[0]+1, (int)bubble_size[0]+1);   // Safety pixel.
+                g.setColor(new Color(255, 255, 255, 50));
+                g.fillOval(BORDER+(int)test.x-1, BORDER+(int)test.y-1, (int)bubble_size[0]+1, (int)bubble_size[0]+1);   // Safety pixel.
             }
         }
     
