@@ -12,7 +12,7 @@ import java.awt.image.VolatileImage;
 // Requires additional management (see RenderComposer.vi_validate()), as VRAM makes no promises.
 
 
-// COMMENT GRAVE
+// COMMENT/todo GRAVE
 //  ignore
 //  will delete later
 // -------------------
@@ -85,6 +85,36 @@ import java.awt.image.VolatileImage;
     // or some/all implemented as part of the engine. Or something other third thing? I don't think the renderer would have any need.
     // There is an ugly seperation between awt UI objects and the mouse/keyboard inputs to the game. 
     // Whatever. AWT UI objects all act externally to the Engine, mouse events and keyboard events get processed in the engine.
+                            
+    
+                            // If we have paused here, but the main loop is in main, and all the setting of rects and changing of sizes is of course done here, then pausing may cause issues with setting those during pause.
+                            // Unless, pause doesn't stop ticks from doing anything entirely, it just skips the velocity/collision parsing stuff. Still allows for changing size, speed vars, and adding/deling rects. And moving the cannon. Ig. It should be that the cannon can fire multiple bullets, with a configurable rate of fire. But that's only during not pause, obv. Should we allow angle adjustment during a pause? Could be a setting. What does rubric say?
+    
+    //private boolean running;
+    //private boolean e_dragging;
+    //private boolean e_dragstop;
+    //private boolean e_add_rect;
+    //private boolean e_del_rect;
+    //private boolean e_fire_cannon;
+    //private boolean e_update_cannon_force;
+    //private boolean e_update_cannon_angle;
+    //private Rectangle dragbox;
+    //private double next_force;
+    //private double next_angle;
+    //private double next_speed;      // This begs the question, should the Engine just take a double value to set as ball speed, or should it know about speed and size presets?
+    //private double next_size;
+    //private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
+    //private Dimension world_size;
+    //private Dimension next_world_size;
+    //private boolean e_world_size_changed = false;
+    
+    
+    // // All as doubles, do any rounding up (for a pixel) in CannonBallRenderer
+    // Only accounting for one cannon in the game, so it really doesn't need the overhead of an object right now. Unlike balloids, rects, or bubbles, of which there will be many.
+
+    //private Vector<Rectangle> rects; 
+    //private Vector<Circle>                  // @todo create classes for balloids and bubbles, which use the java shapes internally for size, position, and collision detection.
+
 
 
 public class uitest implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
@@ -381,79 +411,56 @@ class CannonBallEngine {
     //@todo
     // We have a consideration to make, if we want to define MIN/MAXs for sizes, speeds, etc. or just let the calling methods handle all that.
     // Right now, for simplicity, I'm going to have faith in the callers.
-    
-    private boolean paused; // If we have paused here, but the main loop is in main, and all the setting of rects and changing of sizes is of course done here, then pausing may cause issues with setting those during pause.
-                            // Unless, pause doesn't stop ticks from doing anything entirely, it just skips the velocity/collision parsing stuff. Still allows for changing size, speed vars, and adding/deling rects. And moving the cannon. Ig. It should be that the cannon can fire multiple bullets, with a configurable rate of fire. But that's only during not pause, obv. Should we allow angle adjustment during a pause? Could be a setting. What does rubric say?
-
-    // Update flags corresponding to control events. 
-    // For use in thread loop, to update a game value before ticking the engine.
-    // (If we updated immediately on action event, we risk changing a value during a tick, which would be no good indeed).
-    private boolean running;
-    private boolean e_dragging;
-    private boolean e_dragstop;
-    private boolean e_add_rect;
-    private boolean e_del_rect;
-    private boolean e_fire_cannon;
-    private boolean e_update_cannon_force;
-    private boolean e_update_cannon_angle;
-
-    // To avoid concurrency issues (with tick() being called by a thread), each of these gets two values.
-    // One for the setters (which can be changed whenever), and one for tick() (which is only update to next_... once per tick).
-    private Rectangle dragbox;
-    private double next_force;
-    private double next_angle;
-    private double next_speed;      // This begs the question, should the Engine just take a double value to set as ball speed, or should it know about speed and size presets?
-    private double next_size;
-    private double next_gravity;    // What about our planet presets too? Should it know the gravity of mars, or do we do that here and just supply the gravity value?
-
-    //private Dimension world_size;
-    private Dimension next_world_size;
-    private boolean e_world_size_changed = false;
+   
+    // Controlling tick()
+    private boolean physics_paused; 
+    private boolean restart_game;
 
     private CannonBallRenderer r;
 
-    // Because events (which change engine values) can occur concurrently with the Thread (and thus during a tick()),
+    // Because events (which change engine values) can occur concurrently with the Thread (and thus during a tick(), which is no good),
     // each mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
 
+    private double[] cannon_angle;      // In radians. Degrees only for method interface.
+    private double[] cannon_force;      
+    private double[] bubble_size;       // Pixels (meter -> pixel conversion is done on set_...)
+    private double[] bubble_speed;      // Pixels per second (using the delta_t passed to tick() to approximate seconds)
+    private double[] world_gravity;     // Pixels per second per second. (Meter conversion is done in set_...)
+    private Dimension[] world_size;     // Still in pixels. *Note: the CannonBallRenderer's canvas is always +2 bigger on each axis (for the border).
+    
 
-    boolean restart;
-
-    // In radians. Degrees only for method interface.
-    private double[] cannon_angle;
-    // In pixels, pixels per second, and pixels per second per second. (Meter conversion is done in set_...)
-    private double[] cannon_force;      // Only accounting for one cannon in the game, so it really doesn't need the overhead of an object right now. Unlike balloids, rects, or bubbles, of which there will be many.
-    private double[] bubble_size;   // All as doubles, do any rounding up (for a pixel) in CannonBallRenderer
-    private double[] bubble_speed; 
-    private double[] world_gravity; 
-    private Dimension[] world_size; // Still in pixels.
-
-
-    //private Vector<Rectangle> rects; 
-    //private Vector<Circle>                  // @todo create classes for balloids and bubbles, which use the java shapes internally for size, position, and collision detection.
-
-
+    // temp
     testball[] tests = new testball[100];
+    class testball {
+        double x = (Math.random()*world_size[0].width);
+        double y = (Math.random()*world_size[0].height);
+        double vy = 0;
+    }
 
+    // @todo We should probably use the ball and Vec2s class like the last program, though we should
+    // also probably take advantage of Java's built in Shape classes (like Circle, Rectangle) as they'll make collision detection easy.
+    // Or, if Circle collision detection is too hard, we can use hitbox rectanges in their class. 
+    // ! That is if we do make a class like the last program, cause alternatively we could just do parallel vectors for each data element (pos, vel, size) (!? do we want size and vel magnitude to be same for all bubbles?)
+    //   Managing such a system may become cumbersome, though.
 
     public CannonBallEngine() {
         cannon_angle = new double[]{0, 3.14};
-        cannon_force = new double[]{0, PIXELS_PER_METER*2};          // !! The method interfaces take meters as measurement, but internally it's all pixel values. Also, it's PER SECOND velocity.
-        bubble_size  = new double[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball will need to be huge, to adhere to normal gravity and velocities.
-        bubble_speed = new double[]{0, PIXELS_PER_METER};           // One meter (in pixels) PER SECOND
+        cannon_force = new double[]{0, PIXELS_PER_METER*2};
+        bubble_size  = new double[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
+        bubble_speed = new double[]{0, PIXELS_PER_METER};
         world_gravity = new double[]{0, 9.8*PIXELS_PER_METER};
         world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
 
-        paused = true;
-        restart = false;
-        r = new CannonBallRenderer(MIN_WORLD_SIZE); // ? Is this copied over, or is it now the same object? Will changing world size now change Renderer resolution?
+        physics_paused = true;
+        restart_game = false;
+        r = new CannonBallRenderer(MIN_WORLD_SIZE);
         r.redraw(~0); // debug, draw everything
 
-        //world_size = new Dimension(1280, 720);  // Testing resolution change.
-        //r.set_resolution(world_size);
-        //r.redraw(~0); // debug, draw everything (not needed here cause thread doesn't start until after this init)
-        
-        for (int i = 0; i < 100; i++)
-            tests[i] = new testball();
+        // temp
+        for (int i = 0; i < 100; i++) tests[i] = new testball();
+    }
+    public void set_world_size(Dimension dim) {
+        world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
     }
     public void set_bubble_size(int m) {
         System.out.println("Size: " + m);
@@ -468,52 +475,24 @@ class CannonBallEngine {
         world_gravity[1] = mpsps * PIXELS_PER_METER;
     }
     public void set_pause(boolean p) {
-        paused = p;
-        System.out.println("Pause: " + paused);
-    }
-    public boolean is_paused() { 
-        return paused; 
+        System.out.println("Pause: " + p);
+        physics_paused = p; // This and restart do not have pair values, because it's assumed they'll only be read once per tick().
     }
     public void restart() {
         System.out.println("Restart");
         set_pause(true);
-        restart = true;
+        restart_game = true;
     }
+    public boolean is_paused() { return physics_paused; }
     public Renderer renderer() { return r; }
 
-    public void set_world_size(Dimension dim) {
-        // Instead of all the next_... whatevers, we could have each var a double array.
-        //next_world_size = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
-        //e_world_size_changed = true;
-        world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
-    }
-
-    class testball {
-        double x = (Math.random()*world_size[0].width);
-        double y = (Math.random()*world_size[0].height);
-        double vy = 0;
-
-        //public void move() {
-        //    x += 1;
-        //    y += 1;
-        //}
-    }
-
     public void tick(double delta_t) {
-        //if (e_world_size_changed) {
-        //    world_size = next_world_size;
-        //    r.set_resolution(world_size);
-        //    e_world_size_changed = false;
-        //    r.redraw(~0);
-        //}
-
-
         // Update engine values
         // Not all require redraws.
         cannon_force[0] = cannon_force[1];
         world_gravity[0] = world_gravity[1];
         bubble_speed[0] = bubble_speed[1];
-        if (cannon_angle[0] != cannon_angle[1]) {  // Should we calculate cannon vertexes in the layer draw, or store them every time it's changed here?
+        if (cannon_angle[0] != cannon_angle[1]) {   // Should we calculate cannon vertexes in the layer draw, or store them every time it's changed here?
             cannon_angle[0] = cannon_angle[1]; 
             r.redraw(r.l_cannon);
         }
@@ -524,11 +503,19 @@ class CannonBallEngine {
         if (!world_size[0].equals(world_size[1])) {
             world_size[0] = world_size[1];
             r.set_resolution(world_size[0]);
-            System.out.println("setting resolution: " + world_size[0]);
-            r.redraw(~0); // Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. @todo could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all the time (which we should check), this might not be an issue
+            //System.out.println("setting resolution: " + world_size[0]);
+            r.redraw(~0);   // Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. 
+                            // @todo We could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all 
+                            // the time (which we should check), this might not be an issue cause we'll be generating new buffs all the time anyways.
         }
 
-        if (!paused) {
+        // Physics (moving, colliding, accelerating)
+        if (!physics_paused) {
+
+            // A consideration:
+            //  Move then check collisions? or..
+            //  Check next position, then move.
+
             for (testball test : tests) {
                 test.x += bubble_speed[0]*delta_t;  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
                 test.vy += world_gravity[0]*delta_t;
@@ -536,12 +523,14 @@ class CannonBallEngine {
                 if (test.x+bubble_size[0] > world_size[0].width) test.x = (Math.random()*world_size[0].width);
                 if (test.y+bubble_size[0] > world_size[0].height) {
                     test.y = world_size[0].height-bubble_size[0]-1; 
-                    test.vy = -test.vy*.5;//test.y = (Math.random()*world_size[0].height);
+                    test.vy = -test.vy*.5;
                 }
             }
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
-        } else if (restart) {
+        } else if (restart_game) {
+            // temp
+
             // Reset the state of the game
             // Could use an init_game_state() or something 
             for (testball test: tests) {
@@ -549,8 +538,8 @@ class CannonBallEngine {
                 test.vy = 0;
             }
             r.redraw(r.l_bubbles);
-            r.redraw(r.l_cannon);     // We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
-            restart = false;
+            r.redraw(r.l_cannon);     // @todo We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
+            restart_game = false;
         }
     }
     
