@@ -288,6 +288,7 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
             engine.set_cannon_angle(angle);
             lbl_cannon_angle.setText("Angle: " + angle + "deg");
             display.repaint();
+            window.requestFocus();
         }
     }
 
@@ -395,14 +396,16 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         //System.out.println(display.getSize());
         //System.out.println(window.getSize());
         engine.set_world_size(display.getSize());
+        window.requestFocus();
     }
     
     // Unimplemented WindowListener, ComponenetLister:
     public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
     public void componentHidden(ComponentEvent e) {} public void componentShown(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {} public void keyReleased(KeyEvent e) {} public void keyTyped(KeyEvent e) {}
     public void keyPressed(KeyEvent e) {
-        if(e.getKeyChar() == KeyEvent.VK_SPACE) {
+        if(e.getKeyCode() == KeyEvent.VK_SPACE) {
             engine.fire_cannon();
+            window.requestFocus();
         }
     }
 }
@@ -448,6 +451,8 @@ class CannonBallEngine {
 
     //  ball stuff
     private Vector<Balloid> balloids;
+
+
     
 
 
@@ -524,29 +529,29 @@ class CannonBallEngine {
     }
 
     class Balloid {
-    double x, y;
-    double vx, vy;
-    int radius;
+        double x, y;
+        double vx, vy;
+        int radius;
 
-    public Balloid(double start_x, double start_y, double start_vx, double start_vy) {
-        x = start_x;
-        y = start_y;
-        vx = start_vx;
-        vy = start_vy;
-        radius = 8;
-    }
+        public Balloid(double start_x, double start_y, double start_vx, double start_vy) {
+            x = start_x;
+            y = start_y;
+            vx = start_vx;
+            vy = start_vy;
+            radius = 8;
+        }
 
-    public void move(double dt) {
-        x += vx * dt;
-        y += vy * dt;
-        vy += gravity * dt;
-    }
+        public void move(double dt) {
+            x += vx * dt;
+            y += vy * dt;
+            vy += gravity * dt;
+        }
 
-    public boolean out_of_bounds() {
-        return x < -radius || x > world_size.width + radius ||
-               y < -radius || y > world_size.height + radius;
+        public boolean out_of_bounds() {
+            return x < -radius || x > world_size.width + radius ||
+                y < -radius || y > world_size.height + radius;
+        }
     }
-}
 
     public void fire_cannon() {
         if (cannon == null) return;
@@ -564,6 +569,9 @@ class CannonBallEngine {
     }
 
     public void tick(double delta_t) {
+        //  TEMP DELTA TIME WAITING FOR MERGE
+         double dt = 0.016;
+
         if (e_world_size_changed) {
             world_size = next_world_size;
             r.set_resolution(world_size);
@@ -582,7 +590,18 @@ class CannonBallEngine {
             }
             r.redraw(r.l_bubbles);
             r.redraw(r.l_cannon);
+            r.redraw(r.l_balloids);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
+
+            //  balloid update
+            for (int i = balloids.size() - 1; i >= 0; i--) {
+                Balloid b = balloids.get(i);
+                b.move(dt);
+
+                if (b.out_of_bounds()) {
+                    balloids.remove(i);
+                }
+            }
         }
     }
     
@@ -646,9 +665,12 @@ class CannonBallEngine {
         }
     
         private void draw_balloids(Graphics g) {
-            // @todo bullets here
             g.setColor(Color.green);
-            g.drawRect(res_x()/2 + 35, 25, 20, 20);     // it is indeed limited to rendered res, even when overlayed (rect gets cutoff)
+
+            for (Balloid b : balloids) {
+                g.fillOval((int)(b.x - b.radius), (int)(b.y - b.radius),
+                        b.radius * 2, b.radius * 2);
+            }
         }
     
         private void draw_cannon(Graphics g) {
