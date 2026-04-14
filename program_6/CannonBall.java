@@ -164,6 +164,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         sb_cannon_force.addAdjustmentListener(this);
         window.addWindowListener(this);
         window.addComponentListener(this);
+        display.addMouseListener(engine);   // Mouse handling done in Engine.
+        display.addMouseMotionListener(engine);
         // Start
         window.validate();
         window.setVisible(true);
@@ -172,6 +174,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 
 
     private void exit() {
+        display.removeMouseListener(engine);
+        display.removeMouseMotionListener(engine);
         sb_cannon_angle.removeAdjustmentListener(this);
         sb_cannon_force.removeAdjustmentListener(this);
         for (MenuItem mi : mnu_control_itms) mi.removeActionListener(this);
@@ -347,8 +351,9 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 // ----------------
 // The Game. 
 // Holds data for objects in the world, does the physics and collisions on tick().
+// Also handles mouse interactions with the game.
 // ----------------
-class CannonBallEngine {
+class CannonBallEngine implements MouseListener, MouseMotionListener {
     private static final long serialVersionUID = 2222L;
     private final double PIXELS_PER_METER = 10;    // ! This also acts as a "zoom", changing the size of everything.
     private final Dimension MIN_WORLD_SIZE = new Dimension(256, 256);
@@ -390,9 +395,80 @@ class CannonBallEngine {
     private boolean m_drawhitboxes;
     private boolean m_bubblegravity;
 
+    // Mousery
+    //private Point m1, m2;
+    //private MouseEvent mouseclick = {null, null}
+    //private Rectangle[] drawrect = {null, null}
+    //private Rectangle[] addrect = {null, null}
+    //if (mouseclick[0] != mouseclick[1])
+    //    mouseclick[0] = mouseclick[1];
+    //    switch (mouseclick.getKEY) {
+    //        case rightckic:
+    //            // do box delete check
+    //        case leftclic: 
+    //            // do cannon fire check
+    //
+    //if (addrect[0] != addrect[1])
+    //    addrect[0] = addrect[1];
+    //    // Do the adding rect shit
+
+    //if (dragbox[0] != dragbox[1])
+    //    dragbox[0] = dragbox[1];
+    //    r.redraw(r.l_dragrect); // Renderer will handle if it's a null and not draw. Import this will only update draw rect if it changes size or disappears (becomes null).
+
+    //mousePressed(MouseEvent e) { m1 = e.getPoint(); }
+    //mouseReleased(MouseEvent e) { 
+    //    drawRect[1] = null; 
+    //}
+    //mouseDragged(MouseEvent e) {
+    //    m2 = e.getPoint();
+    //    dragbox[1] = new Rectangle();//m1.x, m1.y, 
+    //    dragbox[1].setLocation(Math.max(1, Math.min(Math.min(m1.x,m2.x), r.rex_y())), 
+    //                           Math.max(1, Math.min(Math.min(m1.y,m2.y), r.res_y())));
+    //    dragbox[1].setSize(Math.min(Math.abs(m1.x-m2.x), r.res_x()-dragbox[1].x), 
+    //                       Math.min(Math.abs(m1.y-m2.y), r.res_y()-dragbox[1].y));
+
+    //private Rectangle m1m2rect(Point mp1, Point mp2) {
+    //    rect = new Rectangle();//m1.x, m1.y, 
+    //    dragbox[1].setLocation(Math.max(1, Math.min(Math.min(m1.x,m2.x), r.rex_y())), 
+    //                           Math.max(1, Math.min(Math.min(m1.y,m2.y), r.res_y())));
+    //    dragbox[1].setSize(Math.min(Math.abs(m1.x-m2.x), r.res_x()-dragbox[1].x), 
+    //                       Math.min(Math.abs(m1.y-m2.y), r.res_y()-dragbox[1].y));
+    //    return
+    //}
+
+
+    //public void mouseClicked(MouseEvent e) {
+    //    mouse_click[1] = e;
+    //    e_mouseclick = true; 
+    //    //if (e.getButton() == MouseEvent.BUTTON3) {
+    //    //    bsim.remove_rect_at_point(e.getPoint());
+    //    //    bsim.forcedraw();
+    //    //}
+    //}
+    //public void mousePressed(MouseEvent e) {
+    //    mousepoints[1][0] = e.getPoint();
+    //    e_mousepressed = true;
+    //}
+    //public void mouseDragged(MouseEvent e) {
+    //    mousepoints[1][1] = e.getPoint();
+    //    e_mousedragged = true;
+    //}
+    //public void mouseReleased(MouseEvent e) { drawRect[1] = null; }
+    //public void mouseEntered(MouseEvent e) {} 
+    //public void mouseExited(MouseEvent e) {} 
+    //public void mouseMoved(MouseEvent e) {}
+
+
+    //private void add_rect(Rectangle); // Adds to world.
+    //private void del_rec_at(Point);   // Removes rect under point
+
+
     // Game Data
     // Because events (which change engine values) can occur concurrently with the Thread (and thus during a tick(), which is no good),
-    // each mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
+    // each externally mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
+    //private MouseEvent[] mouse_click;
+    //private Rectangle[] draw;
     private double[] cannon_force;      
     private double[] cannon_angle;      // In radians. Degrees only for method interface.
     private double[] bubble_size;       // Pixels (meter -> pixel conversion is done on set_...)
@@ -411,7 +487,46 @@ class CannonBallEngine {
     //private Vector<Balloid> balls;  // Like from the cannon.
     private Vector<Rectangle> rects;
 
+    private Point m1, m2;
+    private Rectangle dragbox; // Used by Renderer, as the hollow drag box.
+    //private Rectangle addbox;  // Used by Game, to add a rect. Dragbox is moved into addbox and nulled on MouseExited
+                               // Use isEmpty to check it.
+    private Rectangle addbox[] = new Rectangle[2];
+
+    public void mousePressed(MouseEvent e) { 
+        dragbox = new Rectangle();
+        m1 = e.getPoint(); 
+        System.out.println(m1); 
+    }
+    public void mouseDragged(MouseEvent e) { 
+        m2 = e.getPoint(); 
+        // Dragbox may become null if mouse moves off screen.
+        if (dragbox != null) {
+            dragbox.setLocation(Math.max(1, Math.min(Math.min(m1.x,m2.x), r.res_x())), 
+                                Math.max(1, Math.min(Math.min(m1.y,m2.y), r.res_y())));
+            dragbox.setSize(Math.min(Math.abs(m1.x-m2.x), r.res_x()-dragbox.x), 
+                            Math.min(Math.abs(m1.y-m2.y), r.res_y()-dragbox.y));
+        }
+        r.redraw(r.l_dragbox);
+        System.out.println(m1 + " | " + m2); 
+        System.out.println(dragbox);
+    }
+    
+    public void mouseReleased(MouseEvent e) {
+        addbox[1] = dragbox;    // Compare the objects to see if changed in tick()
+        dragbox = null;
+        r.redraw(r.l_dragbox);  // Renderer will know what to do with a null dragbox.
+        System.out.println(addbox[1]);
+    }
+    public void mouseExited(MouseEvent e) { dragbox = null; } // Avoid weirdness.
+
+    public void mouseClicked(MouseEvent e) {}
+    public void mouseEntered(MouseEvent e) {}
+    public void mouseMoved(MouseEvent e) {}
+
     public CannonBallEngine() {
+        //mouse_click = new MouseEvent[]{null, null};
+        //mouse_select = new Rectangle[]{Rectangle(0,0,0,0), Rectangle(0,0,0,0)};
         cannon_angle = new double[]{1, Math.PI-Math.random()*Math.PI/2};
         cannon_force = new double[]{1, PIXELS_PER_METER*2};
         bubble_size  = new double[]{1, (int)(PIXELS_PER_METER/2+1)};   // It is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
@@ -431,9 +546,12 @@ class CannonBallEngine {
         
         r = new CannonBallRenderer(MIN_WORLD_SIZE);
 
+        //mousepoints = new Points[2][2];
+
         init_game_state();
     }
-    
+   
+    // Places the game into the "new game" or start state. 
     private void init_game_state() {
         score_player = 0;
         score_bubbles = 0;
@@ -444,6 +562,7 @@ class CannonBallEngine {
         bubbs.addElement(new Bubble(null)); // Or a configurable number for start bubbles.
     }
 
+    // Getters, setters, etc. For frame's UI to latch into.
     public void set_world_size(Dimension dim) { world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height)); }
     public void set_bubble_size(double m) { bubble_size[1] = m * PIXELS_PER_METER; }
     public void set_bubble_speed(double mps) { bubble_speed[1] = mps * PIXELS_PER_METER; }
@@ -461,7 +580,11 @@ class CannonBallEngine {
     public double get_cannon_force() { return cannon_force[0]; }
     public double get_elapsed_time() { return elapsed_time; }
 
+    // The tick(). This is where all the game logic happens. Intended to be called once per running loop.
     public void tick(double delta_t) {
+
+        //System.out.println(m1 + " | " + m2);
+
         // Update engine values. Not all require redraws.
         cannon_force[0] = cannon_force[1];
         world_gravity[0] = world_gravity[1];
@@ -494,6 +617,16 @@ class CannonBallEngine {
             r.set_resolution(world_size[0]);
             r.redraw(~0);   
         }
+
+        // Handling mouseclicks and draws
+        //if (e_mousclicked) {
+        //    System.out.println(mouse_clicked.getPoint());
+        //} 
+
+        //if (e_mousedragged) {
+            
+    
+
 
         // Physics (moving, colliding, accelerating)
         if (!physics_paused) {
@@ -560,7 +693,10 @@ class CannonBallEngine {
         }
     }
     
-    // Renderer for the game. Defines how the drawing's done, which layers and how many.
+    // ----------------
+    // The Game Renderer 
+    // Defines how the drawing's done, to which layers and of how many.
+    // ----------------
     class CannonBallRenderer extends Renderer {
         // Alias render layers with descriptive names.
         public final int l_background, l_statics, l_bubbles, l_balloids, l_cannon, l_dragbox;   
@@ -652,7 +788,8 @@ class CannonBallEngine {
     
         // @todo draw the dragbox
         private void draw_dragbox(Graphics g) {
-            //if (dragbox != null) g.drawRect(dragbox);
+            if (dragbox != null) 
+                g.drawRect(dragbox.x, dragbox.y, dragbox.width, dragbox.height);
         }
 
         // Expose resolution to rest of class, so render size can be matched with world size 1:1
@@ -662,6 +799,11 @@ class CannonBallEngine {
         }
     }
 
+    // ----------------
+    // The Cannon
+    // Holds the hitbox, angle, length, etc.
+    // Doesn't really 'do' anything. Firing is done elsewhere.
+    // ----------------
     class Cannon {
         private Point corner_offset;
         private int length;
@@ -708,7 +850,11 @@ class CannonBallEngine {
             return new Point((int)Math.abs(Math.cos(angle-Math.PI/2)*diameter/2), (int)Math.abs(Math.sin(angle-Math.PI/2)*diameter/2));
         }
     }
-    
+   
+    // ----------------
+    // Balls
+    // Abstract clas for common utility between Bubbles and Balloids
+    // ---------------- 
     abstract class Ball {
         protected Vec2 pos;
         protected Vec2 vel;
@@ -744,7 +890,12 @@ class CannonBallEngine {
         public int br_y() { return (int)(pos.y+radius); }
     }
 
-    // The targets
+    // ----------------
+    // The Bubble
+    // These are the targets that move around the game.
+    // Can be placed randomly, or at a position. Heading is always a random diagonal.
+    // Size and speed are based on the single balloid_size/speed vars (shared).
+    // ----------------
     class Bubble extends Ball {
         public Bubble(Vec2 position) {
             radius = bubble_size[0];
