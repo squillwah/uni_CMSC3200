@@ -464,7 +464,7 @@ class CannonBallEngine {
     }
 
     public void set_m_fertileballs(boolean m) { m_fertileballs = m; }
-    public void set_m_drawhitboxes(boolean m) { m_drawhitboxes = m; }
+    public void set_m_drawhitboxes(boolean m) { m_drawhitboxes = m; r.redraw(~0); }
     public void set_m_bubblegravity(boolean m) { m_bubblegravity = m; }
 
     public void set_pause(boolean p) {
@@ -664,19 +664,28 @@ class CannonBallEngine {
     
         // @todo draw the cannon
         private void draw_cannon(Graphics g) {
-            //cannon.draw(g);
-            g.setColor(Color.red);
             Point a = can.tip();
             Point b = can.tail();
             Point z = can.sidediff();
-            g.drawPolygon(
-                new int[]{a.x+z.x, b.x+z.x, b.x-z.x, a.x-z.x}, //br.x-can.corner_offset.x-10, br.x-can.corner_offset.x+10},
-                new int[]{a.y-z.y, b.y-z.y, b.y+z.y, a.y+z.y},
-                4
-            );
-            g.setColor(Color.blue);
-            g.drawLine(a.x, a.y, b.x, b.y);
-            System.out.println("candraw");
+            
+            //g.setColor(new Color(210, 140, 190, 255));
+            // The wheels are assuming cannon is in bottom right.
+            
+            g.setColor(new Color(48, 39, 14, 255));
+            g.fillOval((int)(br.x-PIXELS_PER_METER*7.5), (int)(br.y-PIXELS_PER_METER*6), (int)(PIXELS_PER_METER*7.5), (int)(PIXELS_PER_METER*6));
+
+            g.setColor(new Color(36, 38, 17));//60, 20, 220));
+            g.fillPolygon(new int[]{a.x+z.x, b.x+z.x, b.x-z.x, a.x-z.x}, new int[]{a.y-z.y, b.y-z.y, b.y+z.y, a.y+z.y}, 4);
+            
+            g.setColor(new Color(74, 60, 20, 120));
+            g.fillOval((int)(br.x-PIXELS_PER_METER*8), (int)(br.y-PIXELS_PER_METER*5.5), (int)(PIXELS_PER_METER*7.5), (int)(PIXELS_PER_METER*6));
+            
+            if (m_drawhitboxes) { 
+                g.setColor(Color.red);
+                g.drawPolygon(new int[]{a.x+z.x, b.x+z.x, b.x-z.x, a.x-z.x}, new int[]{a.y-z.y, b.y-z.y, b.y+z.y, a.y+z.y}, 4);
+                g.setColor(Color.blue);
+                g.drawLine(a.x, a.y, b.x, b.y);
+            }
 
             //Point tip = can.tip();
             //tip.x += br.x-can.corner_offset.x;
