@@ -664,7 +664,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         if (!physics_paused) {
             // Special modes:
             if (m_fertileballs) {
-                if (timer_fertileballs > 5) {  // Reproduce every five seconds.
+                if (timer_fertileballs > 3) {  // Reproduce every five seconds.
                     bubbs.addElement(new Bubble(bubbs.elementAt(0).pos())); // Assuming bubbs won't be empty (though a NULL wont break things). 
                     timer_fertileballs = 0;
                 } timer_fertileballs += delta_t;
@@ -698,35 +698,43 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                     if (hitbox.y <= world_perim.y) bubb.set_pos_y(bubb.radius+1);
                     else bubb.set_pos_y(world_perim.height-bubb.radius-1);
                 }
-                // And against rects in scene.
-                for (Rectangle rect : rects) {
-                    System.out.println(hitbox + " !!! " + rect);
-                    if (!(intersection = hitbox.intersection(rect)).isEmpty()) {
-                        System.out.println(intersection);
-                        if (intersection.height > intersection.width) {
-                            normal.x = bubb.vel_x()*-2; 
-                            //bubb.set_pos_x(bubb.pos_x()+Math.signum(normal.x)*intersection.width);
-                        } else {
-                            normal.y = bubb.vel_y()*-2;
-                            //bubb.set_pos_y(bubb.pos_y()+Math.signum(normal.y)*intersection.height);
+                // If no collide is flagged, attempt to clear
+                if (bubb.nocollide) {
+                    System.out.println("nocol: " + bubb.nocollide);
+                    bubb.nocollide = false;
+                    //bubb.nocollide = !(bubb.hitbox().intersection(world_perim).isEqual(bubb.hitbox()));
+                    for (Rectangle rect : rects) bubb.nocollide |= hitbox.intersects(rect);
+                    bubb.nocollide |= hitbox.intersects(can.hitbox());
+                    //for (Rectangle rect : rects) System.out.println(hitbox.intersects(rect));
+                    //System.out.println(hitbox.intersects(can.hitbox()));
+                    System.out.println("nocol2: " + bubb.nocollide);
+                } else {
+                    // Otherwise, continue with collision checking aginast rects and cannon.
+                    for (Rectangle rect : rects) {
+                        System.out.println(hitbox + " !!! " + rect);
+                        if (!(intersection = hitbox.intersection(rect)).isEmpty()) {
+                            System.out.println(intersection);
+                            if (intersection.height > intersection.width) {
+                                normal.x = bubb.vel_x()*-2; 
+                                //bubb.set_pos_x(bubb.pos_x()+Math.signum(normal.x)*intersection.width);
+                            } else {
+                                normal.y = bubb.vel_y()*-2;
+                                //bubb.set_pos_y(bubb.pos_y()+Math.signum(normal.y)*intersection.height);
+                            }
                         }
                     }
+                    // And against the cannon, for score keeping.
+                    if (hitbox.intersects(can.hitbox())) {
+                        //bubbs.removeElement(bubb);
+                        //bubbs.addElement(new Bubble(null));
+                        score_bubbles++;
+                        bubb.nocollide = true;  // Disable collisions and randomly place.
+                        bubb.set_pos_x(bubb.radius()+1+(Math.random()*world_size[0].width*.6-bubb.radius()-1));    // Best to have method that'll do this. And set the no collide flag until collision detection clears it here.
+                        bubb.set_pos_y(bubb.radius()+1+(Math.random()*world_size[0].height-bubb.radius()-1)); 
+                        // @@@@ todo
+                        // Reimplement the hover no collide thing with the bubbles. Random relocation could hit a rect.
+                    }
                 }
-                // And against the cannon, for score keeping.
-                if (hitbox.intersects(can.hitbox())) {
-                    //bubbs.removeElement(bubb);
-                    //bubbs.addElement(new Bubble(null));
-                    score_bubbles++;
-                    //restart();
-                    bubb.set_pos_x(bubb.radius()+1+(Math.random()*world_size[0].width*.75-bubb.radius()-1));    // Best to have method that'll do this. And set the no collide flag until collision detection clears it here.
-                    bubb.set_pos_y(bubb.radius()+1+(Math.random()*world_size[0].height-bubb.radius()-1)); 
-                    //bubb.
-
-
-                    // @@@@ todo
-                    // Reimplement the hover no collide thing with the bubbles. Random relocation could hit a rect.
-                }
-
                 bubb.accelerate(normal);
                 bubb.accelerate(forces);
                 bubb.advance(delta_t);
@@ -963,7 +971,10 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     // Size and speed are based on the single balloid_size/speed vars (shared).
     // ----------------
     class Bubble extends Ball {
+        public boolean nocollide;  // With walls, it cannot always be guaranteed that a random placement will be safe. Easy solution is to disable collision until it becomes safe.
+
         public Bubble(Vec2 position) {
+            nocollide = true;
             radius = bubble_size[0];
             // If no position given, init with random (avoiding cannon).
             if (position == null) pos = new Vec2(radius+1+(Math.random()*world_size[0].width*.75-radius-1), radius+1+(Math.random()*world_size[0].height-radius-1)); 
@@ -994,8 +1005,8 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         }
 
         // The bubbles are to be restricted in world, even on window resize/during pause.
-        public void set_pos_x(double x) { pos.x = x; refresh_hitbox(); }
-        public void set_pos_y(double y) { pos.y = y; refresh_hitbox(); }
+        public void set_pos_x(double x) { pos.x = x; nocollide = true; refresh_hitbox(); }
+        public void set_pos_y(double y) { pos.y = y; nocollide = true; refresh_hitbox(); }
     }
 }
 
