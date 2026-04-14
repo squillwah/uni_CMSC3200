@@ -1,5 +1,5 @@
 
-package CannonBall;
+//package CannonBall;
 
 import java.awt.*;
 import java.awt.event.*;
@@ -136,6 +136,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
         sb_cannon_angle.setMinimum(0); sb_cannon_angle.setMaximum(1000); sb_cannon_angle.setVisibleAmount(100); // 1000-100 == 90.0 degrees
         sb_cannon_angle.setBlockIncrement(45); sb_cannon_angle.setUnitIncrement(9); 
+        sb_cannon_force.setMinimum(0); sb_cannon_force.setMaximum(350); sb_cannon_force.setVisibleAmount(50);   // MIGHT NEED TWEAKED THESE ARE VALUES THAT DONT FEEL TOO BAD
+        sb_cannon_force.setBlockIncrement(25); sb_cannon_force.setUnitIncrement(10); sb_cannon_force.setValue(250);
 
 
         // Add panels to frame, display to panel:
@@ -152,6 +154,7 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         engine.set_gravity(GRAVITIES[earth]);
         engine.set_bubble_size(SIZES[medium]);
         engine.set_bubble_speed(SPEEDS[normal]);
+        engine.set_cannon_force(sb_cannon_force.getValue());
         display.debug_lvl = 0;
         // Attach Listeners  
         for (MenuItem mi : mnu_control_itms) mi.addActionListener(this);
@@ -220,6 +223,9 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
             sb_cannon_angle.setValue((int)(engine.get_cannon_angle()*10));
             lbl_cannon_angle.setText("Angle: " + sb_cannon_angle.getValue()/10.0 + "deg");    // @todo May instead want to have some connect_cannon_angle_scroll or connect_player_score_lbl thing in engine.
             
+            sb_cannon_force.setValue((int)(engine.get_cannon_force()));
+            lbl_cannon_force.setText("Force: " + sb_cannon_force.getValue() + "px/s");
+
             lbl_time.setText("Time: " + ((int)(engine.get_elapsed_time()*10))/10.0);
             lbl_score_ball.setText("Bubbles: " + engine.get_score_bubbles());
             lbl_score_player.setText("Player: " + engine.get_score_player());
@@ -240,8 +246,11 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
         Object bar = e.getSource();
+
         if (bar == sb_cannon_angle) {
-            engine.set_cannon_angle(sb_cannon_angle.getValue()/10.0);
+            engine.set_cannon_angle(sb_cannon_angle.getValue() / 10.0);
+        } else if (bar == sb_cannon_force) {
+            engine.set_cannon_force(sb_cannon_force.getValue());
         }
     }
 
@@ -459,7 +468,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     // Game Objects:
     private Cannon can; 
     private Vector<Bubble> bubbs;   
-    //private Vector<Balloid> balls;  // Like from the cannon.
+    private Vector<Balloid> balls;  // Like from the cannon.
     private Vector<Rectangle> rects;
 
     // Mouse stuff:
@@ -541,6 +550,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         set_cannon_angle(Math.random()*90);
         rects = new Vector<Rectangle>();
         bubbs = new Vector<Bubble>();
+        balls = new Vector<Balloid>();
         bubbs.addElement(new Bubble(null)); // Or a configurable number for start bubbles.
     }
 
@@ -673,7 +683,8 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
            
             // Cannon fire 
             if (fire_cannon) {
-                System.out.println("Fire cannon code goes on line 638");
+                balls.addElement(new Balloid());
+                r.redraw(r.l_balloids);
                 fire_cannon = false;
             }
         
@@ -732,6 +743,60 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                 bubb.advance(delta_t);
             }
 
+            // Balloid collisions and movement.
+            Vec2 ball_normal = new Vec2(0,0);
+            Vec2 ball_forces = new Vec2(0, world_gravity[0] * delta_t);
+            Rectangle ball_hitbox, ball_intersection;
+
+            for (int i = 0; i < balls.size(); i++) {
+                Balloid ball = balls.elementAt(i);
+
+                ball_normal.x = 0;
+                ball_normal.y = 0;
+                ball_hitbox = ball.next_hitbox(delta_t);
+
+                // collide with rectangles
+                for (Rectangle rect : rects) {
+                    if (!(ball_intersection = ball_hitbox.intersection(rect)).isEmpty()) {
+                        if (ball_intersection.height > ball_intersection.width) {
+                            ball_normal.x = ball.vel_x() * -2;
+                        } else {
+                            ball_normal.y = ball.vel_y() * -2;
+                        }
+                    }
+                }
+
+                // collide with bubbles
+                boolean removed = false;
+                for (int j = 0; j < bubbs.size() && !removed; j++) {
+                    if (!(ball_intersection = ball_hitbox.intersection(bubbs.elementAt(j).hitbox())).isEmpty()) {
+                        bubbs.removeElementAt(j);
+                        bubbs.addElement(new Bubble(null));
+                        score_player++;
+
+                        balls.removeElementAt(i);
+                        i--;
+                        removed = true;
+
+                        r.redraw(r.l_bubbles);
+                    }
+                }
+
+                if (!removed) {
+                    ball.accelerate(ball_normal);
+                    ball.accelerate(ball_forces);
+                    ball.advance(delta_t);
+
+                    if (ball.offscreen()) {
+                        balls.removeElementAt(i);
+                        i--;
+                    }
+                }
+            }
+
+            r.redraw(r.l_balloids);
+             
+
             r.redraw(r.l_bubbles);
             elapsed_time += delta_t;
         } else if (restart_game) {
@@ -739,7 +804,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
             r.redraw(r.l_bubbles);
             r.redraw(r.l_cannon);
             r.redraw(r.l_statics);
-            //r.redraw(r.l_balloids);
+            r.redraw(r.l_balloids);
             restart_game = false;
         }
     }
@@ -826,8 +891,18 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     
         // @todo bullets here
         private void draw_balloids(Graphics g) {
-            g.setColor(Color.green);
-            g.drawRect(res_x()/2 + 35, 25, 20, 20);
+            g.setColor(new Color(180, 255, 180, 180));
+
+            for (Balloid ball : balls) {
+                g.fillOval(BORDER + ball.tl_x(), BORDER + ball.tl_y(),
+                        (int)(ball.radius() * 2 + 1), (int)(ball.radius() * 2 + 1));
+
+                if (m_drawhitboxes) {
+                    g.setColor(Color.green);
+                    g.drawRect(ball.hitbox().x, ball.hitbox().y, ball.hitbox().width, ball.hitbox().height);
+                    g.setColor(new Color(180, 255, 180, 180));
+                }
+            }
         }
     
         private void draw_cannon(Graphics g) {
@@ -996,6 +1071,30 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         // The bubbles are to be restricted in world, even on window resize/during pause.
         public void set_pos_x(double x) { pos.x = x; refresh_hitbox(); }
         public void set_pos_y(double y) { pos.y = y; refresh_hitbox(); }
+    }
+
+    // ----------------
+    // The Cannon Ball
+    // This is the projectile the cannon fires
+    // ----------------
+    class Balloid extends Ball {
+        public Balloid() {
+            radius = 12.0;
+
+            Point tip = can.tip();
+            pos = new Vec2(tip.x, tip.y);
+
+            double speed = cannon_force[0];
+            vel = new Vec2(Math.cos(can.angle()) * speed,
+                        -Math.sin(can.angle()) * speed);
+
+            hitbox = gen_hitbox(pos);
+        }
+
+        public boolean offscreen() {
+            return br_x() < 0 || tl_x() > world_size[0].width ||
+                br_y() < 0 || tl_y() > world_size[0].height;
+        }
     }
 }
 
