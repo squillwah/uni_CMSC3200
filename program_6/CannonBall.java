@@ -27,8 +27,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
     private final byte nodebug = 0, db1 = 1, db2 = 2, db3 = 3, NUM_DEBUG_LEVELS = 4;
     // Parallel MenuItem value arrays.
-    private final int SIZES[] = {10, 20, 30, 50, 80};                                                   // Radius in meters (expanding from a single center point pixel).
-    private final int SPEEDS[] = {1, 2, 3, 5, 8};                                                       // Meters per second (applied equally to both components).
+    private final double SIZES[] = {.5, 1, 1.5, 2.5, 4};                                                // Radius in meters (expanding from a single center point pixel).
+    private final double SPEEDS[] = {1, 2, 3, 5, 8};                                                    // Meters per second (applied equally to both components).
     private final double GRAVITIES[] = {3.7, 8.87, 9.80665, 3.71, 24.79, 10.4, 8.87, 11.15, 0.620};     // Meters per second per second. (Pixel -> Meter ratio is defined in Engine)
 
     // Frame and panels.
@@ -41,7 +41,7 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     private boolean main_thread_running;
     // Elements of UI: MenuItems, ScrollBars, Labels.
     private MenuBar menubar;
-    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo;
+    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo;        //@todo fertile ball mode. Balls reproduce.
     private MenuItem[] mnu_control_itms;                        
     private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    
     private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   
@@ -124,6 +124,10 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
         sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
+        sb_cannon_angle.setMinimum(0); sb_cannon_angle.setMaximum(1000); sb_cannon_angle.setVisibleAmount(100); // 1000-100 == 90.0 degrees
+        sb_cannon_angle.setBlockIncrement(45); sb_cannon_angle.setUnitIncrement(9); 
+
+
         // Add panels to frame, display to panel:
         window.setMenuBar(menubar);
         window.add("Center", pnl_display);
@@ -145,6 +149,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.addItemListener(this);
+        sb_cannon_angle.addAdjustmentListener(this);
+        sb_cannon_force.addAdjustmentListener(this);
         window.addWindowListener(this);
         window.addComponentListener(this);
         // Start
@@ -155,7 +161,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 
 
     private void exit() {
-        stop_thread();
+        sb_cannon_angle.removeAdjustmentListener(this);
+        sb_cannon_force.removeAdjustmentListener(this);
         for (MenuItem mi : mnu_control_itms) mi.removeActionListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.removeItemListener(this);
@@ -163,6 +170,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.removeItemListener(this);
         window.removeWindowListener(this);
         window.removeComponentListener(this);
+        
+        stop_thread();
         window.dispose();
         System.exit(0);
     }
@@ -191,6 +200,13 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
             frame_start_t = System.nanoTime();
             //System.out.println(delta_t + " " + frame_start_t);
 
+            // Keep scrolls, score, and time in sync.
+            sb_cannon_angle.setValue((int)(engine.get_cannon_angle()*10));
+            lbl_cannon_angle.setText("Angle: " + sb_cannon_angle.getValue()/10.0 + "deg");    // @todo May instead want to have some connect_cannon_angle_scroll or connect_player_score_lbl thing in engine.
+            
+            lbl_time.setText("Time: " + ((int)(engine.get_time_elapsed()*10))/10.0);
+
+
             engine.tick(delta_t);
             display.debug_inform_ticktime(delta_t);
            
@@ -206,7 +222,10 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
-
+        Object bar = e.getSource();
+        if (bar == sb_cannon_angle) {
+            engine.set_cannon_angle(sb_cannon_angle.getValue()/10.0);
+        }
     }
 
     public void actionPerformed(ActionEvent e) {
@@ -310,30 +329,31 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 // ----------------
 class CannonBallEngine {
     private static final long serialVersionUID = 2222L;
+    private final double PIXELS_PER_METER = 10;    // ! This also acts as a "zoom", changing the size of everything.
     private final Dimension MIN_WORLD_SIZE = new Dimension(256, 256);
-    private final double PIXELS_PER_METER = 5;    // ! This also acts as a "zoom", changing the size of everything.
-
+    
     //@todo
     // We have a consideration to make, if we want to define MIN/MAXs for sizes, speeds, etc. or just let the calling methods handle all that.
     // Right now, for simplicity, I'm going to have faith in the callers.
    
+    // The Renderer
+    private CannonBallRenderer r;
+    
     // Controlling tick()
     private boolean physics_paused; 
     private boolean restart_game;
 
-    private CannonBallRenderer r;
-
     // Because events (which change engine values) can occur concurrently with the Thread (and thus during a tick(), which is no good),
     // each mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
-
     private double[] cannon_angle;      // In radians. Degrees only for method interface.
     private double[] cannon_force;      
     private double[] bubble_size;       // Pixels (meter -> pixel conversion is done on set_...)
     private double[] bubble_speed;      // Pixels per second (using the delta_t passed to tick() to approximate seconds)
     private double[] world_gravity;     // Pixels per second per second. (Meter conversion is done in set_...)
     private Dimension[] world_size;     // Still in pixels. *Note: the CannonBallRenderer's canvas is always +2 bigger on each axis (for the border).
-    
-
+   
+    // Game objects:
+    private Cannon can; 
     // temp
     testball[] tests = new testball[100];
     class testball {
@@ -342,19 +362,29 @@ class CannonBallEngine {
         double vy = 0;
     }
 
+    // Other data
+    private double time_elapsed;    // Time game is not paused. Resets on restart.
+
     // @todo We should probably use the ball and Vec2s class like the last program, though we should
     // also probably take advantage of Java's built in Shape classes (like Circle, Rectangle) as they'll make collision detection easy.
     // Or, if Circle collision detection is too hard, we can use hitbox rectanges in their class. 
     // ! That is if we do make a class like the last program, cause alternatively we could just do parallel vectors for each data element (pos, vel, size) (!? do we want size and vel magnitude to be same for all bubbles?)
     //   Managing such a system may become cumbersome, though.
+    
+
 
     public CannonBallEngine() {
-        cannon_angle = new double[]{0, 3.14};
+        cannon_angle = new double[]{0, Math.PI-Math.random()*Math.PI/2};
         cannon_force = new double[]{0, PIXELS_PER_METER*2};
         bubble_size  = new double[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
         bubble_speed = new double[]{0, PIXELS_PER_METER};
         world_gravity = new double[]{0, 9.8*PIXELS_PER_METER};
         world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
+
+        // A twelve by three meter cannon.
+        can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point(10,10));
+
+        time_elapsed = 0;
 
         physics_paused = true;
         restart_game = false;
@@ -367,13 +397,20 @@ class CannonBallEngine {
     public void set_world_size(Dimension dim) {
         world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
     }
-    public void set_bubble_size(int m) {
+    public void set_bubble_size(double m) {
         System.out.println("Size: " + m);
         bubble_size[1] = m * PIXELS_PER_METER;
     }
     public void set_bubble_speed(double mps) {
         System.out.println("Speed: " + mps);
         bubble_speed[1] = mps * PIXELS_PER_METER;
+    }
+    public void set_cannon_angle(double degrees) {
+        cannon_angle[1] = Math.toRadians(180-Math.min(90, Math.max(0, degrees)));
+        System.out.println("ang " + degrees + " " + cannon_angle[1]);
+    }
+    public void set_cannon_force(double mps) {
+
     }
     public void set_gravity(double mpsps) {
         System.out.println("Gravity: " + mpsps);
@@ -391,14 +428,19 @@ class CannonBallEngine {
     public boolean is_paused() { return physics_paused; }
     public Renderer renderer() { return r; }
 
+    public double get_cannon_angle() { return Math.toDegrees(Math.PI-cannon_angle[0]); }
+    //public double get_cannon_force() {} 
+    public double get_time_elapsed() { return time_elapsed; }
+
     public void tick(double delta_t) {
         // Update engine values
         // Not all require redraws.
         cannon_force[0] = cannon_force[1];
         world_gravity[0] = world_gravity[1];
         bubble_speed[0] = bubble_speed[1];
-        if (cannon_angle[0] != cannon_angle[1]) {   // Should we calculate cannon vertexes in the layer draw, or store them every time it's changed here?
-            cannon_angle[0] = cannon_angle[1]; 
+        if (cannon_angle[0] != cannon_angle[1]) { 
+            cannon_angle[0] = cannon_angle[1];
+            can.aim(cannon_angle[0]);
             r.redraw(r.l_cannon);
         }
         if (bubble_size[0] != bubble_size[1]) {
@@ -408,7 +450,6 @@ class CannonBallEngine {
         if (!world_size[0].equals(world_size[1])) {
             world_size[0] = world_size[1];
             r.set_resolution(world_size[0]);
-            //System.out.println("setting resolution: " + world_size[0]);
             r.redraw(~0);   // Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. 
                             // @todo We could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all 
                             // the time (which we should check), this might not be an issue cause we'll be generating new buffs all the time anyways.
@@ -416,7 +457,6 @@ class CannonBallEngine {
 
         // Physics (moving, colliding, accelerating)
         if (!physics_paused) {
-
             // A consideration:
             //  Move then check collisions? or..
             //  Check next position, then move.
@@ -433,8 +473,13 @@ class CannonBallEngine {
             }
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
+            time_elapsed += delta_t;
         } else if (restart_game) {
+            time_elapsed = 0;
             // temp
+
+            //can.aim(Math.random()+Math.PI/2);
+            set_cannon_angle(Math.random()*90);
 
             // Reset the state of the game
             // Could use an init_game_state() or something 
@@ -443,7 +488,7 @@ class CannonBallEngine {
                 test.vy = 0;
             }
             r.redraw(r.l_bubbles);
-            r.redraw(r.l_cannon);     // @todo We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
+            //r.redraw(r.l_cannon);     // @todo We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
             restart_game = false;
         }
     }
@@ -454,6 +499,9 @@ class CannonBallEngine {
         public final int l_background, l_statics, l_bubbles, l_balloids, l_cannon, l_dragbox;   
         // Border size constant, for readability. Could also make adjustable, by moving and exposing this to Engine.
         public final int BORDER = 1; 
+
+        // For easy of use in drawing. Top left and bottom right corners of world space.
+        public Point tl, br;
         
         public CannonBallRenderer(Dimension resolution) {
             super(6, new Dimension(resolution.width+2, resolution.height+2));  // +2 for BORDER
@@ -463,6 +511,8 @@ class CannonBallEngine {
             l_balloids   = LAYERS[3];
             l_cannon     = LAYERS[4];       // The array business may be stupid and uncessary.
             l_dragbox    = LAYERS[5];
+            tl = new Point(0+BORDER, 0+BORDER);
+            br = new Point(res_x()-BORDER, res_y()-BORDER);
         }
     
         public void draw(int layer, Graphics g) {
@@ -495,7 +545,10 @@ class CannonBallEngine {
         private void draw_bubbles(Graphics g) {
             for (testball test : tests) {
                 g.setColor(new Color(255, 255, 255, 50));
-                g.fillOval(BORDER+(int)test.x-1, BORDER+(int)test.y-1, (int)bubble_size[0]+1, (int)bubble_size[0]+1);   // Safety pixel.
+                g.fillOval(BORDER+(int)(test.x-bubble_size[0]-1), 
+                           BORDER+(int)(test.y-bubble_size[0]-1), 
+                           (int)(bubble_size[0]*2+1), 
+                           (int)(bubble_size[0]*2+1));   // Safety center pixel.
             }
         }
     
@@ -507,6 +560,50 @@ class CannonBallEngine {
     
         // @todo draw the cannon
         private void draw_cannon(Graphics g) {
+            //cannon.draw(g);
+            g.setColor(Color.red);
+            Point a = can.tip();
+            Point b = can.tail();
+            Point z = can.sidediff();
+            g.drawPolygon(
+                new int[]{a.x+z.x, b.x+z.x, b.x-z.x, a.x-z.x}, //br.x-can.corner_offset.x-10, br.x-can.corner_offset.x+10},
+                new int[]{a.y-z.y, b.y-z.y, b.y+z.y, a.y+z.y},
+                4
+            );
+            g.setColor(Color.blue);
+            g.drawLine(a.x, a.y, b.x, b.y);
+            System.out.println("candraw");
+
+            //Point tip = can.tip();
+            //tip.x += br.x-can.corner_offset.x;
+            //tip.y += br.y-can.corner_offset.y;
+            //System.out.println(tip + " " + can.corner_offset + " " +  br + " " + tl);
+            //g.drawRect(world_size[0].width-can.corner_offset-(int)tip.x, 
+            //           world_size[0].height-can.corner_offset-(int)tip.x, 
+            //        
+            //           (int)tip.y, world_width[0]-can.corner_offset.x, can.corner_offset.y);
+            /*g.drawRect(tip.x, tip.y, br.x-can.corner_offset.x, br.x-can.corner_offset.y);
+                       //world_size[0].height-can.corner_offset-tip.x, 
+                    
+                       //(int)tip.y, world_width[0]-can.corner_offset.x, can.corner_offset.y);
+            g.fillPolygon(
+                new int[]{tip.x+10, tip.x-10, br.x-can.corner_offset.x-10, br.x-can.corner_offset.x+10},
+                new int[]{tip.y+10, tip.y-10, br.y-can.corner_offset.y-10, br.y-can.corner_offset.y+10},
+                4
+            );
+
+            Point a = can.tip();
+            Point b = can.tail();
+            g.setColor(Color.blue); 
+            g.fillPolygon(
+                new int[]{a.x+10, b.x+10, b.x-10, a.x-10}, //br.x-can.corner_offset.x-10, br.x-can.corner_offset.x+10},
+                new int[]{a.y+10, b.y+10, b.y-10, a.y-10},
+                4
+            );
+
+            System.out.println(a + " " + b + " " + can.sidediff());*/
+
+
         }
     
         // @todo draw the dragbox
@@ -517,8 +614,48 @@ class CannonBallEngine {
         // Expose this to rest of class, so render resolution (size) can be changed to match the world size 1:1
         public void set_resolution(Dimension res) {
             super.set_resolution(new Dimension(res.width+2, res.height+2));
+            br = new Point(res_x()-BORDER, res_y()-BORDER);
         }
     }
+
+    class Cannon {
+        private Point corner_offset;
+        private int length;
+        private int diameter;
+        private double angle;  // Assuming in range of pi/2 -> pi
+
+        public Cannon(int l, int d, Point offset) {
+            diameter = d;
+            length = l; 
+            angle = Math.PI/2+Math.PI/4+Math.PI/8;
+            corner_offset = new Point(d/2+1+offset.x,d/2+1+offset.y); // Draw as close to corner as possible.
+        }
+
+        public void aim(double rad) {
+            System.out.println("!" + rad);
+            angle = Math.min(Math.PI, Math.max(Math.PI/2, rad));
+            System.out.println(angle);
+        }
+
+        public double angle() { return angle; }
+
+        // World space pixel coordinates of tip and tail (center line).
+        public Point tip() {
+            Point tip = tail();
+            tip.x += (int)(Math.cos(angle)*length);
+            tip.y += -(int)(Math.sin(angle)*length);
+            return tip;
+        }
+        public Point tail() {
+            return new Point(world_size[0].width-corner_offset.x, world_size[0].height-corner_offset.y);
+        }
+        // Coordinate difference of four vertices from center line.
+        public Point sidediff() {
+            System.out.println(Math.cos(angle-Math.PI/2)*(diameter/2.0));
+            return new Point((int)Math.abs(Math.cos(angle-Math.PI/2)*diameter/2), (int)Math.abs(Math.sin(angle-Math.PI/2)*diameter/2));
+        }
+    }
+
 }
 
 // ----------------
@@ -801,6 +938,71 @@ class Vec2 {
     }
 }
 
+class OldCannon {
+    int base_x, base_y;        // center of base
+    int base_radius;           
+
+    double angle_deg;          // angle in degrees
+    int barrel_length;         
+    int barrel_width;          
+
+    public OldCannon(int x, int y) {
+        base_x = x;
+        base_y = y;
+
+        base_radius = 20;
+        angle_deg = 45;
+        barrel_length = 60;
+        barrel_width = 12;
+    }
+
+    public void set_angle(double deg) {
+        angle_deg = Math.max(0, Math.min(90, deg));   // clamp angle
+    }
+
+    public void draw(Graphics g) {
+
+        // draw base
+        g.setColor(Color.darkGray);
+        g.fillOval(base_x - base_radius, base_y - base_radius,
+                   base_radius * 2, base_radius * 2);
+
+        // convert angle
+        double rad = Math.toRadians(angle_deg);     //  tried to do without radians, thatn was a mess
+
+        // direction vector
+        double dx = -Math.cos(rad);
+        double dy = -Math.sin(rad);
+
+        // perpendicular vector
+        double px = -dy;
+        double py = dx;
+
+        int half_w = barrel_width / 2;
+
+        // rectangle corners
+        int x1 = (int)(base_x + px * half_w);
+        int y1 = (int)(base_y + py * half_w);
+
+        int x2 = (int)(base_x - px * half_w);
+        int y2 = (int)(base_y - py * half_w);
+
+        int x3 = (int)(x2 + dx * barrel_length);
+        int y3 = (int)(y2 + dy * barrel_length);
+
+        int x4 = (int)(x1 + dx * barrel_length);
+        int y4 = (int)(y1 + dy * barrel_length);
+
+        // draw barrel
+        g.setColor(Color.gray);
+        g.fillPolygon(
+            new int[]{x1, x2, x3, x4},
+            new int[]{y1, y2, y3, y4},
+            4
+        );
+    }
+}
+
 
 
 // COMMENT/todo GRAVE
@@ -984,3 +1186,15 @@ class Vec2 {
 
     //private static final long serialVersionUID = 1111L; // Are these needed everywhere? @todo Ask pyz about his compiler settings.
 
+
+    // This is the start of the cannon line.
+//    // For cannon size, we can set the width to the ball radius, and use the approximation that a cannon is 3 times as long as it is wide.
+//    //private final Dimension CANNON_SIZE = new Dimension(10.0*PIXELS_PER_METER, 50.0);
+//    class CollidableThing {
+//        public Vec2 pos;
+//        private Rectangle hitbox;
+//
+//    // Cannon Projectiles
+//    class Balloid {
+//        public Vec2 pos
+//
