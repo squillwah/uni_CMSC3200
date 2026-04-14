@@ -755,14 +755,20 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                 ball_normal.y = 0;
                 ball_hitbox = ball.next_hitbox(delta_t);
 
-                // collide with rectangles
-                for (Rectangle rect : rects) {
+                // collide with rectangles, bounce, then destroy rectangle
+                for (int j = 0; j < rects.size(); j++) {
+                    Rectangle rect = rects.elementAt(j);
+
                     if (!(ball_intersection = ball_hitbox.intersection(rect)).isEmpty()) {
                         if (ball_intersection.height > ball_intersection.width) {
                             ball_normal.x = ball.vel_x() * -2;
                         } else {
                             ball_normal.y = ball.vel_y() * -2;
                         }
+
+                        rects.removeElementAt(j);
+                        r.redraw(r.l_statics);
+                        break;
                     }
                 }
 
