@@ -1,16 +1,10 @@
 
-//package CannonBall;
+package CannonBall;
 
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
-
-import java.awt.image.VolatileImage;    
-// https://docs.oracle.com/javase/8/docs/api/java/awt/image/VolatileImage.html
-// Hardware accelerated images, uses GPU/VRAM for buffer drawing/storage.
-// For major performance benefit with multiple transparent buffer layers.
-// Requires additional management (see RenderComposer.vi_validate()), as VRAM makes no promises.
-
+import java.util.Vector;
 
 // ----------------
 // The Main Class
@@ -26,9 +20,10 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
     private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
     private final byte nodebug = 0, db1 = 1, db2 = 2, db3 = 3, NUM_DEBUG_LEVELS = 4;
+    private final byte fertileballs = 0, drawhitboxes = 1, bubblegravity = 2, NUM_EXTRAS = 3;
     // Parallel MenuItem value arrays.
-    private final int SIZES[] = {10, 20, 30, 50, 80};                                                   // Radius in meters (expanding from a single center point pixel).
-    private final int SPEEDS[] = {1, 2, 3, 5, 8};                                                       // Meters per second (applied equally to both components).
+    private final double SIZES[] = {.5, 1, 1.5, 2.5, 4};                                                // Radius in meters (expanding from a single center point pixel).
+    private final double SPEEDS[] = {1, 2, 3, 5, 8};                                                    // Meters per second (applied equally to both components).
     private final double GRAVITIES[] = {3.7, 8.87, 9.80665, 3.71, 24.79, 10.4, 8.87, 11.15, 0.620};     // Meters per second per second. (Pixel -> Meter ratio is defined in Engine)
 
     // Frame and panels.
@@ -41,12 +36,13 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     private boolean main_thread_running;
     // Elements of UI: MenuItems, ScrollBars, Labels.
     private MenuBar menubar;
-    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo;
+    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo, mnu_extras;
     private MenuItem[] mnu_control_itms;                        
     private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    
     private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   
     private CheckboxMenuItem[] mnu_environment_itms;
     private CheckboxMenuItem[] mnu_debuginfo_itms;
+    private CheckboxMenuItem[] mnu_extras_itms;
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
     private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 
 
@@ -112,6 +108,11 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         mnu_debuginfo_itms[db1]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 1"));
         mnu_debuginfo_itms[db2]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 2"));
         mnu_debuginfo_itms[db3]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 3"));
+        mnu_extras                              = menubar.add(new Menu("Extras"));
+        mnu_extras_itms                         = new CheckboxMenuItem[NUM_EXTRAS];
+        mnu_extras_itms[fertileballs]           = (CheckboxMenuItem)mnu_extras.add(new CheckboxMenuItem("fertile balls"));
+        mnu_extras_itms[drawhitboxes]           = (CheckboxMenuItem)mnu_extras.add(new CheckboxMenuItem("draw hitboxes"));
+        mnu_extras_itms[bubblegravity]          = (CheckboxMenuItem)mnu_extras.add(new CheckboxMenuItem("bubble gravity"));
         // Conpan Scrolls, Labels, add to Panels:
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -124,6 +125,9 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 1;   gbc.ipady = 1; gbc.insets = new Insets(0,10,5,10);  lbl_cannon_angle = new Label("Angle: ?deg", Label.CENTER);  pnl_controls.add(lbl_cannon_angle, gbc);
         sb_cannon_force.setBackground(pnl_controls.getBackground().darker());  
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
+        sb_cannon_angle.setMinimum(0); sb_cannon_angle.setMaximum(1000); sb_cannon_angle.setVisibleAmount(100); // 1000-100 == 90.0 degrees
+        sb_cannon_angle.setBlockIncrement(45); sb_cannon_angle.setUnitIncrement(9); 
+
         // Add panels to frame, display to panel:
         window.setMenuBar(menubar);
         window.add("Center", pnl_display);
@@ -145,24 +149,34 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_extras_itms) mi.addItemListener(this);
+        sb_cannon_angle.addAdjustmentListener(this);
+        sb_cannon_force.addAdjustmentListener(this);
         window.addWindowListener(this);
         window.addComponentListener(this);
+        display.addMouseListener(engine);   // Mouse handling done in Engine.
+        display.addMouseMotionListener(engine);
         // Start
         window.validate();
         window.setVisible(true);
         start_thread();
     }
 
-
     private void exit() {
-        stop_thread();
+        display.removeMouseListener(engine);
+        display.removeMouseMotionListener(engine);
+        sb_cannon_angle.removeAdjustmentListener(this);
+        sb_cannon_force.removeAdjustmentListener(this);
         for (MenuItem mi : mnu_control_itms) mi.removeActionListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_size_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.removeItemListener(this);
+        for (CheckboxMenuItem mi : mnu_extras_itms) mi.removeItemListener(this);
         window.removeWindowListener(this);
         window.removeComponentListener(this);
+        
+        stop_thread();
         window.dispose();
         System.exit(0);
     }
@@ -189,7 +203,14 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         while(main_thread_running) {
             delta_t = (System.nanoTime() - frame_start_t) / 1000000000.0; // Seconds.
             frame_start_t = System.nanoTime();
-            //System.out.println(delta_t + " " + frame_start_t);
+
+            // Keep scrolls, score, and time in sync.
+            sb_cannon_angle.setValue((int)(engine.get_cannon_angle()*10));
+            lbl_cannon_angle.setText("Angle: " + sb_cannon_angle.getValue()/10.0 + "deg");    // @todo May instead want to have some connect_cannon_angle_scroll or connect_player_score_lbl thing in engine.
+            
+            lbl_time.setText("Time: " + ((int)(engine.get_elapsed_time()*10))/10.0);
+            lbl_score_ball.setText("Bubbles: " + engine.get_score_bubbles());
+            lbl_score_player.setText("Player: " + engine.get_score_player());
 
             engine.tick(delta_t);
             display.debug_inform_ticktime(delta_t);
@@ -206,7 +227,10 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
-
+        Object bar = e.getSource();
+        if (bar == sb_cannon_angle) {
+            engine.set_cannon_angle(sb_cannon_angle.getValue()/10.0);
+        }
     }
 
     public void actionPerformed(ActionEvent e) {
@@ -266,6 +290,13 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         if ((radio = find_mitem(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, item)) > -1) { 
             set_mradio(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, radio);
             display.debug_lvl = radio;  // It so happens that the debug level and MenuItem offset align. Do not rely on this, will cause issues if that's changed.
+        } else 
+        if ((radio = find_mitem(mnu_extras_itms, NUM_EXTRAS, item)) > -1) {
+            switch (radio) {
+                case fertileballs: engine.set_m_fertileballs(mnu_extras_itms[radio].getState()); break;
+                case drawhitboxes: engine.set_m_drawhitboxes(mnu_extras_itms[radio].getState()); break;
+                case bubblegravity: engine.set_m_bubblegravity(mnu_extras_itms[radio].getState()); break;
+            }
         }
     }
     
@@ -273,8 +304,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         switch ((int)(Math.random()/.25)) {
             case 0: System.out.println("Would you like to play a game?"); break;
             case 1: System.out.println("Life? Don't talk to me about life."); break;
-            case 2: System.out.println("todo: quote 3"); break;
-            case 3: System.out.println("todo: quote 4"); break;
+            case 2: System.out.println("Hello there."); break;
+            case 3: System.out.println(":-)"); break;
             default: System.out.println("Not in the mood. Go away."); exit(); break;
         }
     }
@@ -294,9 +325,10 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     public void windowIconified(WindowEvent e) {} 
     public void windowDeiconified(WindowEvent e) {}
     public void componentResized(ComponentEvent e) { 
-        // To account for the window border, the engine's Renderer creates buffers +2 pixels larger than world_size on each axis.
-        // So, to keep the images in the canvas, shrink the world size -2 pixels on each axis.
-        engine.set_world_size(new Dimension(pnl_display.getWidth()-2, pnl_display.getHeight()-2));   
+        // Restrict minimum sizes to the furthest rectangles out in the engine's world space.
+        //    pnl_display.setMinimumSize(new Dimension(engine.get_furthestrect_display_size().width, engine.get_furthestrect_display_size().height-pnl_controls.getHeight()));
+        
+        engine.set_world_size(new Dimension(pnl_display.getWidth()-2, pnl_display.getHeight()-2)); // Shrink axis by 2 (Renderer expands to create the border).
     }
     
     // Unimplemented WindowListener, ComponenetLister:
@@ -307,153 +339,342 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 // ----------------
 // The Game. 
 // Holds data for objects in the world, does the physics and collisions on tick().
+// Also handles mouse interactions with the game.
 // ----------------
-class CannonBallEngine {
+class CannonBallEngine implements MouseListener, MouseMotionListener {
     private static final long serialVersionUID = 2222L;
+    private final double PIXELS_PER_METER = 10;    // ! This also acts as a "zoom", changing the size of everything.
     private final Dimension MIN_WORLD_SIZE = new Dimension(256, 256);
-    private final double PIXELS_PER_METER = 5;    // ! This also acts as a "zoom", changing the size of everything.
-
-    //@todo
-    // We have a consideration to make, if we want to define MIN/MAXs for sizes, speeds, etc. or just let the calling methods handle all that.
-    // Right now, for simplicity, I'm going to have faith in the callers.
-   
-    // Controlling tick()
+    
+    // The Renderer
+    private CannonBallRenderer r;
+    
+//    // Minimum sizing, accounting for rectangles. 
+//    private Rectangle furthestrects[];  // 2 possible furthest rects from top left.
+//    private Dimension furthestrect_display_size;
+    
+    // Controlling tick():
     private boolean physics_paused; 
     private boolean restart_game;
+    
+    // Mode settings:
+    private boolean m_fertileballs;
+    private boolean m_drawhitboxes;
+    private boolean m_bubblegravity;
 
-    private CannonBallRenderer r;
-
+    // Game Data:
     // Because events (which change engine values) can occur concurrently with the Thread (and thus during a tick(), which is no good),
-    // each mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
-
-    private double[] cannon_angle;      // In radians. Degrees only for method interface.
+    // each externally mutable engine data value gets a buddy. The first value is updated to match the second at each tick start.
     private double[] cannon_force;      
+    private double[] cannon_angle;      // In radians. Degrees only for method interface.
     private double[] bubble_size;       // Pixels (meter -> pixel conversion is done on set_...)
     private double[] bubble_speed;      // Pixels per second (using the delta_t passed to tick() to approximate seconds)
     private double[] world_gravity;     // Pixels per second per second. (Meter conversion is done in set_...)
     private Dimension[] world_size;     // Still in pixels. *Note: the CannonBallRenderer's canvas is always +2 bigger on each axis (for the border).
-    
+    private Rectangle world_perim;
+    private int score_player;
+    private int score_bubbles;
+    private double elapsed_time;        // Time game is not paused. Resets on restart.
+    private double timer_fertileballs;
+    private boolean fire_cannon; 
 
-    // temp
-    testball[] tests = new testball[100];
-    class testball {
-        double x = (Math.random()*world_size[0].width);
-        double y = (Math.random()*world_size[0].height);
-        double vy = 0;
-    }
+    // Game Objects:
+    private Cannon can; 
+    private Vector<Bubble> bubbs;   
+    //private Vector<Balloid> balls;  // Like from the cannon.
+    private Vector<Rectangle> rects;
 
-    // @todo We should probably use the ball and Vec2s class like the last program, though we should
-    // also probably take advantage of Java's built in Shape classes (like Circle, Rectangle) as they'll make collision detection easy.
-    // Or, if Circle collision detection is too hard, we can use hitbox rectanges in their class. 
-    // ! That is if we do make a class like the last program, cause alternatively we could just do parallel vectors for each data element (pos, vel, size) (!? do we want size and vel magnitude to be same for all bubbles?)
-    //   Managing such a system may become cumbersome, though.
+    // Mouse stuff:
+    private Point m1, m2;
+    private boolean dragoff; 
+    private Rectangle dragbox;
+    private Rectangle addrect[]; 
+    private MouseEvent mouseclick[];
 
     public CannonBallEngine() {
-        cannon_angle = new double[]{0, 3.14};
-        cannon_force = new double[]{0, PIXELS_PER_METER*2};
-        bubble_size  = new double[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
-        bubble_speed = new double[]{0, PIXELS_PER_METER};
-        world_gravity = new double[]{0, 9.8*PIXELS_PER_METER};
+        
+        addrect = new Rectangle[]{null, null};
+        cannon_angle = new double[]{1, Math.PI-Math.random()*Math.PI/2};
+        cannon_force = new double[]{1, PIXELS_PER_METER*2};
+        bubble_size  = new double[]{1, (int)(PIXELS_PER_METER/2+1)};   // It is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
+        bubble_speed = new double[]{1, PIXELS_PER_METER};
+        world_gravity = new double[]{1, 9.8*PIXELS_PER_METER};
         world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
-
+        world_perim = new Rectangle(0, 0, world_size[0].width, world_size[0].height);
+        
+        // A twelve by three meter cannon.
+        can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point((int)PIXELS_PER_METER, (int)PIXELS_PER_METER));
+       
+        mouseclick = new MouseEvent[]{null, null};
+        m1 = null;
+        m2 = null; 
+        dragoff = false;
+        dragbox = null;
+        
         physics_paused = true;
         restart_game = false;
-        r = new CannonBallRenderer(MIN_WORLD_SIZE);
-        r.redraw(~0); // debug, draw everything
+        m_fertileballs = false;
+        m_drawhitboxes = false;
+        m_bubblegravity = false;
 
-        // temp
-        for (int i = 0; i < 100; i++) tests[i] = new testball();
+        fire_cannon = false;
+        
+        r = new CannonBallRenderer(MIN_WORLD_SIZE);
+        
+        init_game_state();
+        
+//        furthestrects = new Rectangle[]{new Rectangle(0,0,0,0), new Rectangle(0,0,0,0)};
+//        calculate_furthestrect_display_size();
     }
-    public void set_world_size(Dimension dim) {
-        world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
+   
+    // Places the game into the "new game" or start state. 
+    private void init_game_state() {
+        score_player = 0;
+        score_bubbles = 0;
+        elapsed_time = 0;
+        timer_fertileballs = 0;
+        set_cannon_angle(Math.random()*90);
+        rects = new Vector<Rectangle>();
+        bubbs = new Vector<Bubble>();
+        bubbs.addElement(new Bubble(null)); // Or a configurable number for start bubbles.
     }
-    public void set_bubble_size(int m) {
-        System.out.println("Size: " + m);
-        bubble_size[1] = m * PIXELS_PER_METER;
-    }
-    public void set_bubble_speed(double mps) {
-        System.out.println("Speed: " + mps);
-        bubble_speed[1] = mps * PIXELS_PER_METER;
-    }
-    public void set_gravity(double mpsps) {
-        System.out.println("Gravity: " + mpsps);
-        world_gravity[1] = mpsps * PIXELS_PER_METER;
-    }
-    public void set_pause(boolean p) {
-        System.out.println("Pause: " + p);
-        physics_paused = p; // This and restart do not have pair values, because it's assumed they'll only be read once per tick().
-    }
-    public void restart() {
-        System.out.println("Restart");
-        set_pause(true);
-        restart_game = true;
-    }
+
+    // Getters, setters, etc. For frame's UI to latch into.
+    public void set_world_size(Dimension dim) { world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height)); }
+    public void set_bubble_size(double m) { bubble_size[1] = m * PIXELS_PER_METER; }
+    public void set_bubble_speed(double mps) { bubble_speed[1] = mps * PIXELS_PER_METER; }
+    public void set_cannon_angle(double degrees) { cannon_angle[1] = Math.toRadians(180-Math.min(90, Math.max(0, degrees))); }
+    public void set_cannon_force(double mps) { cannon_force[1] = mps; }
+    public void set_gravity(double mpsps) { world_gravity[1] = mpsps * PIXELS_PER_METER; }
+    public void set_m_fertileballs(boolean m) { m_fertileballs = m; }
+    public void set_m_drawhitboxes(boolean m) { m_drawhitboxes = m; r.redraw(~0); }
+    public void set_m_bubblegravity(boolean m) { m_bubblegravity = m; }
+    public void set_pause(boolean p) { physics_paused = p; }
+    public void restart() { set_pause(true); restart_game = true; }
     public boolean is_paused() { return physics_paused; }
     public Renderer renderer() { return r; }
+    public double get_cannon_angle() { return Math.toDegrees(Math.PI-cannon_angle[0]); }
+    public double get_cannon_force() { return cannon_force[0]; }
+    public double get_elapsed_time() { return elapsed_time; }
+    public int get_score_bubbles() { return score_bubbles; }
+    public int get_score_player() { return score_player; }
+    public void fire_cannon() { fire_cannon = true; }
 
+//    private void calculate_furthestrect_display_size() {
+//        Dimension ds = new Dimension(MIN_WORLD_SIZE.width + r.BORDER*2, MIN_WORLD_SIZE.height + r.BORDER*2);
+//        for (Rectangle rect : rects) {
+//            if (rect.x+rect.width > ds.width) {
+//                ds.width = rect.x+rect.width; 
+//                furthestrects[0] = rect;            // Hold references to the furthest rects, so we'll know when to recalulate this if we destroy them.
+//            }
+//            if (rect.y+rect.height > ds.height) {
+//                ds.height = rect.y+rect.height;
+//                furthestrects[1] = rect;
+//            }
+//        }
+//        furthestrect_display_size = ds;
+//    }
+//    public Dimension get_furthestrect_display_size() { return furthestrect_display_size; }
+
+    // The tick(). This is where all the game logic happens. Intended to be called once per running loop.
     public void tick(double delta_t) {
-        // Update engine values
-        // Not all require redraws.
+        // Update engine values. Not all require redraws.
         cannon_force[0] = cannon_force[1];
         world_gravity[0] = world_gravity[1];
-        bubble_speed[0] = bubble_speed[1];
-        if (cannon_angle[0] != cannon_angle[1]) {   // Should we calculate cannon vertexes in the layer draw, or store them every time it's changed here?
-            cannon_angle[0] = cannon_angle[1]; 
+        
+        if (addrect[0] != addrect[1]) {
+            addrect[0] = addrect[1];
+            // Verify that the rectangle doesn't intersect with cannon, bubbles, or balloids, as well as absorbs smaller rects/becomes absorbed by bigger rects.
+            int bubble = 0, balloid = 0, rect = 0;
+            boolean addit = addrect[0] != null && !addrect[0].isEmpty() && !addrect[0].intersects(can.hitbox());
+            while (addit && bubble < bubbs.size()) {
+                addit = !addrect[0].intersects(bubbs.elementAt(bubble).hitbox());
+                bubble++;
+            }
+            //while (addit && balloid < balloids.size()) {
+            //    addit = !addrect[0].intersects(balloids.elementAt(balloid).hitbox());
+            //    balloid++;
+            //}
+            while (addit && rect < rects.size()) {
+                addit = !rects.elementAt(rect).contains(addrect[0]);
+                if (addrect[0].contains(rects.elementAt(rect))) { rects.removeElementAt(rect); rect--; }
+                rect++;
+            } 
+            if (addit) {
+                rects.addElement(addrect[0]);
+//                calculate_furthestrect_display_size();
+                r.redraw(r.l_statics); 
+            }
+        }
+        if (mouseclick[0] != mouseclick[1]) {
+            mouseclick[0] = mouseclick[1];
+            Point p = mouseclick[0].getPoint(); p = new Point(p.x-r.BORDER, p.y-r.BORDER); // To world space.
+            if (mouseclick[0].getButton() == MouseEvent.BUTTON3) {
+                for (int i = 0; i < rects.size(); i++) {
+                    if (rects.elementAt(i).contains(p)) {
+//                        if (rects.elementAt(i) == furthestrects[0] || rects.elementAt(i) == furthestrects[1])
+//                            calculate_furthestrect_display_size();
+                        rects.removeElementAt(i);
+                        i = rects.size();
+                        r.redraw(r.l_statics);
+                    }
+                }
+            } else 
+            if (mouseclick[0].getButton() == MouseEvent.BUTTON1) {
+                if (can.hitbox().contains(p)) {
+                    fire_cannon();
+                }
+            }
+        }
+        if (cannon_angle[0] != cannon_angle[1]) { 
+            cannon_angle[0] = cannon_angle[1];
+            can.aim(cannon_angle[0]);
             r.redraw(r.l_cannon);
+        }
+        if (bubble_speed[0] != bubble_speed[1]) {
+            bubble_speed[0] = bubble_speed[1];
+            for (Bubble bubb : bubbs) bubb.refresh_speed(); // Update all bubbs.
         }
         if (bubble_size[0] != bubble_size[1]) {
             bubble_size[0] = bubble_size[1];
+            for (Bubble bubb : bubbs) bubb.refresh_size();
             r.redraw(r.l_bubbles);
         }
         if (!world_size[0].equals(world_size[1])) {
-            world_size[0] = world_size[1];
+//            world_size[0] = new Dimension(Math.max(world_size[1].width, furthestrect_display_size.width), Math.max(world_size[1].height, furthestrect_display_size.height));
+//            world_size[1].setSize(world_size[0]);
+            world_size[0] = world_size[1]; 
+            world_perim.setBounds(0, 0, world_size[0].width, world_size[0].height);
+            can.refresh_hitbox();
+            for (Bubble bubb : bubbs) {
+                if (bubb.tl_x() <= world_perim.x) bubb.set_pos_x(bubb.radius+1);
+                else if (bubb.br_x() >= world_perim.width) bubb.set_pos_x(world_perim.width-bubb.radius-1);
+                if (bubb.tl_y() <= world_perim.y) bubb.set_pos_y(bubb.radius+1);
+                else if (bubb.br_y() >= world_perim.height) bubb.set_pos_y(world_perim.height-bubb.radius-1);
+            }
             r.set_resolution(world_size[0]);
-            //System.out.println("setting resolution: " + world_size[0]);
-            r.redraw(~0);   // Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. 
-                            // @todo We could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all 
-                            // the time (which we should check), this might not be an issue cause we'll be generating new buffs all the time anyways.
+            r.redraw(~0);   
+            // @Todo restrict the frame size here somehow, or find a way to let the Frame know (cannot shrink smaller than rectangles).
         }
 
         // Physics (moving, colliding, accelerating)
         if (!physics_paused) {
-
-            // A consideration:
-            //  Move then check collisions? or..
-            //  Check next position, then move.
-
-            for (testball test : tests) {
-                test.x += bubble_speed[0]*delta_t;  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
-                test.vy += world_gravity[0]*delta_t;
-                test.y += test.vy*delta_t;
-                if (test.x+bubble_size[0] > world_size[0].width) test.x = (Math.random()*world_size[0].width);
-                if (test.y+bubble_size[0] > world_size[0].height) {
-                    test.y = world_size[0].height-bubble_size[0]-1; 
-                    test.vy = -test.vy*.5;
+            // Special modes:
+            if (m_fertileballs) {
+                if (timer_fertileballs > 3) {  // Reproduce every five seconds.
+                    bubbs.addElement(new Bubble(bubbs.elementAt(0).pos())); // Assuming bubbs won't be empty (though a NULL wont break things). 
+                    timer_fertileballs = 0;
+                } timer_fertileballs += delta_t;
+            }
+        
+           
+            // Cannon fire 
+            if (fire_cannon) {
+                System.out.println("Fire cannon code goes on line 638");
+                fire_cannon = false;
+            }
+        
+       
+            // Bubble collisions. 
+            Vec2 normal = new Vec2(0,0);
+            Vec2 forces = new Vec2(0,0);
+            Rectangle hitbox, intersection;
+            if (m_bubblegravity) forces.y = world_gravity[0]*delta_t;
+            for (Bubble bubb : bubbs) {
+                // Collision detection of bubbles against screen edges. 
+                normal.x = normal.y = 0;
+                hitbox = bubb.next_hitbox(delta_t);                 // There will always be a degree of slight innacuracy to this, because we cannot predict the next ticktime.
+                intersection = hitbox.intersection(world_perim);
+                if (hitbox.width != intersection.width) {
+                    normal.x = bubb.vel_x()*-2; 
+                    if (hitbox.x <= world_perim.x) bubb.set_pos_x(bubb.radius+1);
+                    else bubb.set_pos_x(world_perim.width-bubb.radius-1);
+                } 
+                if (hitbox.height != intersection.height)  {
+                    normal.y = bubb.vel_y()*-2;
+                    if (hitbox.y <= world_perim.y) bubb.set_pos_y(bubb.radius+1);
+                    else bubb.set_pos_y(world_perim.height-bubb.radius-1);
                 }
+                // If nocollide is flagged, attempt to clear
+                if (bubb.nocollide) {
+                    bubb.nocollide = false;
+                    for (Rectangle rect : rects) bubb.nocollide |= hitbox.intersects(rect);
+                    bubb.nocollide |= hitbox.intersects(can.hitbox());
+                } else {
+                    // Otherwise, continue with collision checking against rects and cannon.
+                    for (Rectangle rect : rects) {
+                        if (!(intersection = hitbox.intersection(rect)).isEmpty()) {
+                            if (intersection.height > intersection.width) {
+                                normal.x = bubb.vel_x()*-2; 
+                                //bubb.set_pos_x(bubb.pos_x()+Math.signum(normal.x)*intersection.width);
+                            } else {
+                                normal.y = bubb.vel_y()*-2;
+                                //bubb.set_pos_y(bubb.pos_y()+Math.signum(normal.y)*intersection.height);
+                            }
+                        }
+                    }
+                    // And against the cannon, for score keeping.
+                    if (hitbox.intersects(can.hitbox())) {
+                        score_bubbles++;
+                        bubb.nocollide = true;  // Disable collisions and randomly relocate.
+                        bubb.set_pos_x(bubb.radius()+1+(Math.random()*world_size[0].width*.6-bubb.radius()-1));
+                        bubb.set_pos_y(bubb.radius()+1+(Math.random()*world_size[0].height-bubb.radius()-1)); 
+                    }
+                }
+                bubb.accelerate(normal);
+                bubb.accelerate(forces);
+                bubb.advance(delta_t);
             }
-            r.redraw(r.l_bubbles);
-            //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
-        } else if (restart_game) {
-            // temp
 
-            // Reset the state of the game
-            // Could use an init_game_state() or something 
-            for (testball test: tests) {
-                test.x = test.y = MIN_WORLD_SIZE.height/2;
-                test.vy = 0;
-            }
             r.redraw(r.l_bubbles);
-            r.redraw(r.l_cannon);     // @todo We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
+            elapsed_time += delta_t;
+        } else if (restart_game) {
+            init_game_state();
+            r.redraw(r.l_bubbles);
+            r.redraw(r.l_cannon);
+            r.redraw(r.l_statics);
+            //r.redraw(r.l_balloids);
             restart_game = false;
         }
     }
-    
-    // Renderer for the game. Defines how the drawing's done, which layers and how many.
+   
+
+    public void mousePressed(MouseEvent e) { 
+        m1 = e.getPoint(); 
+        dragbox = new Rectangle();
+    }
+    public void mouseDragged(MouseEvent e) { 
+        m2 = e.getPoint(); 
+        if (!dragoff) {
+            dragbox.setLocation(Math.max(r.BORDER, Math.min(Math.min(m1.x,m2.x), r.res_x()-r.BORDER*2)), Math.max(r.BORDER, Math.min(Math.min(m1.y,m2.y), r.res_y()-r.BORDER*2)));
+            dragbox.setSize(Math.min(Math.abs(m1.x-m2.x), r.res_x()-r.BORDER*2-dragbox.x), Math.min(Math.abs(m1.y-m2.y), r.res_y()-r.BORDER*2-dragbox.y));
+        }
+        r.redraw(r.l_dragbox);
+    }
+    public void mouseReleased(MouseEvent e) {
+        if (m2 == null) mouseclick[1] = e;
+        addrect[1] = dragbox;
+        dragbox = null;
+        m1 = null;
+        m2 = null;
+        r.redraw(r.l_dragbox);
+    }
+    public void mouseExited(MouseEvent e) { dragoff = true; }
+    public void mouseEntered(MouseEvent e) { dragoff = false; }
+    public void mouseClicked(MouseEvent e) {} public void mouseMoved(MouseEvent e) {}
+   
+
+    // ----------------
+    // The Game Renderer 
+    // Defines how the drawing's done, to which layers and of how many.
+    // ----------------
     class CannonBallRenderer extends Renderer {
         // Alias render layers with descriptive names.
         public final int l_background, l_statics, l_bubbles, l_balloids, l_cannon, l_dragbox;   
         // Border size constant, for readability. Could also make adjustable, by moving and exposing this to Engine.
         public final int BORDER = 1; 
+        // For easy of use in drawing. Top left and bottom right corners of world space.
+        public Point tl, br;
         
         public CannonBallRenderer(Dimension resolution) {
             super(6, new Dimension(resolution.width+2, resolution.height+2));  // +2 for BORDER
@@ -461,11 +682,14 @@ class CannonBallEngine {
             l_statics    = LAYERS[1];
             l_bubbles    = LAYERS[2];
             l_balloids   = LAYERS[3];
-            l_cannon     = LAYERS[4];       // The array business may be stupid and uncessary.
+            l_cannon     = LAYERS[4];   // The array business may be stupid and uncessary.
             l_dragbox    = LAYERS[5];
+            tl = new Point(0+BORDER, 0+BORDER);
+            br = new Point(res_x()-BORDER, res_y()-BORDER);
         }
     
         public void draw(int layer, Graphics g) {
+            try {
                 // Could very easily support drawing multiple layers onto one graphics here (with &), if that ever becomes desirable.
                 if (layer == l_background)      draw_background(g);
                 else if (layer == l_statics)    draw_statics(g);    
@@ -474,50 +698,225 @@ class CannonBallEngine {
                 else if (layer == l_cannon)     draw_cannon(g);     
                 else if (layer == l_dragbox)    draw_dragbox(g);    
                 else System.out.println("err: bad layer code in draw");
+            } catch (java.util.ConcurrentModificationException e) { 
+                // No gods no masters.
+                System.out.println("Everything is fine."); 
+            }
         }
     
         // @todo depending on the planet, can make the background different.
         private void draw_background(Graphics g) {
             g.setColor(Color.darkGray);
             g.fillRect(0, 0, res_x(), res_y());         // Fill background. RenderComposers preserve all layer transparency.
+            //switch ((int)(world_gravity[0])) {
+            //    case 3: g.setColor(Color.red.darker()); break;
+            //    case 8: g.setColor(Color.white); break;
+            //    case 9: g.setColor(Color.green.darker()); break;
+            //    case 24: g.setColor(Color.orange.darker()); break;
+            //    case 10: g.setColor(Color.orange.brighter()); break;
+            //    case 11: g.setColor(Color.blue); break;
+            //    case 0: g.setColor(Color.lightGray); break;
+            //}
             g.setColor(Color.blue);
             g.drawRect(0, 0, res_x()-1, res_y()-1);
-            //System.out.println("background");
         }
     
-        // @todo draw rectangles here, any other static objects
         private void draw_statics(Graphics g) {
-            g.setColor(Color.blue);
-            g.fillRect(res_x()/2, 30, 40, 40);
+            g.setColor(Color.orange.darker());
+            for (Rectangle r : rects) {
+                g.fillRect(r.x, r.y, r.width, r.height);
+                if (m_drawhitboxes) {
+                    g.setColor(Color.red); 
+                    g.drawRect(r.x, r.y, r.width, r.height);
+                    g.setColor(Color.orange.darker());
+                }
+            }
+            //g.setColor(Color.blue);
+            //g.fillRect(res_x()/2, 30, 40, 40);
         }
     
-        // @todo draw the bubbles (moving targets) here
         private void draw_bubbles(Graphics g) {
-            for (testball test : tests) {
-                g.setColor(new Color(255, 255, 255, 50));
-                g.fillOval(BORDER+(int)test.x-1, BORDER+(int)test.y-1, (int)bubble_size[0]+1, (int)bubble_size[0]+1);   // Safety pixel.
+            g.setColor(new Color(155, 255, 255, 50));
+            for (Bubble bubb : bubbs) {
+                g.fillOval(BORDER+bubb.tl_x(), BORDER+bubb.tl_y(), (int)(bubb.radius()*2+1), (int)(bubb.radius()*2+1));
+                if (m_drawhitboxes) g.drawRect(bubb.hitbox().x, bubb.hitbox().y, bubb.hitbox().width, bubb.hitbox().height);
             }
         }
     
         // @todo bullets here
         private void draw_balloids(Graphics g) {
-            g.setColor(Color.green);
-            g.drawRect(res_x()/2 + 35, 25, 20, 20);
+            //g.setColor(Color.green);
+            //g.drawRect(res_x()/2 + 35, 25, 20, 20);
         }
     
-        // @todo draw the cannon
         private void draw_cannon(Graphics g) {
+            Point a = can.tip();
+            Point b = can.tail();
+            Point z = can.sidediff();
+            
+            // The wheels are assuming cannon is in bottom right.
+            g.setColor(new Color(48, 39, 14, 255));
+            g.fillOval((int)(br.x-PIXELS_PER_METER*7.5), (int)(br.y-PIXELS_PER_METER*6), (int)(PIXELS_PER_METER*7.5), (int)(PIXELS_PER_METER*6));
+            g.setColor(new Color(36, 38, 17));
+            g.fillPolygon(new int[]{a.x+z.x, b.x+z.x, b.x-z.x, a.x-z.x}, new int[]{a.y-z.y, b.y-z.y, b.y+z.y, a.y+z.y}, 4);
+            g.setColor(new Color(74, 60, 20, 120));
+            g.fillOval((int)(br.x-PIXELS_PER_METER*8), (int)(br.y-PIXELS_PER_METER*5.5), (int)(PIXELS_PER_METER*7.5), (int)(PIXELS_PER_METER*6));
+            
+            if (m_drawhitboxes) { 
+                g.setColor(Color.red);
+                g.drawPolygon(new int[]{a.x+z.x, b.x+z.x, b.x-z.x, a.x-z.x}, new int[]{a.y-z.y, b.y-z.y, b.y+z.y, a.y+z.y}, 4);
+                g.setColor(Color.blue);
+                g.drawLine(a.x, a.y, b.x, b.y);
+                g.setColor(Color.magenta);
+                g.drawRect(can.hitbox().x, can.hitbox().y, can.hitbox().width, can.hitbox().height);
+            }
         }
     
-        // @todo draw the dragbox
         private void draw_dragbox(Graphics g) {
-            //if (dragbox != null) g.drawRect(dragbox);
+            g.setColor(Color.white);
+            if (dragbox != null) g.drawRect(dragbox.x, dragbox.y, dragbox.width, dragbox.height);
         }
 
-        // Expose this to rest of class, so render resolution (size) can be changed to match the world size 1:1
+        // Expose resolution to rest of class, so render size can be matched with world size 1:1
         public void set_resolution(Dimension res) {
             super.set_resolution(new Dimension(res.width+2, res.height+2));
+            br = new Point(res_x()-BORDER, res_y()-BORDER);
         }
+    }
+
+    // ----------------
+    // The Cannon
+    // Holds the hitbox, angle, length, etc.
+    // Doesn't really 'do' anything. Firing is done elsewhere.
+    // ----------------
+    class Cannon {
+        private Point corner_offset;
+        private int length;
+        private int diameter;
+        private double angle;  // Assuming in range of pi/2 -> pi
+        private Rectangle hitbox;
+
+        public Cannon(int l, int d, Point offset) {
+            diameter = d;
+            length = l; 
+            angle = Math.PI/2+Math.PI/4+Math.PI/8;
+            corner_offset = new Point(d/2+1+offset.x,d/2+1+offset.y); // Draw as close to corner as possible.
+            hitbox = new Rectangle();
+            refresh_hitbox();
+        }
+
+        public void aim(double rad) {
+            angle = Math.min(Math.PI, Math.max(Math.PI/2, rad));
+            refresh_hitbox();
+        }
+
+        public void refresh_hitbox() {
+            Point tip = tip(); Point tail = tail(); Point diff = sidediff();
+            hitbox.setBounds(tip.x-diff.x, tip.y-diff.y, tail.x-tip.x+diff.x*2, tail.y-tip.y+diff.y*2);
+        }
+
+        public double angle() { return angle; }
+
+        public Rectangle hitbox() { return hitbox; }
+
+        // World space pixel coordinates of tip and tail (center line).
+        public Point tip() {
+            Point tip = tail();
+            tip.x += (int)(Math.cos(angle)*length);
+            tip.y += -(int)(Math.sin(angle)*length);
+            return tip;
+        }
+        public Point tail() {
+            return new Point(world_size[0].width-corner_offset.x, world_size[0].height-corner_offset.y);
+        }
+        // Coordinate difference of four vertices from center line.
+        public Point sidediff() {
+            return new Point((int)Math.abs(Math.cos(angle-Math.PI/2)*diameter/2), (int)Math.abs(Math.sin(angle-Math.PI/2)*diameter/2));
+        }
+    }
+   
+    // ----------------
+    // Balls
+    // Abstract class for common utility between Bubbles and Balloids
+    // ---------------- 
+    abstract class Ball {
+        protected Vec2 pos;
+        protected Vec2 vel;
+        protected double radius;
+        protected Rectangle hitbox;
+
+        public Ball() {} // Extending classes need to ensure that they initialize vel, pos, radius, and hitbox.
+
+        protected Rectangle gen_hitbox(Vec2 p) { return new Rectangle((int)(p.x-radius-1), (int)(p.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
+        protected void refresh_hitbox() { hitbox.setBounds((int)(pos.x-radius-1), (int)(pos.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
+
+        // Hitboxes, current position and next (at delta_t).
+        public Rectangle hitbox() { return hitbox; }
+        public Rectangle next_hitbox(double delta_t) { return gen_hitbox(Vec2.add(pos, Vec2.mul(vel, delta_t))); }
+      
+        // Apply acceleration force, advance position by velocity (per second, given time).
+        public void accelerate(Vec2 accel) { vel.add(accel); }
+        public void advance(double delta_t) { 
+            pos.add(Vec2.mul(vel, delta_t));
+            hitbox.setLocation((int)(pos.x-radius-1), (int)(pos.y-radius-1)); 
+        } 
+
+        public double radius() { return radius; }
+        public Vec2 vel() { return new Vec2(vel); }
+        public Vec2 pos() { return new Vec2(pos); }
+        public double vel_x() { return vel.x; } public double vel_y() { return vel.y; }
+        public double pos_x() { return pos.x; } public double pos_y() { return pos.y; }
+       
+        // Four corners of the circle. Primary use in drawing. 
+        public int tl_x() { return (int)(pos.x-1-radius); }
+        public int tl_y() { return (int)(pos.y-1-radius); }
+        public int br_x() { return (int)(pos.x+radius); }
+        public int br_y() { return (int)(pos.y+radius); }
+    }
+
+    // ----------------
+    // The Bubble
+    // These are the targets that move around the game.
+    // Can be placed randomly, or at a position. Heading is always a random diagonal.
+    // Size and speed are based on the single balloid_size/speed vars (shared).
+    // ----------------
+    class Bubble extends Ball {
+        public boolean nocollide;  // With walls, it cannot always be guaranteed that a random placement will be safe. Easy solution is to disable collision until it becomes safe.
+
+        public Bubble(Vec2 position) {
+            nocollide = true;
+            radius = bubble_size[0];
+            // If no position given, init with random (avoiding cannon).
+            if (position == null) pos = new Vec2(radius+1+(Math.random()*world_size[0].width*.75-radius-1), radius+1+(Math.random()*world_size[0].height-radius-1)); 
+            else pos = new Vec2(position);
+            // Heading always random perfect diagonal.
+            vel = new Vec2(1,1);
+            if (Math.random() < .5) vel.x = -vel.x; 
+            if (Math.random() < .5) vel.y = -vel.y;
+            hitbox = gen_hitbox(pos);
+            refresh_speed();
+        }
+        
+        // Update radius/vel to match bubble_size/bubble_speed
+        public void refresh_size() {
+            // Lookahead collision detection. Don't give new size if it intersects.
+            Rectangle new_hitbox = (new Rectangle(hitbox));
+            new_hitbox.grow((int)(bubble_size[0]-radius), (int)(bubble_size[0]-radius));
+            Rectangle intersection = new_hitbox.intersection(world_perim);
+            boolean nointersects = new_hitbox.width == intersection.width && new_hitbox.height == intersection.height;
+            for (int i = 0; nointersects && i < rects.size(); i++) nointersects = (intersection = new_hitbox.intersection(rects.elementAt(i))).isEmpty();
+            if (nointersects) {
+                radius = bubble_size[0];
+                refresh_hitbox();
+            }
+        }
+        public void refresh_speed() { 
+            vel = Vec2.mul(new Vec2(Math.signum(vel.x), Math.signum(vel.y)), bubble_speed[0]+Math.random()*bubble_speed[0]+1);  // Some random variation.
+        }
+
+        // The bubbles are to be restricted in world, even on window resize/during pause.
+        public void set_pos_x(double x) { pos.x = x; nocollide = true; refresh_hitbox(); }
+        public void set_pos_y(double y) { pos.y = y; nocollide = true; refresh_hitbox(); }
     }
 }
 
@@ -531,7 +930,6 @@ class MultiBufferedCanvas extends Canvas {
     
     private RenderComposer composer;
     private BufferedImage backbuff;
-    //private VolatileImage backbuff;
 
     // For "debug" stat bar overlay.
     public int debug_lvl; // 3 detail levels: 1 = least, 3 = most. Any other # disables.
@@ -541,7 +939,6 @@ class MultiBufferedCanvas extends Canvas {
     private double debug_data_ticktime;
 
     public MultiBufferedCanvas(Renderer r) {
-        System.out.println(r);
         setBackground(new Color(10, 10, 10));
         composer = new RenderComposer(r);
         
@@ -651,41 +1048,31 @@ abstract class Renderer {
 }
 
 
-// RC still very w.i.p, regarding VolatileImage vs BufferedImage. If only we had defines and ifdefs to toggle.
 
-// !!! @todo 
-// instead of recreating the graphics each time (if it becomes a lag issue), track when the resolution changes, and only recreate them then.
-// instead of creating new buffers each redraw, keep them and their graphics. just wipe the buffer with transparent pixels and call the layer's draw method.
-// How best to do? Could make as part of the redraw bitcode, that would give reason for the code array too, cause the codes won't be directly related to powers of 2.
-
-// Create and manage BufferedImage layers for a Renderer. Bake the final image.
-//  ! Not designed for concurrency. Ensure that the Renderer and RenderComposer are not being accessed/modified concurrently.
+// ----------------
+// The RenderComposer
+// Creates and manage BufferedImage layers for a Renderer. Bake the final image.
+// Not designed for concurrency. Ensure that the Renderer and RenderComposer are not being accessed/modified concurrently.
+// ----------------
 class RenderComposer {
     private final Color TRANSPARENT = new Color(0,0,0,0);
 
     int draws;  // Holds the code of layers to draw in update.
     private Renderer r;
     private Graphics gfx;
-    //private VolatileImage composedbuff; // @ todo use volatile instead?
-    private BufferedImage composedbuff; // @ todo use volatile instead?
+    private BufferedImage composedbuff;     // @ todo use volatile instead?
     private Graphics2D composedbuff_gfx;    // Graphics 2D is necessary for transparent clearing.
-    //private VolatileImage[] layerbuffs;
     private BufferedImage[] layerbuffs;
     private Graphics2D[] layerbuffs_gfx;
-    private GraphicsConfiguration gc;
 
     public RenderComposer(Renderer rudolph) {
-        gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         set_renderer(rudolph);
     }
    
     // There could be a use for changing the renderer. 
     public void set_renderer(Renderer rudolph) {
         r = rudolph;
-        System.out.println(rudolph);
-
         // Init empty layers.
-        //layerbuffs = new VolatileImage[r.LAYER_COUNT];
         layerbuffs = new BufferedImage[r.LAYER_COUNT];
         layerbuffs_gfx = new Graphics2D[r.LAYER_COUNT];
         generate_buffers();
@@ -693,20 +1080,18 @@ class RenderComposer {
 
     // Generate all buffers once, fitting to the resolution of the set Renderer.
     private void generate_buffers() {
-        //composedbuff = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
         composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
         composedbuff_gfx = composedbuff.createGraphics();//getGraphics();
         composedbuff_gfx.setBackground(TRANSPARENT);    // For clearRect
         for (int i = 0; i < r.LAYER_COUNT; i++) {
             layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
-            //layerbuffs[i] = gc.createCompatibleVolatileImage(r.res_x(), r.res_y(), Transparency.TRANSLUCENT);//VolatileImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
             layerbuffs_gfx[i] = layerbuffs[i].createGraphics(); //getGraphics();
             layerbuffs_gfx[i].setBackground(TRANSPARENT);
         } 
     }
     // Dispose and nullify all buffers and graphics. 
     public void dispose_buffers() {
-        composedbuff_gfx.dispose(); // @bug potential if we ever try to dispose without generating first. Easy fix is a condition, but I don't see how that bug could happen rn. The RenderComposer always needs a Renderer set, from construction till destruction. 
+        composedbuff_gfx.dispose(); 
         composedbuff_gfx = null;
         composedbuff = null;
         for (int i = 0; i < r.LAYER_COUNT; i++) {
@@ -722,43 +1107,27 @@ class RenderComposer {
         // Regenerate buffers to correct size on Renderer resolution changes.
         if (r.reschange_status()) {
             dispose_buffers();
-            generate_buffers(); // @bug Hopefully no concurrency issues arise (Renderer changing resolution rapidly from an AWT event), r.res_x/y() in the generate method giving different answers per buffer. I think with the way we've threading set up, and the way the Renderer's resolution is only changed in Engine during tick (i think), this should be a problem.
+            generate_buffers(); 
             r.reschange_clear();
         }
         for (int i = 0; i < r.LAYER_COUNT; i++) {
             if ((draws & r.LAYERS[i]) > 0) { // Again, could just be 2^i instead of LAYERS[i].
-                //layerbuffs[i] = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB);
-                //gfx = layerbuffs[i].getGraphics();
-                //r.draw(r.LAYERS[i], gfx);A
-                //layerbuffs_gfx[i].setColor(TRANSPARENT);
-                layerbuffs_gfx[i].clearRect(0, 0, r.res_x(), r.res_y()); // @bug ! Again, hopefully Renderer resolution isn't change during this.
-                                                                    // Also, we could just allow the Renderer to wipe at their own discretion.
+                layerbuffs_gfx[i].clearRect(0, 0, r.res_x(), r.res_y()); // Hopefully Renderer resolution isn't change during this.
+                                                                         // Also, alternatively, Renderer could just wipe at their own discretion.
                 r.draw(r.LAYERS[i], layerbuffs_gfx[i]);
-                //System.out.println("draw");
-                //gfx.dispose();
             }
         }
-        if (draws != 0) compose(); // Only compose layers if there was a redraw. (!= 0 instead of >0, because all bits set == -1)
+        if (draws != 0) compose(); // Only compose layers if there was a redraw. 
     }
 
     // Bake layerbuffs onto composedbuff.
     private void compose() {
-        //composedbuff = new BufferedImage(r.res_x(), r.res_y(), BufferedImage.TYPE_INT_ARGB); // Is transparent, leaving it up to the layers or image recipient to draw the background. 
-        //gfx = composedbuff.getGraphics();
-        //gfx.fillOval(50, 50, 10, 10);
-        //composedbuff_gfx.setColor(Color.white);
         composedbuff_gfx.clearRect(0, 0, r.res_x(), r.res_y());
-        //for (VolatileImage layer : layerbuffs) {
         for (BufferedImage layer : layerbuffs) {
-            //gfx.drawImage(layer, 0, 0, null);
             composedbuff_gfx.drawImage(layer, 0, 0, null);
-            //System.out.println("drawg" + layer);
         }
-        //gfx.dispose();
-        //System.out.println("composin");
     }
 
-    //public VolatileImage recompose() {
     public BufferedImage recompose() {
         update();
         return composedbuff;
@@ -768,9 +1137,38 @@ class RenderComposer {
     public int info_res_x() { return r.res_x(); }
     public int info_res_y() { return r.res_y(); }
     public int info_layer_count() { return r.LAYER_COUNT; }
-    public int info_redraw_status() { return draws; } //r.redraw_status(); } return draws from last update, otherwise will always be zero wth the current single thread configuration.
+    public int info_redraw_status() { return draws; } 
 }
 
+// ----------------
+// Vec2
+// Two dimensional vector, for velocity and position data.
+// Doubles (instead of ints) to support pixel movement slower than the tickrate.
+// ----------------
+class Vec2 {
+    public double x;
+    public double y;
+
+    public Vec2(double x, double y) { this.x = x; this.y = y; }
+    public Vec2(Vec2 copy) { x = copy.x; y = copy.y; }
+
+    public void add(Vec2 addend) { x += addend.x; y += addend.y; }
+    public void mul(double scalar) { x *= scalar; y*= scalar; }
+    
+    public static Vec2 add(Vec2 augend, Vec2 addend) {
+        Vec2 resultant = new Vec2(augend);
+        resultant.add(addend);
+        return resultant;
+    }
+    public static Vec2 mul(Vec2 multiplicand, double multiplier) {
+        Vec2 product = new Vec2(multiplicand);
+        product.mul(multiplier);
+        return product;
+    }
+    public static double magnitude(Vec2 v) {
+        return Math.sqrt(v.x*v.x+v.y*v.y);
+    }
+}
 
 
 
@@ -956,3 +1354,31 @@ class RenderComposer {
 
     //private static final long serialVersionUID = 1111L; // Are these needed everywhere? @todo Ask pyz about his compiler settings.
 
+
+    // This is the start of the cannon line.
+//    // For cannon size, we can set the width to the ball radius, and use the approximation that a cannon is 3 times as long as it is wide.
+//    //private final Dimension CANNON_SIZE = new Dimension(10.0*PIXELS_PER_METER, 50.0);
+//    class CollidableThing {
+//        public Vec2 pos;
+//        private Rectangle hitbox;
+//
+//    // Cannon Projectiles
+//    class Balloid {
+//        public Vec2 pos
+//
+            
+            //r.redraw(r.l_cannon);     // @todo We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
+    
+
+    //@todo
+    // We have a consideration to make, if we want to define MIN/MAXs for sizes, speeds, etc. or just let the calling methods handle all that.
+    // Right now, for simplicity, I'm going to have faith in the callers.
+   
+
+// Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. 
+// @todo We could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all 
+// the time (which we should check), this might not be an issue cause we'll be generating new buffs all the time anyways.
+
+
+
+            //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
