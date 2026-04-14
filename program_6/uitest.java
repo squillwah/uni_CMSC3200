@@ -206,7 +206,14 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
 
 
     public void adjustmentValueChanged(AdjustmentEvent e) {
+        Object src = e.getSource();
 
+        if (src == sb_cannon_angle) {
+            int angle = sb_cannon_angle.getValue();
+            engine.set_cannon_angle(angle);
+            lbl_cannon_angle.setText("Angle: " + angle + "deg");
+            display.repaint();
+        }
     }
 
     public void actionPerformed(ActionEvent e) {
@@ -432,6 +439,7 @@ class CannonBallEngine {
                 }
             }
             r.redraw(r.l_bubbles);
+            r.redraw(r.l_cannon);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
         } else if (restart_game) {
             // temp
@@ -956,3 +964,88 @@ class RenderComposer {
 
     //private static final long serialVersionUID = 1111L; // Are these needed everywhere? @todo Ask pyz about his compiler settings.
 
+class Cannon {
+    int base_x, base_y;        // center of base
+    int base_radius;           
+
+    double angle_deg;          // angle in degrees
+    int barrel_length;         
+    int barrel_width;          
+
+    public Cannon(int x, int y) {
+        base_x = x;
+        base_y = y;
+
+        base_radius = 20;
+        angle_deg = 45;
+        barrel_length = 60;
+        barrel_width = 12;
+    }
+
+    //  helper methods
+    public void set_angle(double deg) {
+        angle_deg = Math.max(0, Math.min(90, deg));   // clamp angle
+    }
+
+    public double angle_rad() {
+        return Math.toRadians(angle_deg);
+    }
+
+    public double dir_x() {
+        return -Math.cos(angle_rad());
+    }
+
+    public double dir_y() {
+        return -Math.sin(angle_rad());
+    }
+
+    public int tip_x() {
+        return (int)(base_x + dir_x() * barrel_length);
+    }
+
+    public int tip_y() {
+        return (int)(base_y + dir_y() * barrel_length);
+    }
+
+    public void draw(Graphics g) {
+
+        // draw base
+        g.setColor(Color.red);
+        g.fillOval(base_x - base_radius, base_y - base_radius,
+                   base_radius * 2, base_radius * 2);
+
+        // convert angle
+        double rad = Math.toRadians(angle_deg);     //  tried to do without radians, that was a mess
+
+        // direction vector
+        double dx = -Math.cos(rad);
+        double dy = -Math.sin(rad);
+
+        // perpendicular vector
+        double px = -dy;
+        double py = dx;
+
+        int half_w = barrel_width / 2;
+
+        // rectangle corners
+        int x1 = (int)(base_x + px * half_w);
+        int y1 = (int)(base_y + py * half_w);
+
+        int x2 = (int)(base_x - px * half_w);
+        int y2 = (int)(base_y - py * half_w);
+
+        int x3 = (int)(x2 + dx * barrel_length);
+        int y3 = (int)(y2 + dy * barrel_length);
+
+        int x4 = (int)(x1 + dx * barrel_length);
+        int y4 = (int)(y1 + dy * barrel_length);
+
+        // draw barrel
+        g.setColor(Color.red);
+        g.fillPolygon(
+            new int[]{x1, x2, x3, x4},
+            new int[]{y1, y2, y3, y4},
+            4
+        );
+    }
+}
