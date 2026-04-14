@@ -1,5 +1,5 @@
 
-//package CannonBall;
+package CannonBall;
 
 import java.awt.*;
 import java.awt.event.*;
