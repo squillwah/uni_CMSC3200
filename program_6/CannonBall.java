@@ -29,6 +29,7 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     private final byte xslow   = 0, slow  = 1, normal  = 2, fast  = 3, xfast   = 4, NUM_SPEEDS   = 5;
     private final byte mercury = 0, venus = 1, earth   = 2, mars  = 3, jupiter = 4, saturn = 5, uranus = 6, neptune = 7, pluto = 8, NUM_PLANETS = 9;
     private final byte nodebug = 0, db1 = 1, db2 = 2, db3 = 3, NUM_DEBUG_LEVELS = 4;
+    private final byte fertileballs = 0, drawhitboxes = 1, bubblegravity = 2, NUM_EXTRAS = 3;
     // Parallel MenuItem value arrays.
     private final double SIZES[] = {.5, 1, 1.5, 2.5, 4};                                                // Radius in meters (expanding from a single center point pixel).
     private final double SPEEDS[] = {1, 2, 3, 5, 8};                                                    // Meters per second (applied equally to both components).
@@ -44,12 +45,13 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     private boolean main_thread_running;
     // Elements of UI: MenuItems, ScrollBars, Labels.
     private MenuBar menubar;
-    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo;        //@todo fertile ball mode. Balls reproduce.
+    private Menu mnu_control, mnu_parameters, mnu_environment, mnu_parameters_mnu_size, mnu_parameters_mnu_speed, mnu_debuginfo, mnu_extras;
     private MenuItem[] mnu_control_itms;                        
     private CheckboxMenuItem[] mnu_parameters_mnu_size_itms;    
     private CheckboxMenuItem[] mnu_parameters_mnu_speed_itms;   
     private CheckboxMenuItem[] mnu_environment_itms;
     private CheckboxMenuItem[] mnu_debuginfo_itms;
+    private CheckboxMenuItem[] mnu_extras_itms;
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
     private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 
 
@@ -115,6 +117,11 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         mnu_debuginfo_itms[db1]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 1"));
         mnu_debuginfo_itms[db2]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 2"));
         mnu_debuginfo_itms[db3]                 = (CheckboxMenuItem)mnu_debuginfo.add(new CheckboxMenuItem("level 3"));
+        mnu_extras                              = menubar.add(new Menu("Extras"));
+        mnu_extras_itms                         = new CheckboxMenuItem[NUM_EXTRAS];
+        mnu_extras_itms[fertileballs]           = (CheckboxMenuItem)mnu_extras.add(new CheckboxMenuItem("fertile balls"));
+        mnu_extras_itms[drawhitboxes]           = (CheckboxMenuItem)mnu_extras.add(new CheckboxMenuItem("draw hitboxes"));
+        mnu_extras_itms[bubblegravity]          = (CheckboxMenuItem)mnu_extras.add(new CheckboxMenuItem("bubble gravity"));
         // Conpan Scrolls, Labels, add to Panels:
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -152,6 +159,7 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.addItemListener(this);
         for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.addItemListener(this);
+        for (CheckboxMenuItem mi : mnu_extras_itms) mi.addItemListener(this);
         sb_cannon_angle.addAdjustmentListener(this);
         sb_cannon_force.addAdjustmentListener(this);
         window.addWindowListener(this);
@@ -171,6 +179,7 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         for (CheckboxMenuItem mi : mnu_parameters_mnu_speed_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_environment_itms) mi.removeItemListener(this);
         for (CheckboxMenuItem mi : mnu_debuginfo_itms) mi.removeItemListener(this);
+        for (CheckboxMenuItem mi : mnu_extras_itms) mi.removeItemListener(this);
         window.removeWindowListener(this);
         window.removeComponentListener(this);
         
@@ -288,6 +297,13 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         if ((radio = find_mitem(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, item)) > -1) { 
             set_mradio(mnu_debuginfo_itms, NUM_DEBUG_LEVELS, radio);
             display.debug_lvl = radio;  // It so happens that the debug level and MenuItem offset align. Do not rely on this, will cause issues if that's changed.
+        } else 
+        if ((radio = find_mitem(mnu_extras_itms, NUM_EXTRAS, item)) > -1) {
+            switch (radio) {
+                case fertileballs: engine.set_m_fertileballs(mnu_extras_itms[radio].getState()); break;
+                case drawhitboxes: engine.set_m_drawhitboxes(mnu_extras_itms[radio].getState()); break;
+                case bubblegravity: engine.set_m_bubblegravity(mnu_extras_itms[radio].getState()); break;
+            }
         }
     }
     
@@ -374,10 +390,12 @@ class CannonBallEngine {
     private int score_player;
     private int score_bubbles;
     private double elapsed_time;    // Time game is not paused. Resets on restart.
-    private double timer_fertile_balls;
+    private double timer_fertileballs;
 
     // Mode settings
-    private boolean m_fertile_balls;
+    private boolean m_fertileballs;
+    private boolean m_drawhitboxes;
+    private boolean m_bubblegravity;
 
 
     // @todo We should probably use the ball and Vec2s class like the last program, though we should
@@ -395,35 +413,28 @@ class CannonBallEngine {
         bubble_speed = new double[]{1, PIXELS_PER_METER};
         world_gravity = new double[]{1, 9.8*PIXELS_PER_METER};
         world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
+        world_perim = new Rectangle(0, 0, world_size[0].width, world_size[0].height);
 
         // A twelve by three meter cannon.
-        can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point(10,10));
-
-        bubbs = new Vector<Bubble>();
-        bubbs.addElement(new Bubble(null));
-
-        world_perim = new Rectangle(0, 0, world_size[0].width, world_size[0].height);
-        score_player = 0;
-        score_bubbles = 0;
-        elapsed_time = 0;
-        timer_fertile_balls = 0;
-
-        m_fertile_balls = true; // testing
-
+        can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point((int)PIXELS_PER_METER, (int)PIXELS_PER_METER));
+        
         physics_paused = true;
         restart_game = false;
 
+        m_fertileballs = false;
+        m_drawhitboxes = false;
+        m_bubblegravity = false;
+        
         r = new CannonBallRenderer(MIN_WORLD_SIZE);
-        r.redraw(~0); // debug, draw everything
 
-        // temp
-        //for (int i = 0; i < 100; i++) tests[i] = new testball();
+        init_game_state();
     }
     
     private void init_game_state() {
         score_player = 0;
         score_bubbles = 0;
         elapsed_time = 0;
+        timer_fertileballs = 0;
         set_cannon_angle(Math.random()*90);
         bubbs = new Vector<Bubble>();
         bubbs.addElement(new Bubble(null)); // Or a configurable number for start bubbles.
@@ -451,6 +462,11 @@ class CannonBallEngine {
         System.out.println("Gravity: " + mpsps);
         world_gravity[1] = mpsps * PIXELS_PER_METER;
     }
+
+    public void set_m_fertileballs(boolean m) { m_fertileballs = m; }
+    public void set_m_drawhitboxes(boolean m) { m_drawhitboxes = m; }
+    public void set_m_bubblegravity(boolean m) { m_bubblegravity = m; }
+
     public void set_pause(boolean p) {
         System.out.println("Pause: " + p);
         physics_paused = p; // This and restart do not have pair values, because it's assumed they'll only be read once per tick().
@@ -504,17 +520,22 @@ class CannonBallEngine {
                             // the time (which we should check), this might not be an issue cause we'll be generating new buffs all the time anyways.
         }
 
-        // Special modes:
-        if (m_fertile_balls) {
-            if (timer_fertile_balls > 5) {  // Reproduce every five seconds.
-                bubbs.addElement(new Bubble(bubbs.elementAt(0).pos()));  // Assuming bubbs won't be empty (though a NULL shouldn't break things). We want it to spawn off the position of an existing ball.
-                timer_fertile_balls = 0;
-            } timer_fertile_balls += delta_t;
-        }
 
 
         // Physics (moving, colliding, accelerating)
         if (!physics_paused) {
+
+
+            // Special modes:
+            if (m_fertileballs) {
+                if (timer_fertileballs > 5) {  // Reproduce every five seconds.
+                    bubbs.addElement(new Bubble(bubbs.elementAt(0).pos()));  // Assuming bubbs won't be empty (though a NULL shouldn't break things). We want it to spawn off the position of an existing ball.
+                    timer_fertileballs = 0;
+                } timer_fertileballs += delta_t;
+            }
+
+
+
             // A consideration:
             //  Move then check collisions? or..
             //  Check next position, then move.
@@ -530,10 +551,12 @@ class CannonBallEngine {
             //    }
             //}
         
-            // Collision detection of bubbles against screen edges. 
             Vec2 normal = new Vec2(0,0);
+            Vec2 forces = new Vec2(0,0);
             Rectangle hitbox, intersection;
+            if (m_bubblegravity) forces.y = world_gravity[0]*delta_t;
             for (Bubble bubb : bubbs) {
+                // Collision detection of bubbles against screen edges. 
                 normal.x = normal.y = 0;
                 hitbox = bubb.next_hitbox(delta_t);                 // There will always be a degree of slight innacuracy to this, because we cannot predict the next ticktime.
                 intersection = hitbox.intersection(world_perim);
@@ -548,6 +571,8 @@ class CannonBallEngine {
                     else bubb.set_pos_y(world_perim.height-bubb.radius-1);
                 }
                 bubb.accelerate(normal);
+                bubb.accelerate(forces);
+              
                 bubb.advance(delta_t);
             }
             
@@ -623,28 +648,12 @@ class CannonBallEngine {
             g.fillRect(res_x()/2, 30, 40, 40);
         }
     
-        // @todo draw the bubbles (moving targets) here
         private void draw_bubbles(Graphics g) {
-            //for (testball test : tests) {
-            //    g.setColor(new Color(255, 255, 255, 50));
-            //    g.fillOval(BORDER+(int)(test.x-bubble_size[0]-1), 
-            //               BORDER+(int)(test.y-bubble_size[0]-1), 
-            //               (int)(bubble_size[0]*2+1), 
-            //               (int)(bubble_size[0]*2+1));   // Safety center pixel.
-            //}
-
             g.setColor(new Color(155, 255, 255, 50));
             for (Bubble bubb : bubbs) {
-                System.out.println(bubb.pos().x + " || " + bubb.pos().y);
-                System.out.println(bubb.radius());
-                g.fillOval(BORDER+bubb.tl_x(), BORDER+bubb.tl_y(), (int)(bubb.radius()*2+1), (int)(bubb.radius()*2+1)); //bubb.br_x(), bubb.br_y());
-                g.drawRect(bubb.hitbox().x, bubb.hitbox().y, bubb.hitbox().width, bubb.hitbox().height);    // @todo we should have hitboxes as a flag or other layer for a menu option.
-                //g.fillOval(BORDER+(int)(bubb.pos_x()-bubb.radius()-1), 
-                //           BORDER+(int)(bubb.pos_y()-bubble_size[0]-1), 
-                //           (int)(bubble_size[0]*2+1), 
-                //           (int)(bubble_size[0]*2+1));   // Safety center pixel.
+                g.fillOval(BORDER+bubb.tl_x(), BORDER+bubb.tl_y(), (int)(bubb.radius()*2+1), (int)(bubb.radius()*2+1));
+                if (m_drawhitboxes) g.drawRect(bubb.hitbox().x, bubb.hitbox().y, bubb.hitbox().width, bubb.hitbox().height);
             }
-
         }
     
         // @todo bullets here
@@ -790,8 +799,8 @@ class CannonBallEngine {
     class Bubble extends Ball {
         public Bubble(Vec2 position) {
             radius = bubble_size[0];
-            // If no position given, init with random.
-            if (position == null) pos = new Vec2(radius+1+(Math.random()*world_size[0].width-radius-1), radius+1+(Math.random()*world_size[0].height-radius-1)); 
+            // If no position given, init with random (avoiding cannon).
+            if (position == null) pos = new Vec2(radius+1+(Math.random()*world_size[0].width*.75-radius-1), radius+1+(Math.random()*world_size[0].height-radius-1)); 
             else pos = new Vec2(position);
             // Heading always random perfect diagonal.
             vel = new Vec2(1,1);
