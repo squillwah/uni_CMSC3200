@@ -220,6 +220,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
 
 
             engine.tick(delta_t);
+            lbl_score_player.settext("Player: " + engine.get_player_score());
+            lbl_score_ball.settext("Ball: " + engine.get_ball_score());
             display.debug_inform_ticktime(delta_t);
            
             if (paintlimiter > 2) {     // Dunno if actually helps anything.
@@ -351,6 +353,31 @@ class CannonBallEngine {
     private final double PIXELS_PER_METER = 10;    // ! This also acts as a "zoom", changing the size of everything.
     private final Dimension MIN_WORLD_SIZE = new Dimension(256, 256);
     
+    // double cannon_x = 60, cannon_y = 60;
+    // double cannon_angle_deg = 45; // degrees only for method interface, internally stored in radians
+    // double cannon_force_val = 200; // pixels per second, for both components. will be converted to mps 
+    
+    // double ball_x, ball_y;
+    // double vx, vy;
+    // boolean fired = false;
+
+    // public void set_cannon_angle(double angle) {
+    //     cannon_angle_deg = angle;
+    // }
+    // public void set_cannon_force(double force) {
+    //     cannon_force_val = force;}
+    // }
+    // public void fire() {
+    //     if (!fired) {
+    //     double angle_rad = Math.toRadians(cannon_angle_deg);
+    //     ball_x = cannon_x;
+    //     ball_y = world_size[0].height - 50; 
+    //     vx = cannon_force_val * Math.cos(angle_rad);
+    //     vy = -cannon_force_val * Math.sin(angle_rad); // - because screen y increases downwards
+    //     fired = true;
+    // }
+    // }
+
     // The Renderer
     private CannonBallRenderer r;
     
@@ -477,6 +504,28 @@ class CannonBallEngine {
                     timer_fertileballs = 0;
                 } timer_fertileballs += delta_t;
             }
+            /* if (fired) {
+                    vy += world_gravity[0] * delta_t;
+                    ball_x += vx * delta_t;
+                    ball_y += vy * delta_t;
+                    
+                    // if off screen
+                    if (ball_x > world_size[0].width || ball_y > world_size[0].height) {
+                    fired = false; 
+                    }
+         } */
+
+            // time + score 
+            /* double time = 0;
+               int player_score = 0;
+               int ball_score = 0;
+               time += delta_t; */
+
+            // adding getters for UI
+            /* public double get_time() {return time;}
+                public int get_player_score() {return player_score;}
+                public int get_ball_score() {return ball_score;}
+             */
         
             Vec2 normal = new Vec2(0,0);
             Vec2 forces = new Vec2(0,0);
@@ -593,6 +642,13 @@ class CannonBallEngine {
                 g.drawRect(can.hitbox().x, can.hitbox().y, can.hitbox().width, can.hitbox().height);
             }
         }
+        /* private void draw_projectiles(Graphics g) {
+        g.drawRect()
+        if (fired) {
+            g.set.solor(Color.green);
+            g.fillOval((int)ball_x, (int)ball_y, 10,10);
+            }
+        } */
     
         // @todo draw the dragbox
         private void draw_dragbox(Graphics g) {
