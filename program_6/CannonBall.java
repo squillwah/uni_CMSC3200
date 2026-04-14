@@ -771,7 +771,35 @@ class RenderComposer {
     public int info_redraw_status() { return draws; } //r.redraw_status(); } return draws from last update, otherwise will always be zero wth the current single thread configuration.
 }
 
+// ----------------
+// Vec2
+// Two dimensional vector, for velocity and position data.
+// Doubles (instead of ints) to support pixel movement slower than the tickrate.
+// ----------------
+class Vec2 {
+    public double x;
+    public double y;
 
+    public Vec2(double x, double y) { this.x = x; this.y = y; }
+    public Vec2(Vec2 copy) { x = copy.x; y = copy.y; }
+
+    public void add(Vec2 addend) { x += addend.x; y += addend.y; }
+    public void mul(double scalar) { x *= scalar; y*= scalar; }
+    
+    public static Vec2 add(Vec2 augend, Vec2 addend) {
+        Vec2 resultant = new Vec2(augend);
+        resultant.add(addend);
+        return resultant;
+    }
+    public static Vec2 mul(Vec2 multiplicand, double multiplier) {
+        Vec2 product = new Vec2(multiplicand);
+        product.mul(multiplier);
+        return product;
+    }
+    public static double magnitude(Vec2 v) {
+        return Math.sqrt(v.x*v.x+v.y*v.y);
+    }
+}
 
 
 
