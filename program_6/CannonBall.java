@@ -377,38 +377,56 @@ class CannonBallEngine {
         public Ball() {} // Extending classes need to ensure that they initialize vel, pos, radius, and hitbox.
 
         protected Rectangle gen_hitbox(Vec2 p) { return new Rectangle((int)(p.x-radius-1), (int)(p.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
+        protected void refresh_hitbox() { hitbox.setBounds((int)(pos.x-radius-1), (int)(pos.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
 
-        // Hitboxes, current position and next.
+        // Hitboxes, current position and next (at delta_t).
         public Rectangle hitbox() { return hitbox; }
-        public Rectangle next_hitbox() { return gen_hitbox(Vec2.add(pos, vel)); }
+        public Rectangle next_hitbox(double delta_t) { return gen_hitbox(Vec2.add(pos, Vec2.mul(vel, delta_t))); }
       
-        // Advance position by velocity, apply acceleration force. 
-        public void advance() { pos.add(vel); hitbox.setLocation((int)(pos.x-radius-1), (int)(pos.y-radius-1)); } 
+        // Apply acceleration force, advance position by velocity (per second, given time).
         public void accelerate(Vec2 accel) { vel.add(accel); }
+        public void advance(double delta_t) { 
+            pos.add(Vec2.mul(vel, delta_t));
+            hitbox.setLocation((int)(pos.x-radius-1), (int)(pos.y-radius-1)); 
+        } 
 
+        public double radius() { return radius; }
         public Vec2 vel() { return new Vec2(vel); }
         public Vec2 pos() { return new Vec2(pos); }
+        public double vel_x() { return vel.x; } public double vel_y() { return vel.y; }
+        public double pos_x() { return pos.x; } public double pos_y() { return pos.y; }
+       
+        // Four corners of the circle. Primary use in drawing. 
+        public int tl_x() { return (int)(pos.x-1-radius); }
+        public int tl_y() { return (int)(pos.y-1-radius); }
+        public int br_x() { return (int)(pos.x+radius); }
+        public int br_y() { return (int)(pos.y+radius); }
     }
 
     // The targets
     class Bubble extends Ball {
         public Bubble() {
+            radius = bubble_size[0];
             // Init with random position and heading.
-            pos = new Vec2(Math.random()*world_size[0].width, Math.random()*world_size[0].height); 
+            pos = new Vec2(radius+1+(Math.random()*world_size[0].width-radius-1), radius+1+(Math.random()*world_size[0].height-radius-1)); 
             vel = new Vec2(1,1);
             if (Math.random() < .5) vel.x = -vel.x; 
             if (Math.random() < .5) vel.y = -vel.y;
             hitbox = gen_hitbox(pos);
         }
-       
+      
+
         // Update radius/vel to match bubble_size/bubble_speed
         public void refresh_size() {
             radius = bubble_size[0];
-            hitbox.setBounds((int)(pos.x-radius-1), (int)(pos.y-radius-1), (int)(radius*2+1), (int)(radius*2+1));   // Update hitbox.
+            refresh_hitbox();
         }
         public void refresh_speed() { 
             vel = Vec2.mul(new Vec2(Math.signum(vel.x), Math.signum(vel.y)), bubble_speed[0]);
         }
+
+        public void set_pos_x(double x) { pos.x = x; refresh_hitbox(); }
+        public void set_pos_y(double y) { pos.y = y; refresh_hitbox(); }
     }
 
 //    // The projectile
@@ -418,6 +436,8 @@ class CannonBallEngine {
 
     // Other data
     private double time_elapsed;    // Time game is not paused. Resets on restart.
+    private Rectangle world_perim;
+
 
     // @todo We should probably use the ball and Vec2s class like the last program, though we should
     // also probably take advantage of Java's built in Shape classes (like Circle, Rectangle) as they'll make collision detection easy.
@@ -439,9 +459,11 @@ class CannonBallEngine {
         can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point(10,10));
 
         num_bubbs = 5;  // Arbitrary 5 bubbs, just for testing.
-        bubbs = new Vector<Bubble>(5);
+        bubbs = new Vector<Bubble>();
+        for (int i = 0; i < num_bubbs; i++) bubbs.addElement(new Bubble());
 
         time_elapsed = 0;
+        world_perim = new Rectangle(0, 0, world_size[0].width, world_size[0].height);
 
         physics_paused = true;
         restart_game = false;
@@ -494,18 +516,32 @@ class CannonBallEngine {
         // Not all require redraws.
         cannon_force[0] = cannon_force[1];
         world_gravity[0] = world_gravity[1];
-        bubble_speed[0] = bubble_speed[1];
         if (cannon_angle[0] != cannon_angle[1]) { 
             cannon_angle[0] = cannon_angle[1];
             can.aim(cannon_angle[0]);
             r.redraw(r.l_cannon);
         }
+        if (bubble_speed[0] != bubble_speed[1]) {
+            bubble_speed[0] = bubble_speed[1];
+            for (Bubble bubb : bubbs) bubb.refresh_speed(); // Update all bubbs.
+        }
         if (bubble_size[0] != bubble_size[1]) {
             bubble_size[0] = bubble_size[1];
+            for (Bubble bubb : bubbs) bubb.refresh_size();
             r.redraw(r.l_bubbles);
         }
         if (!world_size[0].equals(world_size[1])) {
             world_size[0] = world_size[1];
+            world_perim.setBounds(0, 0, world_size[0].width, world_size[0].height);
+            // Loop through bubbles, keep them in bounds.
+            //Rectangle hitbox;
+            for (Bubble bubb : bubbs) {
+                //hitbox = bubb.hitbox();
+                if (bubb.tl_x() <= world_perim.x) bubb.set_pos_x(bubb.radius+1);
+                else if (bubb.br_x() >= world_perim.width) bubb.set_pos_x(world_perim.width-bubb.radius-1);
+                if (bubb.tl_y() <= world_perim.y) bubb.set_pos_y(bubb.radius+1);
+                else if (bubb.br_y() >= world_perim.height) bubb.set_pos_y(world_perim.height-bubb.radius-1);
+            }
             r.set_resolution(world_size[0]);
             r.redraw(~0);   // Make sure to flag everything to draw again, as RenderComposer will leave the new buffers blank. 
                             // @todo We could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all 
@@ -518,16 +554,39 @@ class CannonBallEngine {
             //  Move then check collisions? or..
             //  Check next position, then move.
 
-            for (testball test : tests) {
-                test.x += bubble_speed[0]*delta_t;  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
-                test.vy += world_gravity[0]*delta_t;
-                test.y += test.vy*delta_t;
-                if (test.x+bubble_size[0] > world_size[0].width) test.x = (Math.random()*world_size[0].width);
-                if (test.y+bubble_size[0] > world_size[0].height) {
-                    test.y = world_size[0].height-bubble_size[0]-1; 
-                    test.vy = -test.vy*.5;
+            //for (testball test : tests) {
+            //    test.x += bubble_speed[0]*delta_t;  // @todo since all bubble speeds are the same, we can probably just use a point or Vec2 for all their pos's, no object.
+            //    test.vy += world_gravity[0]*delta_t;
+            //    test.y += test.vy*delta_t;
+            //    if (test.x+bubble_size[0] > world_size[0].width) test.x = (Math.random()*world_size[0].width);
+            //    if (test.y+bubble_size[0] > world_size[0].height) {
+            //        test.y = world_size[0].height-bubble_size[0]-1; 
+            //        test.vy = -test.vy*.5;
+            //    }
+            //}
+        
+            // Collision detection of bubbles against screen edges. 
+            Vec2 normal = new Vec2(0,0);
+            Rectangle hitbox, intersection;
+            for (Bubble bubb : bubbs) {
+                normal.x = normal.y = 0;
+                hitbox = bubb.next_hitbox(delta_t);                 // There will always be a degree of slight innacuracy to this, because we cannot predict the next ticktime.
+                intersection = hitbox.intersection(world_perim);
+                if (hitbox.width != intersection.width) {
+                    normal.x = bubb.vel_x()*-2; 
+                    if (hitbox.x <= world_perim.x) bubb.set_pos_x(bubb.radius+1);
+                    else bubb.set_pos_x(world_perim.width-bubb.radius-1);
+                } 
+                if (hitbox.height != intersection.height)  {
+                    normal.y = bubb.vel_y()*-2;
+                    if (hitbox.y <= world_perim.y) bubb.set_pos_y(bubb.radius+1);
+                    else bubb.set_pos_y(world_perim.height-bubb.radius-1);
                 }
+                bubb.accelerate(normal);
+                bubb.advance(delta_t);
             }
+            
+
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
             time_elapsed += delta_t;
@@ -600,13 +659,26 @@ class CannonBallEngine {
     
         // @todo draw the bubbles (moving targets) here
         private void draw_bubbles(Graphics g) {
-            for (testball test : tests) {
-                g.setColor(new Color(255, 255, 255, 50));
-                g.fillOval(BORDER+(int)(test.x-bubble_size[0]-1), 
-                           BORDER+(int)(test.y-bubble_size[0]-1), 
-                           (int)(bubble_size[0]*2+1), 
-                           (int)(bubble_size[0]*2+1));   // Safety center pixel.
+            //for (testball test : tests) {
+            //    g.setColor(new Color(255, 255, 255, 50));
+            //    g.fillOval(BORDER+(int)(test.x-bubble_size[0]-1), 
+            //               BORDER+(int)(test.y-bubble_size[0]-1), 
+            //               (int)(bubble_size[0]*2+1), 
+            //               (int)(bubble_size[0]*2+1));   // Safety center pixel.
+            //}
+
+            g.setColor(new Color(155, 255, 255, 50));
+            for (Bubble bubb : bubbs) {
+                System.out.println(bubb.pos().x + " || " + bubb.pos().y);
+                System.out.println(bubb.radius());
+                g.fillOval(BORDER+bubb.tl_x(), BORDER+bubb.tl_y(), (int)(bubb.radius()*2+1), (int)(bubb.radius()*2+1)); //bubb.br_x(), bubb.br_y());
+                g.drawRect(bubb.hitbox().x, bubb.hitbox().y, bubb.hitbox().width, bubb.hitbox().height);    // @todo we should have hitboxes as a flag or other layer for a menu option.
+                //g.fillOval(BORDER+(int)(bubb.pos_x()-bubb.radius()-1), 
+                //           BORDER+(int)(bubb.pos_y()-bubble_size[0]-1), 
+                //           (int)(bubble_size[0]*2+1), 
+                //           (int)(bubble_size[0]*2+1));   // Safety center pixel.
             }
+
         }
     
         // @todo bullets here
