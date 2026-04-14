@@ -360,15 +360,15 @@ public class uitest implements ActionListener, AdjustmentListener, ComponentList
         if ((radio = find_mitem(mnu_environment_itms, NUM_PLANETS, item)) > -1) {
             set_mradio(mnu_environment_itms, NUM_PLANETS, radio);//(CheckboxMenuItem)item);
             switch (radio) {
-                case mercury: engine.set_gravity(10); break;    // How many meters is a pixel?
-                case venus:   engine.set_gravity(11); break;
-                case earth:   engine.set_gravity(12); break;
-                case mars:    engine.set_gravity(13); break;
-                case jupiter: engine.set_gravity(14); break;
-                case saturn:  engine.set_gravity(15); break;
-                case uranus:  engine.set_gravity(16); break;
-                case neptune: engine.set_gravity(17); break;
-                case pluto:   engine.set_gravity(18); exit(); break;
+                case mercury: engine.set_gravity(100); break;    // How many meters is a pixel?
+                case venus:   engine.set_gravity(110); break;
+                case earth:   engine.set_gravity(120); break;
+                case mars:    engine.set_gravity(130); break;
+                case jupiter: engine.set_gravity(140); break;
+                case saturn:  engine.set_gravity(150); break;
+                case uranus:  engine.set_gravity(160); break;
+                case neptune: engine.set_gravity(170); break;
+                case pluto:   engine.set_gravity(180); exit(); break;
                 default: System.out.println("err: bad env menu item offset, can't match: " + item); break;
             }
         } else
@@ -449,8 +449,9 @@ class CannonBallEngine {
     private final int CANNON_MARGIN_RIGHT = 60;
     private final int CANNON_MARGIN_BOTTOM = 60;
 
-    //  ball stuff
+    //  screen objects
     private Vector<Balloid> balloids;
+    private Vector<RectBlock> rects;
 
 
     
@@ -475,14 +476,19 @@ class CannonBallEngine {
 
         //  just doing at the end to have world size
 
-        //  ball storage for updating
+        //  object storage
         balloids = new Vector<Balloid>();
+        rects = new Vector<RectBlock>();
         //  TODO MAKE POSITION REALITIVE TO SCREEN
         cannon = new Cannon(
             world_size.width - CANNON_MARGIN_RIGHT,
             world_size.height - CANNON_MARGIN_BOTTOM
-        );   
+        );
+        
+        //TEST BLOCK 
+        add_rectangle(300, 250, 120, 40);
     }
+
     public void set_bubble_size(int px) {
         System.out.println("Size: " + px);
     }
@@ -551,8 +557,61 @@ class CannonBallEngine {
             return x < -radius || x > world_size.width + radius ||
                 y < -radius || y > world_size.height + radius;
         }
+
+        public void bounce_off_rect(RectBlock rect) {
+            double left_dist   = Math.abs(x - rect.x);
+            double right_dist  = Math.abs(x - (rect.x + rect.w));
+            double top_dist    = Math.abs(y - rect.y);
+            double bottom_dist = Math.abs(y - (rect.y + rect.h));
+
+            double min_dist = Math.min(Math.min(left_dist, right_dist),
+                                    Math.min(top_dist, bottom_dist));
+
+            if (min_dist == left_dist) {
+                vx = -Math.abs(vx);
+                x = rect.x - radius - 1;
+            } else if (min_dist == right_dist) {
+                vx = Math.abs(vx);
+                x = rect.x + rect.w + radius + 1;
+            } else if (min_dist == top_dist) {
+                vy = -Math.abs(vy);
+                y = rect.y - radius - 1;
+            } else {
+                vy = Math.abs(vy);
+                y = rect.y + rect.h + radius + 1;
+            }
+        }
     }
 
+    class RectBlock {
+        int x, y;
+        int w, h;
+        Color color;
+
+        public RectBlock(int start_x, int start_y, int width, int height) {
+            x = start_x;
+            y = start_y;
+            w = width;
+            h = height;
+            color = Color.blue;
+        }
+
+        //  this is a weird way to do it, but was having issues with inconsistent collision just checking bounds,
+        //  this pretty much checks if the ball is within its range to hit, and returns whether it will hit
+        //  not pretty and had some external help from both family when I got stuck
+        //  will replace with something better
+        public boolean intersects_ball(double bx, double by, int br) {
+            double closest_x = Math.max(x, Math.min(bx, x + w));
+            double closest_y = Math.max(y, Math.min(by, y + h));
+
+            double dx = bx - closest_x;
+            double dy = by - closest_y;
+
+            return dx * dx + dy * dy <= br * br;
+        }
+    }
+
+    //  makes balls
     public void fire_cannon() {
         if (cannon == null) return;
 
@@ -566,6 +625,12 @@ class CannonBallEngine {
 
         balloids.add(new Balloid(start_x, start_y, vx, vy));
         r.redraw(r.l_balloids);
+    }
+
+    //  adds rects the same way firing the cannon adds balls
+    public void add_rectangle(int x, int y, int w, int h) {
+        rects.add(new RectBlock(x, y, w, h));
+        r.redraw(r.l_statics);
     }
 
     public void tick(double delta_t) {
@@ -594,12 +659,24 @@ class CannonBallEngine {
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
 
             //  balloid update
-            for (int i = balloids.size() - 1; i >= 0; i--) {
+           for (int i = 0; i < balloids.size(); i++) {
                 Balloid b = balloids.get(i);
                 b.move(dt);
 
+                boolean collided = false;
+
+                for (int j = 0; j < rects.size(); j++) {
+                    RectBlock rect = rects.get(j);
+
+                    if (!collided && rect.intersects_ball(b.x, b.y, b.radius)) {
+                        b.bounce_off_rect(rect);
+                        collided = true;
+                    }
+                }
+
                 if (b.out_of_bounds()) {
                     balloids.remove(i);
+                    i--;
                 }
             }
         }
@@ -679,8 +756,10 @@ class CannonBallEngine {
         }
     
         private void draw_dragbox(Graphics g) {
-            // @todo draw the dragbox
-            //if (dragbox != null) g.drawRect(dragbox);
+            for (RectBlock rect : rects) {
+                g.setColor(rect.color);
+                g.fillRect(rect.x, rect.y, rect.w, rect.h);
+            }
         }
 
         // Expose this to rest of class, so render resolution (size) can be changed to match the world size 1:1
