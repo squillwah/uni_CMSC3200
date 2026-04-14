@@ -12,6 +12,9 @@ import java.awt.image.VolatileImage;
 // Requires additional management (see RenderComposer.vi_validate()), as VRAM makes no promises.
 
 
+import java.util.Vector;
+
+
 // ----------------
 // The Main Class
 // Creates the frame + UI elements, game engine and canvas display.
@@ -354,6 +357,9 @@ class CannonBallEngine {
    
     // Game objects:
     private Cannon can; 
+    private Vector<Bubble> bubbs;   
+    private int num_bubbs;
+    //private Vector<Balloid> balls;  // Like from the cannon.
     // temp
     testball[] tests = new testball[100];
     class testball {
@@ -361,6 +367,54 @@ class CannonBallEngine {
         double y = (Math.random()*world_size[0].height);
         double vy = 0;
     }
+
+    abstract class Ball {
+        protected Vec2 pos;
+        protected Vec2 vel;
+        protected double radius;
+        protected Rectangle hitbox;
+
+        public Ball() {} // Extending classes need to ensure that they initialize vel, pos, radius, and hitbox.
+
+        protected Rectangle gen_hitbox(Vec2 p) { return new Rectangle((int)(p.x-radius-1), (int)(p.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
+
+        // Hitboxes, current position and next.
+        public Rectangle hitbox() { return hitbox; }
+        public Rectangle next_hitbox() { return gen_hitbox(Vec2.add(pos, vel)); }
+      
+        // Advance position by velocity, apply acceleration force. 
+        public void advance() { pos.add(vel); hitbox.setLocation((int)(pos.x-radius-1), (int)(pos.y-radius-1)); } 
+        public void accelerate(Vec2 accel) { vel.add(accel); }
+
+        public Vec2 vel() { return new Vec2(vel); }
+        public Vec2 pos() { return new Vec2(pos); }
+    }
+
+    // The targets
+    class Bubble extends Ball {
+        public Bubble() {
+            // Init with random position and heading.
+            pos = new Vec2(Math.random()*world_size[0].width, Math.random()*world_size[0].height); 
+            vel = new Vec2(1,1);
+            if (Math.random() < .5) vel.x = -vel.x; 
+            if (Math.random() < .5) vel.y = -vel.y;
+            hitbox = gen_hitbox(pos);
+        }
+       
+        // Update radius/vel to match bubble_size/bubble_speed
+        public void refresh_size() {
+            radius = bubble_size[0];
+            hitbox.setBounds((int)(pos.x-radius-1), (int)(pos.y-radius-1), (int)(radius*2+1), (int)(radius*2+1));   // Update hitbox.
+        }
+        public void refresh_speed() { 
+            vel = Vec2.mul(new Vec2(Math.signum(vel.x), Math.signum(vel.y)), bubble_speed[0]);
+        }
+    }
+
+//    // The projectile
+//    class Balloid extends Ball {}
+
+
 
     // Other data
     private double time_elapsed;    // Time game is not paused. Resets on restart.
@@ -383,6 +437,9 @@ class CannonBallEngine {
 
         // A twelve by three meter cannon.
         can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point(10,10));
+
+        num_bubbs = 5;  // Arbitrary 5 bubbs, just for testing.
+        bubbs = new Vector<Bubble>(5);
 
         time_elapsed = 0;
 
