@@ -530,9 +530,9 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         elapsed_time = 0;
         timer_fertileballs = 0;
         set_cannon_angle(Math.random()*90);
+        rects = new Vector<Rectangle>();
         bubbs = new Vector<Bubble>();
         bubbs.addElement(new Bubble(null)); // Or a configurable number for start bubbles.
-        rects = new Vector<Rectangle>();
     }
 
     // Getters, setters, etc. For frame's UI to latch into.
@@ -652,6 +652,21 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                     if (hitbox.y <= world_perim.y) bubb.set_pos_y(bubb.radius+1);
                     else bubb.set_pos_y(world_perim.height-bubb.radius-1);
                 }
+                // And against rects in scene.
+                for (Rectangle rect : rects) {
+                    System.out.println(hitbox + " !!! " + rect);
+                    if (!(intersection = hitbox.intersection(rect)).isEmpty()) {
+                        System.out.println(intersection);
+                        if (intersection.height > intersection.width) {
+                            normal.x = bubb.vel_x()*-2; 
+                            //bubb.set_pos_x(bubb.pos_x()+Math.signum(normal.x)*intersection.width);
+                        } else {
+                            normal.y = bubb.vel_y()*-2;
+                            //bubb.set_pos_y(bubb.pos_y()+Math.signum(normal.y)*intersection.height);
+                        }
+                    }
+                }
+
                 bubb.accelerate(normal);
                 bubb.accelerate(forces);
                 bubb.advance(delta_t);
@@ -731,6 +746,11 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
             g.setColor(Color.orange.darker());
             for (Rectangle r : rects) {
                 g.fillRect(r.x, r.y, r.width, r.height);
+                if (m_drawhitboxes) {
+                    g.setColor(Color.red); 
+                    g.drawRect(r.x, r.y, r.width, r.height);
+                    g.setColor(Color.orange.darker());
+                }
             }
             g.setColor(Color.blue);
             g.fillRect(res_x()/2, 30, 40, 40);
@@ -898,8 +918,16 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         
         // Update radius/vel to match bubble_size/bubble_speed
         public void refresh_size() {
-            radius = bubble_size[0];
-            refresh_hitbox();
+            // Lookahead collision detection. Don't give new size if it intersects.
+            Rectangle new_hitbox = (new Rectangle(hitbox));
+            new_hitbox.grow((int)(bubble_size[0]-radius), (int)(bubble_size[0]-radius));
+            Rectangle intersection = new_hitbox.intersection(world_perim);
+            boolean nointersects = new_hitbox.width == intersection.width && new_hitbox.height == intersection.height;
+            for (int i = 0; nointersects && i < rects.size(); i++) nointersects = (intersection = new_hitbox.intersection(rects.elementAt(i))).isEmpty();
+            if (nointersects) {
+                radius = bubble_size[0];
+                refresh_hitbox();
+            }
         }
         public void refresh_speed() { 
             vel = Vec2.mul(new Vec2(Math.signum(vel.x), Math.signum(vel.y)), bubble_speed[0]+Math.random()*bubble_speed[0]+1);  // Some random variation.
