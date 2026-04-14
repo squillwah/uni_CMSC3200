@@ -460,46 +460,40 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     //private Vector<Balloid> balls;  // Like from the cannon.
     private Vector<Rectangle> rects;
 
+    // Mouse stuff:
     private Point m1, m2;
-    private Rectangle dragbox; // Used by Renderer, as the hollow drag box.
-    //private Rectangle addbox;  // Used by Game, to add a rect. Dragbox is moved into addbox and nulled on MouseExited
-                               // Use isEmpty to check it.
-    private Rectangle addbox[] = new Rectangle[2];
+    private boolean dragoff; 
+    private Rectangle dragbox;
+    private Rectangle addrect[]; 
 
     public void mousePressed(MouseEvent e) { 
-        dragbox = new Rectangle();
         m1 = e.getPoint(); 
+        dragbox = new Rectangle();
         System.out.println(m1); 
     }
     public void mouseDragged(MouseEvent e) { 
         m2 = e.getPoint(); 
-        // Dragbox may become null if mouse moves off screen.
-        if (dragbox != null) {
-            dragbox.setLocation(Math.max(1, Math.min(Math.min(m1.x,m2.x), r.res_x())), 
-                                Math.max(1, Math.min(Math.min(m1.y,m2.y), r.res_y())));
-            dragbox.setSize(Math.min(Math.abs(m1.x-m2.x), r.res_x()-dragbox.x), 
-                            Math.min(Math.abs(m1.y-m2.y), r.res_y()-dragbox.y));
+        if (!dragoff) {
+            dragbox.setLocation(Math.max(r.BORDER, Math.min(Math.min(m1.x,m2.x), r.res_x()-r.BORDER*2)), Math.max(r.BORDER, Math.min(Math.min(m1.y,m2.y), r.res_y()-r.BORDER*2)));
+            dragbox.setSize(Math.min(Math.abs(m1.x-m2.x), r.res_x()-r.BORDER*2-dragbox.x), Math.min(Math.abs(m1.y-m2.y), r.res_y()-r.BORDER*2-dragbox.y));
         }
         r.redraw(r.l_dragbox);
-        System.out.println(m1 + " | " + m2); 
-        System.out.println(dragbox);
     }
     
     public void mouseReleased(MouseEvent e) {
-        addbox[1] = dragbox;    // Compare the objects to see if changed in tick()
+        addrect[1] = dragbox;
         dragbox = null;
-        r.redraw(r.l_dragbox);  // Renderer will know what to do with a null dragbox.
-        System.out.println(addbox[1]);
+        r.redraw(r.l_dragbox);
+        System.out.println(addrect[1]);
     }
-    public void mouseExited(MouseEvent e) { dragbox = null; } // Avoid weirdness.
+    public void mouseExited(MouseEvent e) { dragoff = true; }//dragbox = null; } // Avoid weirdness.
 
     public void mouseClicked(MouseEvent e) {}
-    public void mouseEntered(MouseEvent e) {}
+    public void mouseEntered(MouseEvent e) { dragoff = false; }
     public void mouseMoved(MouseEvent e) {}
 
     public CannonBallEngine() {
-        //mouse_click = new MouseEvent[]{null, null};
-        //mouse_select = new Rectangle[]{Rectangle(0,0,0,0), Rectangle(0,0,0,0)};
+        addrect = new Rectangle[]{null, null};
         cannon_angle = new double[]{1, Math.PI-Math.random()*Math.PI/2};
         cannon_force = new double[]{1, PIXELS_PER_METER*2};
         bubble_size  = new double[]{1, (int)(PIXELS_PER_METER/2+1)};   // It is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
@@ -507,9 +501,14 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         world_gravity = new double[]{1, 9.8*PIXELS_PER_METER};
         world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
         world_perim = new Rectangle(0, 0, world_size[0].width, world_size[0].height);
-
+        
         // A twelve by three meter cannon.
         can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point((int)PIXELS_PER_METER, (int)PIXELS_PER_METER));
+        
+        m1 = null;
+        m2 = null; 
+        dragoff = false;
+        dragbox = null;
         
         physics_paused = true;
         restart_game = false;
@@ -533,6 +532,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         set_cannon_angle(Math.random()*90);
         bubbs = new Vector<Bubble>();
         bubbs.addElement(new Bubble(null)); // Or a configurable number for start bubbles.
+        rects = new Vector<Rectangle>();
     }
 
     // Getters, setters, etc. For frame's UI to latch into.
@@ -555,12 +555,34 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
 
     // The tick(). This is where all the game logic happens. Intended to be called once per running loop.
     public void tick(double delta_t) {
-
-        //System.out.println(m1 + " | " + m2);
-
         // Update engine values. Not all require redraws.
         cannon_force[0] = cannon_force[1];
         world_gravity[0] = world_gravity[1];
+        if (addrect[0] != addrect[1]) {
+            addrect[0] = addrect[1];
+            // Verify that the rectangle doesn't intersect with cannon, bubbles, or balloids, and absorbs smaller rects/gives up itself.
+            int bubble = 0, balloid = 0, rect = 0;
+            boolean addit = addrect[0] != null && !addrect[0].isEmpty() && !addrect[0].intersects(can.hitbox());
+            while (addit && bubble < bubbs.size()) {
+                addit = !addrect[0].intersects(bubbs.elementAt(bubble).hitbox());
+                bubble++;
+            }
+            //while (addit && balloid < balloids.size()) {
+            //    addit = !addrect[0].intersects(balloids.elementAt(balloid).hitbox());
+            //    balloid++;
+            //}
+            while (addit && rect < rects.size()) {
+                System.out.println("he");
+                addit = !rects.elementAt(rect).contains(addrect[0]);
+                if (addrect[0].contains(rects.elementAt(rect))) { rects.removeElementAt(rect); rect--; }
+                rect++;
+            } 
+            if (addit) {
+                rects.addElement(addrect[0]);
+                r.redraw(r.l_statics); 
+                System.out.println(rects);
+            }
+        }
         if (cannon_angle[0] != cannon_angle[1]) { 
             cannon_angle[0] = cannon_angle[1];
             can.aim(cannon_angle[0]);
@@ -640,6 +662,9 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         } else if (restart_game) {
             init_game_state();
             r.redraw(r.l_bubbles);
+            r.redraw(r.l_cannon);
+            r.redraw(r.l_statics);
+            //r.redraw(r.l_balloids);
             restart_game = false;
         }
     }
@@ -669,6 +694,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         }
     
         public void draw(int layer, Graphics g) {
+            try {
                 // Could very easily support drawing multiple layers onto one graphics here (with &), if that ever becomes desirable.
                 if (layer == l_background)      draw_background(g);
                 else if (layer == l_statics)    draw_statics(g);    
@@ -677,18 +703,35 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                 else if (layer == l_cannon)     draw_cannon(g);     
                 else if (layer == l_dragbox)    draw_dragbox(g);    
                 else System.out.println("err: bad layer code in draw");
+            } catch (java.util.ConcurrentModificationException e) { 
+                // No gods no masters.
+                System.out.println("Everything is fine."); 
+            }
         }
     
         // @todo depending on the planet, can make the background different.
         private void draw_background(Graphics g) {
             g.setColor(Color.darkGray);
             g.fillRect(0, 0, res_x(), res_y());         // Fill background. RenderComposers preserve all layer transparency.
+            //switch ((int)(world_gravity[0])) {
+            //    case 3: g.setColor(Color.red.darker()); break;
+            //    case 8: g.setColor(Color.white); break;
+            //    case 9: g.setColor(Color.green.darker()); break;
+            //    case 24: g.setColor(Color.orange.darker()); break;
+            //    case 10: g.setColor(Color.orange.brighter()); break;
+            //    case 11: g.setColor(Color.blue); break;
+            //    case 0: g.setColor(Color.lightGray); break;
+            //}
             g.setColor(Color.blue);
             g.drawRect(0, 0, res_x()-1, res_y()-1);
         }
     
         // @todo draw rectangles here, any other static objects
         private void draw_statics(Graphics g) {
+            g.setColor(Color.orange.darker());
+            for (Rectangle r : rects) {
+                g.fillRect(r.x, r.y, r.width, r.height);
+            }
             g.setColor(Color.blue);
             g.fillRect(res_x()/2, 30, 40, 40);
         }
@@ -730,10 +773,9 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
             }
         }
     
-        // @todo draw the dragbox
         private void draw_dragbox(Graphics g) {
-            if (dragbox != null) 
-                g.drawRect(dragbox.x, dragbox.y, dragbox.width, dragbox.height);
+            g.setColor(Color.white);
+            if (dragbox != null) g.drawRect(dragbox.x, dragbox.y, dragbox.width, dragbox.height);
         }
 
         // Expose resolution to rest of class, so render size can be matched with world size 1:1
