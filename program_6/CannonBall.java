@@ -221,7 +221,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
             lbl_cannon_angle.setText("Angle: " + sb_cannon_angle.getValue()/10.0 + "deg");    // @todo May instead want to have some connect_cannon_angle_scroll or connect_player_score_lbl thing in engine.
             
             lbl_time.setText("Time: " + ((int)(engine.get_elapsed_time()*10))/10.0);
-
+            lbl_score_ball.setText("Bubbles: " + engine.get_score_bubbles());
+            lbl_score_player.setText("Player: " + engine.get_score_player());
 
             engine.tick(delta_t);
             display.debug_inform_ticktime(delta_t);
@@ -453,7 +454,8 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     private int score_bubbles;
     private double elapsed_time;        // Time game is not paused. Resets on restart.
     private double timer_fertileballs;
-   
+    private boolean fire_cannon; 
+
     // Game Objects:
     private Cannon can; 
     private Vector<Bubble> bubbs;   
@@ -465,6 +467,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     private boolean dragoff; 
     private Rectangle dragbox;
     private Rectangle addrect[]; 
+    private MouseEvent mouseclick[];
 
     public void mousePressed(MouseEvent e) { 
         m1 = e.getPoint(); 
@@ -481,10 +484,13 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     }
     
     public void mouseReleased(MouseEvent e) {
+        if (m2 == null) mouseclick[1] = e;
         addrect[1] = dragbox;
         dragbox = null;
+        m1 = null;
+        m2 = null;
         r.redraw(r.l_dragbox);
-        System.out.println(addrect[1]);
+        //System.out.println(addrect[1]);
     }
     public void mouseExited(MouseEvent e) { dragoff = true; }//dragbox = null; } // Avoid weirdness.
 
@@ -504,7 +510,8 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         
         // A twelve by three meter cannon.
         can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point((int)PIXELS_PER_METER, (int)PIXELS_PER_METER));
-        
+       
+        mouseclick = new MouseEvent[]{null, null};
         m1 = null;
         m2 = null; 
         dragoff = false;
@@ -515,6 +522,8 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
         m_fertileballs = false;
         m_drawhitboxes = false;
         m_bubblegravity = false;
+
+        fire_cannon = false;
         
         r = new CannonBallRenderer(MIN_WORLD_SIZE);
 
@@ -552,12 +561,17 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     public double get_cannon_angle() { return Math.toDegrees(Math.PI-cannon_angle[0]); }
     public double get_cannon_force() { return cannon_force[0]; }
     public double get_elapsed_time() { return elapsed_time; }
+    public int get_score_bubbles() { return score_bubbles; }
+    public int get_score_player() { return score_player; }
+    public void fire_cannon() { fire_cannon = true; }
+
 
     // The tick(). This is where all the game logic happens. Intended to be called once per running loop.
     public void tick(double delta_t) {
         // Update engine values. Not all require redraws.
         cannon_force[0] = cannon_force[1];
         world_gravity[0] = world_gravity[1];
+        
         if (addrect[0] != addrect[1]) {
             addrect[0] = addrect[1];
             // Verify that the rectangle doesn't intersect with cannon, bubbles, or balloids, and absorbs smaller rects/gives up itself.
@@ -583,20 +597,43 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                 System.out.println(rects);
             }
         }
+        
+        if (mouseclick[0] != mouseclick[1]) {
+            mouseclick[0] = mouseclick[1];
+            Point p = mouseclick[0].getPoint(); p = new Point(p.x-r.BORDER, p.y-r.BORDER); // To world space.
+            if (mouseclick[0].getButton() == MouseEvent.BUTTON3) {
+                for (int i = 0; i < rects.size(); i++) {
+                    if (rects.elementAt(i).contains(p)) {
+                        rects.removeElementAt(i);
+                        i = rects.size();
+                        r.redraw(r.l_statics);
+                    }
+                }
+            } else 
+            if (mouseclick[0].getButton() == MouseEvent.BUTTON1) {
+                if (can.hitbox().contains(p)) {
+                    fire_cannon();
+                }
+            }
+        }
+
         if (cannon_angle[0] != cannon_angle[1]) { 
             cannon_angle[0] = cannon_angle[1];
             can.aim(cannon_angle[0]);
             r.redraw(r.l_cannon);
         }
+        
         if (bubble_speed[0] != bubble_speed[1]) {
             bubble_speed[0] = bubble_speed[1];
             for (Bubble bubb : bubbs) bubb.refresh_speed(); // Update all bubbs.
         }
+        
         if (bubble_size[0] != bubble_size[1]) {
             bubble_size[0] = bubble_size[1];
             for (Bubble bubb : bubbs) bubb.refresh_size();
             r.redraw(r.l_bubbles);
         }
+
         if (!world_size[0].equals(world_size[1])) {
             world_size[0] = world_size[1];
             world_perim.setBounds(0, 0, world_size[0].width, world_size[0].height);
@@ -633,6 +670,15 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                 } timer_fertileballs += delta_t;
             }
         
+           
+            // Cannon fire 
+            if (fire_cannon) {
+                System.out.println("Fire cannon code goes on line 638");
+                fire_cannon = false;
+            }
+        
+       
+            // Bubble collisions. 
             Vec2 normal = new Vec2(0,0);
             Vec2 forces = new Vec2(0,0);
             Rectangle hitbox, intersection;
@@ -665,6 +711,20 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                             //bubb.set_pos_y(bubb.pos_y()+Math.signum(normal.y)*intersection.height);
                         }
                     }
+                }
+                // And against the cannon, for score keeping.
+                if (hitbox.intersects(can.hitbox())) {
+                    //bubbs.removeElement(bubb);
+                    //bubbs.addElement(new Bubble(null));
+                    score_bubbles++;
+                    //restart();
+                    bubb.set_pos_x(bubb.radius()+1+(Math.random()*world_size[0].width*.75-bubb.radius()-1));    // Best to have method that'll do this. And set the no collide flag until collision detection clears it here.
+                    bubb.set_pos_y(bubb.radius()+1+(Math.random()*world_size[0].height-bubb.radius()-1)); 
+                    //bubb.
+
+
+                    // @@@@ todo
+                    // Reimplement the hover no collide thing with the bubbles. Random relocation could hit a rect.
                 }
 
                 bubb.accelerate(normal);
@@ -859,7 +919,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
    
     // ----------------
     // Balls
-    // Abstract clas for common utility between Bubbles and Balloids
+    // Abstract class for common utility between Bubbles and Balloids
     // ---------------- 
     abstract class Ball {
         protected Vec2 pos;
