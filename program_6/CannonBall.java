@@ -295,8 +295,8 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         switch ((int)(Math.random()/.25)) {
             case 0: System.out.println("Would you like to play a game?"); break;
             case 1: System.out.println("Life? Don't talk to me about life."); break;
-            case 2: System.out.println("todo: quote 3"); break;
-            case 3: System.out.println("todo: quote 4"); break;
+            case 2: System.out.println("Hello there."); break;
+            case 3: System.out.println(":-)"); break;
             default: System.out.println("Not in the mood. Go away."); exit(); break;
         }
     }
@@ -358,8 +358,9 @@ class CannonBallEngine {
     // Game objects:
     private Cannon can; 
     private Vector<Bubble> bubbs;   
-    private int num_bubbs;
+    //private int num_bubbs;
     //private Vector<Balloid> balls;  // Like from the cannon.
+    
     // temp
     testball[] tests = new testball[100];
     class testball {
@@ -368,75 +369,15 @@ class CannonBallEngine {
         double vy = 0;
     }
 
-    abstract class Ball {
-        protected Vec2 pos;
-        protected Vec2 vel;
-        protected double radius;
-        protected Rectangle hitbox;
-
-        public Ball() {} // Extending classes need to ensure that they initialize vel, pos, radius, and hitbox.
-
-        protected Rectangle gen_hitbox(Vec2 p) { return new Rectangle((int)(p.x-radius-1), (int)(p.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
-        protected void refresh_hitbox() { hitbox.setBounds((int)(pos.x-radius-1), (int)(pos.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
-
-        // Hitboxes, current position and next (at delta_t).
-        public Rectangle hitbox() { return hitbox; }
-        public Rectangle next_hitbox(double delta_t) { return gen_hitbox(Vec2.add(pos, Vec2.mul(vel, delta_t))); }
-      
-        // Apply acceleration force, advance position by velocity (per second, given time).
-        public void accelerate(Vec2 accel) { vel.add(accel); }
-        public void advance(double delta_t) { 
-            pos.add(Vec2.mul(vel, delta_t));
-            hitbox.setLocation((int)(pos.x-radius-1), (int)(pos.y-radius-1)); 
-        } 
-
-        public double radius() { return radius; }
-        public Vec2 vel() { return new Vec2(vel); }
-        public Vec2 pos() { return new Vec2(pos); }
-        public double vel_x() { return vel.x; } public double vel_y() { return vel.y; }
-        public double pos_x() { return pos.x; } public double pos_y() { return pos.y; }
-       
-        // Four corners of the circle. Primary use in drawing. 
-        public int tl_x() { return (int)(pos.x-1-radius); }
-        public int tl_y() { return (int)(pos.y-1-radius); }
-        public int br_x() { return (int)(pos.x+radius); }
-        public int br_y() { return (int)(pos.y+radius); }
-    }
-
-    // The targets
-    class Bubble extends Ball {
-        public Bubble() {
-            radius = bubble_size[0];
-            // Init with random position and heading.
-            pos = new Vec2(radius+1+(Math.random()*world_size[0].width-radius-1), radius+1+(Math.random()*world_size[0].height-radius-1)); 
-            vel = new Vec2(1,1);
-            if (Math.random() < .5) vel.x = -vel.x; 
-            if (Math.random() < .5) vel.y = -vel.y;
-            hitbox = gen_hitbox(pos);
-        }
-      
-
-        // Update radius/vel to match bubble_size/bubble_speed
-        public void refresh_size() {
-            radius = bubble_size[0];
-            refresh_hitbox();
-        }
-        public void refresh_speed() { 
-            vel = Vec2.mul(new Vec2(Math.signum(vel.x), Math.signum(vel.y)), bubble_speed[0]);
-        }
-
-        public void set_pos_x(double x) { pos.x = x; refresh_hitbox(); }
-        public void set_pos_y(double y) { pos.y = y; refresh_hitbox(); }
-    }
-
-//    // The projectile
-//    class Balloid extends Ball {}
-
-
-
     // Other data
-    private double time_elapsed;    // Time game is not paused. Resets on restart.
     private Rectangle world_perim;
+    private int score_player;
+    private int score_bubbles;
+    private double elapsed_time;    // Time game is not paused. Resets on restart.
+    private double timer_fertile_balls;
+
+    // Mode settings
+    private boolean m_fertile_balls;
 
 
     // @todo We should probably use the ball and Vec2s class like the last program, though we should
@@ -448,31 +389,46 @@ class CannonBallEngine {
 
 
     public CannonBallEngine() {
-        cannon_angle = new double[]{0, Math.PI-Math.random()*Math.PI/2};
-        cannon_force = new double[]{0, PIXELS_PER_METER*2};
-        bubble_size  = new double[]{0, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
-        bubble_speed = new double[]{0, PIXELS_PER_METER};
-        world_gravity = new double[]{0, 9.8*PIXELS_PER_METER};
+        cannon_angle = new double[]{1, Math.PI-Math.random()*Math.PI/2};
+        cannon_force = new double[]{1, PIXELS_PER_METER*2};
+        bubble_size  = new double[]{1, (int)(PIXELS_PER_METER/2+1)};   // ! @@ it is likely that the cannonball and bubbles will need to be huge, to adhere to normal gravity and velocities.
+        bubble_speed = new double[]{1, PIXELS_PER_METER};
+        world_gravity = new double[]{1, 9.8*PIXELS_PER_METER};
         world_size = new Dimension[]{MIN_WORLD_SIZE, MIN_WORLD_SIZE};
 
         // A twelve by three meter cannon.
         can = new Cannon((int)(PIXELS_PER_METER*12), (int)(PIXELS_PER_METER*3), new Point(10,10));
 
-        num_bubbs = 5;  // Arbitrary 5 bubbs, just for testing.
         bubbs = new Vector<Bubble>();
-        for (int i = 0; i < num_bubbs; i++) bubbs.addElement(new Bubble());
+        bubbs.addElement(new Bubble(null));
 
-        time_elapsed = 0;
         world_perim = new Rectangle(0, 0, world_size[0].width, world_size[0].height);
+        score_player = 0;
+        score_bubbles = 0;
+        elapsed_time = 0;
+        timer_fertile_balls = 0;
+
+        m_fertile_balls = true; // testing
 
         physics_paused = true;
         restart_game = false;
+
         r = new CannonBallRenderer(MIN_WORLD_SIZE);
         r.redraw(~0); // debug, draw everything
 
         // temp
-        for (int i = 0; i < 100; i++) tests[i] = new testball();
+        //for (int i = 0; i < 100; i++) tests[i] = new testball();
     }
+    
+    private void init_game_state() {
+        score_player = 0;
+        score_bubbles = 0;
+        elapsed_time = 0;
+        set_cannon_angle(Math.random()*90);
+        bubbs = new Vector<Bubble>();
+        bubbs.addElement(new Bubble(null)); // Or a configurable number for start bubbles.
+    }
+
     public void set_world_size(Dimension dim) {
         world_size[1] = new Dimension(Math.max(MIN_WORLD_SIZE.width, dim.width), Math.max(MIN_WORLD_SIZE.height, dim.height));
     }
@@ -489,7 +445,7 @@ class CannonBallEngine {
         System.out.println("ang " + degrees + " " + cannon_angle[1]);
     }
     public void set_cannon_force(double mps) {
-
+        cannon_force[1] = mps;
     }
     public void set_gravity(double mpsps) {
         System.out.println("Gravity: " + mpsps);
@@ -509,7 +465,7 @@ class CannonBallEngine {
 
     public double get_cannon_angle() { return Math.toDegrees(Math.PI-cannon_angle[0]); }
     //public double get_cannon_force() {} 
-    public double get_time_elapsed() { return time_elapsed; }
+    public double get_time_elapsed() { return elapsed_time; }
 
     public void tick(double delta_t) {
         // Update engine values
@@ -547,6 +503,15 @@ class CannonBallEngine {
                             // @todo We could make this automatic in CBRenderer, or if VolatileBuffers means generating new buffs all 
                             // the time (which we should check), this might not be an issue cause we'll be generating new buffs all the time anyways.
         }
+
+        // Special modes:
+        if (m_fertile_balls) {
+            if (timer_fertile_balls > 5) {  // Reproduce every five seconds.
+                bubbs.addElement(new Bubble(bubbs.elementAt(0).pos()));  // Assuming bubbs won't be empty (though a NULL shouldn't break things). We want it to spawn off the position of an existing ball.
+                timer_fertile_balls = 0;
+            } timer_fertile_balls += delta_t;
+        }
+
 
         // Physics (moving, colliding, accelerating)
         if (!physics_paused) {
@@ -589,20 +554,21 @@ class CannonBallEngine {
 
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_background | r.l_statics | r.l_balloids);   // redraw all every tick, to test perf
-            time_elapsed += delta_t;
+            elapsed_time += delta_t;
         } else if (restart_game) {
-            time_elapsed = 0;
+            //time_elapsed = 0;
             // temp
 
             //can.aim(Math.random()+Math.PI/2);
-            set_cannon_angle(Math.random()*90);
+            //set_cannon_angle(Math.random()*90);
+            init_game_state();
 
             // Reset the state of the game
             // Could use an init_game_state() or something 
-            for (testball test: tests) {
-                test.x = test.y = MIN_WORLD_SIZE.height/2;
-                test.vy = 0;
-            }
+            //for (testball test: tests) {
+            //    test.x = test.y = MIN_WORLD_SIZE.height/2;
+            //    test.vy = 0;
+            //}
             r.redraw(r.l_bubbles);
             //r.redraw(r.l_cannon);     // @todo We may want to make sets, or special codes, for states where specific layers will always need to be redrawn. Who cares.
             restart_game = false;
@@ -784,7 +750,70 @@ class CannonBallEngine {
             return new Point((int)Math.abs(Math.cos(angle-Math.PI/2)*diameter/2), (int)Math.abs(Math.sin(angle-Math.PI/2)*diameter/2));
         }
     }
+    
+    abstract class Ball {
+        protected Vec2 pos;
+        protected Vec2 vel;
+        protected double radius;
+        protected Rectangle hitbox;
 
+        public Ball() {} // Extending classes need to ensure that they initialize vel, pos, radius, and hitbox.
+
+        protected Rectangle gen_hitbox(Vec2 p) { return new Rectangle((int)(p.x-radius-1), (int)(p.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
+        protected void refresh_hitbox() { hitbox.setBounds((int)(pos.x-radius-1), (int)(pos.y-radius-1), (int)(radius*2+1), (int)(radius*2+1)); }
+
+        // Hitboxes, current position and next (at delta_t).
+        public Rectangle hitbox() { return hitbox; }
+        public Rectangle next_hitbox(double delta_t) { return gen_hitbox(Vec2.add(pos, Vec2.mul(vel, delta_t))); }
+      
+        // Apply acceleration force, advance position by velocity (per second, given time).
+        public void accelerate(Vec2 accel) { vel.add(accel); }
+        public void advance(double delta_t) { 
+            pos.add(Vec2.mul(vel, delta_t));
+            hitbox.setLocation((int)(pos.x-radius-1), (int)(pos.y-radius-1)); 
+        } 
+
+        public double radius() { return radius; }
+        public Vec2 vel() { return new Vec2(vel); }
+        public Vec2 pos() { return new Vec2(pos); }
+        public double vel_x() { return vel.x; } public double vel_y() { return vel.y; }
+        public double pos_x() { return pos.x; } public double pos_y() { return pos.y; }
+       
+        // Four corners of the circle. Primary use in drawing. 
+        public int tl_x() { return (int)(pos.x-1-radius); }
+        public int tl_y() { return (int)(pos.y-1-radius); }
+        public int br_x() { return (int)(pos.x+radius); }
+        public int br_y() { return (int)(pos.y+radius); }
+    }
+
+    // The targets
+    class Bubble extends Ball {
+        public Bubble(Vec2 position) {
+            radius = bubble_size[0];
+            // If no position given, init with random.
+            if (position == null) pos = new Vec2(radius+1+(Math.random()*world_size[0].width-radius-1), radius+1+(Math.random()*world_size[0].height-radius-1)); 
+            else pos = new Vec2(position);
+            // Heading always random perfect diagonal.
+            vel = new Vec2(1,1);
+            if (Math.random() < .5) vel.x = -vel.x; 
+            if (Math.random() < .5) vel.y = -vel.y;
+            hitbox = gen_hitbox(pos);
+            refresh_speed();
+        }
+        
+        // Update radius/vel to match bubble_size/bubble_speed
+        public void refresh_size() {
+            radius = bubble_size[0];
+            refresh_hitbox();
+        }
+        public void refresh_speed() { 
+            vel = Vec2.mul(new Vec2(Math.signum(vel.x), Math.signum(vel.y)), bubble_speed[0]+Math.random()*bubble_speed[0]+1);  // Some random variation.
+        }
+
+        // The bubbles are to be restricted in world, even on window resize/during pause.
+        public void set_pos_x(double x) { pos.x = x; refresh_hitbox(); }
+        public void set_pos_y(double y) { pos.y = y; refresh_hitbox(); }
+    }
 }
 
 // ----------------
