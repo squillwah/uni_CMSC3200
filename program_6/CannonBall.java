@@ -138,7 +138,7 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
         sb_cannon_angle.setMinimum(0); sb_cannon_angle.setMaximum(1000); sb_cannon_angle.setVisibleAmount(100); // 1000-100 == 90.0 degrees
         sb_cannon_angle.setBlockIncrement(45); sb_cannon_angle.setUnitIncrement(9); 
-        sb_cannon_force.setMinimum(0); sb_cannon_force.setMaximum(350); sb_cannon_force.setVisibleAmount(50);   // MIGHT NEED TWEAKED THESE ARE VALUES THAT DONT FEEL TOO BAD
+        sb_cannon_force.setMinimum(0); sb_cannon_force.setMaximum(800); sb_cannon_force.setVisibleAmount(100);   // MIGHT NEED TWEAKED THESE ARE VALUES THAT DONT FEEL TOO BAD
         sb_cannon_force.setBlockIncrement(25); sb_cannon_force.setUnitIncrement(10); sb_cannon_force.setValue(250);
 
         // Add panels to frame, display to panel:
@@ -512,10 +512,10 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                 addit = !addrect[0].intersects(bubbs.elementAt(bubble).hitbox());
                 bubble++;
             }
-            //while (addit && balloid < balloids.size()) {
-            //    addit = !addrect[0].intersects(balloids.elementAt(balloid).hitbox());
-            //    balloid++;
-            //}
+            while (addit && balloid < balls.size()) {
+                addit = !addrect[0].intersects(balls.elementAt(balloid).hitbox());
+                balloid++;
+            }
             while (addit && rect < rects.size()) {
                 addit = !rects.elementAt(rect).contains(addrect[0]);
                 if (addrect[0].contains(rects.elementAt(rect))) { rects.removeElementAt(rect); rect--; }
@@ -677,7 +677,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                     }
                 }
 
-                // collide with bubbles
+                // collide with bubbles, cannon
                 boolean removed = false;
                 for (int j = 0; j < bubbs.size() && !removed; j++) {
                     if (!(ball_intersection = ball_hitbox.intersection(bubbs.elementAt(j).hitbox())).isEmpty()) {
@@ -692,11 +692,20 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                         r.redraw(r.l_bubbles);
                     }
                 }
+                // Only check cannon collision if ball is older than two seconds. Invincibility frames, like Mario.
+                if (ball.lifetime > 1 && ball_hitbox.intersects(can.hitbox())) {
+                    balls.removeElementAt(i);
+                    i--;
+                    removed = true;
+                    score_bubbles++;
+                }
+
 
                 if (!removed) {
                     ball.accelerate(ball_normal);
                     ball.accelerate(ball_forces);
                     ball.advance(delta_t);
+                    ball.lifetime += delta_t;
 
                     if (ball.offscreen()) {
                         balls.removeElementAt(i);
@@ -1016,6 +1025,8 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
     // This is the projectile the cannon fires
     // ----------------
     class Balloid extends Ball {
+        public double lifetime;     // Time of been living. Seconds.
+
         public Balloid() {
             radius = 12.0;
 
@@ -1027,11 +1038,13 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                         -Math.sin(can.angle()) * speed);
 
             hitbox = gen_hitbox(pos);
+
+            lifetime = 0;
         }
 
         public boolean offscreen() {
             return br_x() < 0 || tl_x() > world_size[0].width ||
-                br_y() < 0 || tl_y() > world_size[0].height;
+                /*br_y() < 0 ||*/ tl_y() > world_size[0].height;
         }
     }
 }
