@@ -710,6 +710,7 @@ class CannonBallEngine implements MouseListener, MouseMotionListener {
                     if (ball.offscreen()) {
                         balls.removeElementAt(i);
                         i--;
+                        System.out.println("Ballvis has left the building."); // Inform the user.
                     }
                 }
             }
