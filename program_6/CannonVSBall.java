@@ -220,7 +220,7 @@ public class CannonVSBall implements ActionListener, AdjustmentListener, Compone
 
             // Keep scrolls, score, and time in sync.
             sb_cannon_angle.setValue((int)(engine.get_cannon_angle()*10));
-            lbl_cannon_angle.setText("Angle: " + sb_cannon_angle.getValue()/10.0 + "deg");    // @todo May instead want to have some connect_cannon_angle_scroll or connect_player_score_lbl thing in engine.
+            lbl_cannon_angle.setText("Angle: " + sb_cannon_angle.getValue()/10.0 + "deg"); 
             
             sb_cannon_force.setValue((int)(engine.get_cannon_force()));
             lbl_cannon_force.setText("Force: " + sb_cannon_force.getValue() + "px/s");
@@ -265,7 +265,7 @@ public class CannonVSBall implements ActionListener, AdjustmentListener, Compone
                 break;
             case restart:
                 engine.restart();
-                mnu_control_itms[run].setEnabled(true);     // Assuming restart always pauses. @todo may want to change this depending on game feel. Or rubric demands.
+                mnu_control_itms[run].setEnabled(true);     // Assuming restart always pauses. 
                 mnu_control_itms[pause].setEnabled(false);
                 break;
             case quit:
