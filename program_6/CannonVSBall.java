@@ -10,7 +10,7 @@
 // Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
 // SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
 
-package CannonBall;
+package CannonVSBall;
 
 import java.awt.*;
 import java.awt.event.*;
@@ -22,7 +22,7 @@ import java.util.Vector;
 // Creates the frame + UI elements, game engine and canvas display.
 // Manages interaction between UI bits/controls and game state.
 // ----------------
-public class CannonBall implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
+public class CannonVSBall implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, Runnable, WindowListener {
     private static final long serialVersionUID = 1111L;
     private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
     // Offsets for MenuItem and value arrays.
@@ -57,9 +57,9 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
     private Label lbl_cannon_force, lbl_cannon_angle, lbl_score_ball, lbl_score_player, lbl_time;   
     private Scrollbar sb_cannon_force, sb_cannon_angle;                                                 
 
-    public static void main(String[] args) { new CannonBall(); }
+    public static void main(String[] args) { new CannonVSBall(); }
 
-    public CannonBall() {
+    public CannonVSBall() {
         // Engine, Display, Thread:
         engine = new CannonBallEngine();
         display = new MultiBufferedCanvas(engine.renderer());
@@ -138,7 +138,7 @@ public class CannonBall implements ActionListener, AdjustmentListener, Component
         sb_cannon_angle.setBackground(pnl_controls.getBackground().darker());
         sb_cannon_angle.setMinimum(0); sb_cannon_angle.setMaximum(1000); sb_cannon_angle.setVisibleAmount(100); // 1000-100 == 90.0 degrees
         sb_cannon_angle.setBlockIncrement(45); sb_cannon_angle.setUnitIncrement(9); 
-        sb_cannon_force.setMinimum(0); sb_cannon_force.setMaximum(800); sb_cannon_force.setVisibleAmount(100);   // MIGHT NEED TWEAKED THESE ARE VALUES THAT DONT FEEL TOO BAD
+        sb_cannon_force.setMinimum(0); sb_cannon_force.setMaximum(800); sb_cannon_force.setVisibleAmount(100);   
         sb_cannon_force.setBlockIncrement(25); sb_cannon_force.setUnitIncrement(10); sb_cannon_force.setValue(250);
 
         // Add panels to frame, display to panel:
