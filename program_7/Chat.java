@@ -97,7 +97,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
             Frame about = new Frame("About");
             about.setSize(300, 150);
             about.setLayout(new BorderLayout());
-            about.add(new Label("Basic AWT window is working.", Label.CENTER), BorderLayout.CENTER);
+            about.add(new Label("WHOOOOOOOOO", Label.CENTER), BorderLayout.CENTER);
 
             about.addWindowListener(new WindowAdapter() {
                 public void windowClosing(WindowEvent e) {
