@@ -44,7 +44,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         window.setMenuBar(mbar);
 
         ;   // simple content
-        Label title = new Label("AWT Chat Window", Label.CENTER);
+        Label title = new Label("Window", Label.CENTER);
         window.add(title, BorderLayout.CENTER);
 
         ;   // listeners
@@ -97,7 +97,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
             Frame about = new Frame("About");
             about.setSize(300, 150);
             about.setLayout(new BorderLayout());
-            about.add(new Label("WHOOOOOOOOO", Label.CENTER), BorderLayout.CENTER);
+            about.add(new Label("By using this program you agree to give a 100% on all grades related to it.", Label.CENTER), BorderLayout.CENTER);
 
             about.addWindowListener(new WindowAdapter() {
                 public void windowClosing(WindowEvent e) {
