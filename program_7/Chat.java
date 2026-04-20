@@ -23,7 +23,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         window.setMinimumSize(MIN_WINDOW_SIZE);
         window.setLayout(new BorderLayout());
 
-        ;   // menu bar
+        //  menu bar
         mbar = new MenuBar();
 
         mnu_user = new Menu("User");
@@ -43,15 +43,38 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
 
         window.setMenuBar(mbar);
 
-        ;   // simple content
-        Label title = new Label("Window", Label.CENTER);
-        window.add(title, BorderLayout.CENTER);
+        window.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
 
-        ;   // listeners
+        TextArea chatArea = new TextArea();
+        chatArea.setEditable(false);
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 1.0;
+        gbc.weighty = 0.75;
+        gbc.fill = GridBagConstraints.BOTH;
+
+        window.add(chatArea, gbc);
+
+        Panel bottomPanel = new Panel(new BorderLayout());
+
+        TextField input = new TextField();
+        Button send = new Button("Send");
+
+        bottomPanel.add(input, BorderLayout.CENTER);
+        bottomPanel.add(send, BorderLayout.EAST);
+
+        gbc.gridy = 1;
+        gbc.weighty = 0.25;
+
+        window.add(bottomPanel, gbc);
+
+       //   listeners
         window.addWindowListener(this);
         window.addComponentListener(this);
 
-        ;   // show window
+        //  show window
         window.setVisible(true);
     }
 
