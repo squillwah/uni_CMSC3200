@@ -1,4 +1,7 @@
-//package program_7;
+package chat;
+
+// javac -d . Chat.java
+// java chat.Chat
 
 import java.awt.*;
 import java.awt.event.*;
@@ -25,26 +28,27 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
 
         //  menu bar
         mbar = new MenuBar();
-
         mnu_user = new Menu("User");
         mnu_help = new Menu("Help");
-
         mi_exit = new MenuItem("Exit");
         mi_about = new MenuItem("About");
-
-        mi_exit.addActionListener(this);
-        mi_about.addActionListener(this);
-
         mnu_user.add(mi_exit);
         mnu_help.add(mi_about);
-
         mbar.add(mnu_user);
         mbar.add(mnu_help);
-
         window.setMenuBar(mbar);
 
         window.setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
+
+        // ! We'll want to make these chatbox, input field, and send buttons class variables. We'll need access to them beyond this constructor.
+        //
+        // ! In addition to them, we'll also need:
+        //  - Buttons for Change Host, Change Port, Start Server, Connect, & Disconnet
+        //  - TextFields for Host and Port
+        //  - Another TextArea for the event log
+        //
+        //  Take a look at Lesson 19 (~6:00 in) for the example of how it should all look and work.
 
         TextArea chatArea = new TextArea();
         chatArea.setEditable(false);
@@ -68,54 +72,46 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         gbc.gridy = 1;
         gbc.weighty = 0.25;
 
+        gbc.fill = GridBagConstraints.HORIZONTAL;
         window.add(bottomPanel, gbc);
 
-       //   listeners
+        //   listeners
         window.addWindowListener(this);
         window.addComponentListener(this);
+        mi_exit.addActionListener(this);
+        mi_about.addActionListener(this);
 
         //  show window
         window.setVisible(true);
     }
 
-    //  Listeners
-    public void windowActivated(WindowEvent e) {}
+    // ! We need to remove our listeners on close, as well as do whatever socket stuff needs doing later when that's implemented.
+    private void shutdown() {
+        window.removeWindowListener(this);
+        window.removeComponentListener(this);
+        mi_exit.removeActionListener(this);
+        mi_about.removeActionListener(this);
 
-    public void windowClosed(WindowEvent e) {}
+        // @todo other listeners, socket closing, etc.
 
-    public void windowClosing(WindowEvent e) {
         window.dispose();
         System.exit(0);
     }
+    
+    //  Listeners
 
-    public void windowDeactivated(WindowEvent e) {}
-
-    public void windowDeiconified(WindowEvent e) {}
-
-    public void windowIconified(WindowEvent e) {}
-
-    public void windowOpened(WindowEvent e) {}
-
+    public void windowClosing(WindowEvent e) {
+        shutdown(); 
+    }
+    
     public void itemStateChanged(ItemEvent e) {}
-
-    public void componentHidden(ComponentEvent e) {}
-
-    public void componentMoved(ComponentEvent e) {}
-
-    public void componentResized(ComponentEvent e) {}
-
-    public void componentShown(ComponentEvent e) {}
-
-    public void adjustmentValueChanged(AdjustmentEvent e) {}
 
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
 
-        if (src == mi_exit) {
-            window.dispose();
-            System.exit(0);
-        }
-
+        if (src == mi_exit) { 
+            shutdown(); 
+        } else
         if (src == mi_about) {
             Frame about = new Frame("About");
             about.setSize(300, 150);
@@ -131,4 +127,11 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
             about.setVisible(true);
         }
     }
+    
+    // ! If we're using layouts, we probably don't need ComponentListener (at least not to resize anything)
+    public void componentHidden(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {} public void componentResized(ComponentEvent e) {} public void componentShown(ComponentEvent e) {}
+    // ! Don't think we'll be using any scrolls either. 
+    public void adjustmentValueChanged(AdjustmentEvent e) {}
+    // Unimplemented WindowListener. 
+    public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
 }
