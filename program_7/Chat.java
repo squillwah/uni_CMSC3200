@@ -33,7 +33,6 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         window.setMinimumSize(MIN_WINDOW_SIZE);
         window.setLayout(new BorderLayout());
 
-
         //  menu bar
         mbar = new MenuBar();
         mnu_user = new Menu("User");
@@ -49,7 +48,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         // Chatlog panel:
         pnl_chatlog = new Panel();
         pnl_chatlog.setLayout(new BorderLayout());
-        txa_chatlog = new TextArea(); txa_chatlog.setEditable(false);
+        txa_chatlog = new TextArea("", 20, 1); txa_chatlog.setEditable(false);
         pnl_chatlog.add(txa_chatlog, BorderLayout.CENTER);
         window.add(pnl_chatlog, BorderLayout.CENTER);
 
@@ -61,22 +60,19 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         txf_port = new TextField();
         lbl_host = new Label("Host: ", Label.RIGHT);
         lbl_port = new Label("Port: ", Label.RIGHT);
-        txa_eventlog = new TextArea(); txa_eventlog.setEditable(false);
+        txa_eventlog = new TextArea("", 5, 1); txa_eventlog.setEditable(false);
         bt_sendmessage = new Button("Send");
         bt_changehost  = new Button("Change Host");
         bt_changeport  = new Button("Change Port");
         bt_startserver = new Button("Start Server");
         bt_connect     = new Button("Connect");
         bt_disconnect  = new Button("Disconnect");
-        
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
-
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 4; gbc.weightx = 1;
         pnl_controls.add(txf_message, gbc);
         gbc.gridx = 4; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_sendmessage, gbc);
-
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(lbl_host, gbc);
         gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = 1;
@@ -85,7 +81,6 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         pnl_controls.add(bt_changehost, gbc);
         gbc.gridx = 4; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_startserver, gbc);
-        
         gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(lbl_port, gbc);
         gbc.gridx = 1; gbc.gridy = 2; gbc.gridwidth = 2; gbc.weightx = 1;
@@ -94,56 +89,11 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         pnl_controls.add(bt_changeport, gbc);
         gbc.gridx = 4; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_connect, gbc);
-        
         gbc.gridx = 4; gbc.gridy = 3; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_disconnect, gbc);
-
-        // @ todo This should be smaller. Can't make it.
-        //txa_eventlog.setMaximumSize(new Dimension(10000, 10));
-        //gbc.ipady = 10;
-        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 5; gbc.weightx = 1;//gbc.weighty = 0; //gbc.gridheight = 1; //gbc.weightx = 1; gbc.weighty = 0;
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 5; gbc.weightx = 1;
         pnl_controls.add(txa_eventlog, gbc);
-
         window.add(pnl_controls, BorderLayout.SOUTH);
-        
-        
-        
-        //window.setLayout(new GridBagLayout());
-        //GridBagConstraints gbc = new GridBagConstraints();
-
-        // ! We'll want to make these chatbox, input field, and send buttons class variables. We'll need access to them beyond this constructor.
-        //
-        // ! In addition to them, we'll also need:
-        //  - Buttons for Change Host, Change Port, Start Server, Connect, & Disconnet
-        //  - TextFields for Host and Port
-        //  - Another TextArea for the event log
-        //
-        //  Take a look at Lesson 19 (~6:00 in) for the example of how it should all look and work.
-
-        //TextArea chatArea = new TextArea();
-        //chatArea.setEditable(false);
-
-        //gbc.gridx = 0;
-        //gbc.gridy = 0;
-        //gbc.weightx = 1.0;
-        //gbc.weighty = 0.75;
-        //gbc.fill = GridBagConstraints.BOTH;
-
-        //window.add(chatArea, gbc);
-
-        //Panel bottomPanel = new Panel(new BorderLayout());
-
-        //TextField input = new TextField();
-        //Button send = new Button("Send");
-
-        //bottomPanel.add(input, BorderLayout.CENTER);
-        //bottomPanel.add(send, BorderLayout.EAST);
-
-        //gbc.gridy = 1;
-        //gbc.weighty = 0.25;
-
-        //gbc.fill = GridBagConstraints.HORIZONTAL;
-        //window.add(bottomPanel, gbc);
 
         //   listeners
         window.addWindowListener(this);
