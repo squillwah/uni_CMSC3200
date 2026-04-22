@@ -18,7 +18,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
     private Menu mnu_user, mnu_help;
     private MenuItem mi_exit, mi_about;
 
-    private TextField txf_message, txf_host, txf_port;
+    private TextField txf_username, txf_message, txf_host, txf_port;
     private TextArea txa_chatlog, txa_eventlog;
     private Button bt_sendmessage, bt_changehost, bt_changeport, bt_startserver, bt_connect, bt_disconnect;
     private Label lbl_host, lbl_port;
@@ -55,6 +55,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         // Controls panel:
         pnl_controls = new Panel();
         pnl_controls.setLayout(new GridBagLayout());
+        txf_username = new TextField(); 
         txf_message = new TextField();
         txf_host = new TextField();
         txf_port = new TextField();
@@ -68,21 +69,25 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         bt_connect     = new Button("Connect");
         bt_disconnect  = new Button("Disconnect");
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 4; gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.NONE; gbc.anchor = GridBagConstraints.LINE_END; gbc.ipadx = 100; 
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 0.0;
+        pnl_controls.add(txf_username, gbc);
+        gbc.ipadx = 0; 
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .0;
+        pnl_controls.add(lbl_host, gbc);
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .0;
+        pnl_controls.add(lbl_port, gbc);
+        gbc.fill = GridBagConstraints.HORIZONTAL; gbc.anchor = GridBagConstraints.CENTER; gbc.ipadx = 0;
+        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 3; gbc.weightx = 1;
         pnl_controls.add(txf_message, gbc);
         gbc.gridx = 4; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_sendmessage, gbc);
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
-        pnl_controls.add(lbl_host, gbc);
         gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = 1;
         pnl_controls.add(txf_host, gbc);
         gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_changehost, gbc);
         gbc.gridx = 4; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_startserver, gbc);
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .1;
-        pnl_controls.add(lbl_port, gbc);
         gbc.gridx = 1; gbc.gridy = 2; gbc.gridwidth = 2; gbc.weightx = 1;
         pnl_controls.add(txf_port, gbc);
         gbc.gridx = 3; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .1;
