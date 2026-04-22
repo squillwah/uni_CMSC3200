@@ -1,4 +1,4 @@
-package chat;
+//package chat;
 
 // javac -d . Chat.java
 // java chat.Chat
@@ -22,6 +22,12 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
     private TextArea txa_chatlog, txa_eventlog;
     private Button bt_sendmessage, bt_changehost, bt_changeport, bt_startserver, bt_connect, bt_disconnect;
     private Label lbl_host, lbl_port;
+
+    private User user;
+    String source;
+
+    int port;
+    String ip;
 
 
     public static void main(String[] args) {
@@ -51,6 +57,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         txa_chatlog = new TextArea("", 20, 1); txa_chatlog.setEditable(false);
         pnl_chatlog.add(txa_chatlog, BorderLayout.CENTER);
         window.add(pnl_chatlog, BorderLayout.CENTER);
+        txa_chatlog.setBackground(Color.WHITE);
 
         // Controls panel:
         pnl_controls = new Panel();
@@ -105,10 +112,23 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         window.addComponentListener(this);
         mi_exit.addActionListener(this);
         mi_about.addActionListener(this);
+        bt_sendmessage.addActionListener(this);
+        txf_message.addActionListener(this);
 
         //  show window
         window.validate();
         window.setVisible(true);
+
+        //  user data
+        user = new User();
+        source = "U";       //  U if user, H if host    
+
+        //  networking defaults
+        port = 44004;
+        ip = "127.0.0.1";
+
+        txf_host.setText(ip);
+        txf_port.setText(Integer.toString(port));
     }
 
     // ! We need to remove our listeners on close, as well as do whatever socket stuff needs doing later when that's implemented.
@@ -117,6 +137,8 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         window.removeComponentListener(this);
         mi_exit.removeActionListener(this);
         mi_about.removeActionListener(this);
+        bt_sendmessage.removeActionListener(this);
+        txf_message.removeActionListener(this);
 
         // @todo other listeners, socket closing, etc.
 
@@ -131,7 +153,6 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
     }
     
     public void itemStateChanged(ItemEvent e) {}
-
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
 
@@ -152,7 +173,24 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
             });
 
             about.setVisible(true);
+        } else
+        if (src == bt_sendmessage || src == txf_message) {
+            sendMessage();
         }
+    }
+
+    private void sendMessage() {
+        String msg = txf_message.getText();
+
+        if (!msg.isEmpty()) {
+            String fullMsg = source + "<" + user.getName() + "> " + msg;
+            txa_chatlog.append(fullMsg + "\n");
+            txf_message.setText("");
+        }
+    }
+
+    private void logEvent(String event) {
+        txa_eventlog.append(event);
     }
     
     // ! If we're using layouts, we probably don't need ComponentListener (at least not to resize anything)
@@ -161,4 +199,20 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
     public void adjustmentValueChanged(AdjustmentEvent e) {}
     // Unimplemented WindowListener. 
     public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
+}
+
+//  store user data
+class User {
+    
+    private String name;
+
+
+    User() {
+
+        name = "DEFAULT USER";
+    }
+
+    public String getName() {
+        return name;
+    }
 }
