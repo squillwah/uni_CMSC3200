@@ -68,6 +68,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         lbl_host = new Label("Host: ", Label.RIGHT);
         lbl_port = new Label("Port: ", Label.RIGHT);
         txa_eventlog = new TextArea("", 5, 1); txa_eventlog.setEditable(false);
+        txa_eventlog.setBackground(Color.WHITE);
         bt_sendmessage = new Button("Send");
         bt_changehost  = new Button("Change Host");
         bt_changeport  = new Button("Change Port");
@@ -170,22 +171,24 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
             about.setVisible(true);
         } else
         if (src == bt_sendmessage || src == txf_message) {
-            sendMessage();
+            String msg = txf_message.getText();
+
+            if (!msg.isEmpty()) {
+                String fullMsg = source + "<" + user.getName() + "> " + msg;
+                sendMessage(fullMsg);
+            }
         }
     }
 
-    private void sendMessage() {
-        String msg = txf_message.getText();
-
-        if (!msg.isEmpty()) {
-            String fullMsg = source + "<" + user.getName() + "> " + msg;
-            txa_chatlog.append(fullMsg + "\n");
-            txf_message.setText("");
-        }
+    //  reusable for both message sent from client and server
+    private void sendMessage(String message) {
+        txa_chatlog.append(message + "\n");
+        txf_message.setText("");
     }
 
     private void logEvent(String event) {
-        txa_eventlog.append(event);
+        txa_eventlog.setForeground(Color.BLACK);
+        txa_eventlog.append(event + "\n");
     }
     
     // ! If we're using layouts, we probably don't need ComponentListener (at least not to resize anything)
