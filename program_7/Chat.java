@@ -7,6 +7,9 @@ package chat;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.*;
+import java.net.*;
+
 
 public class Chat implements ActionListener, ItemListener, Runnable, WindowListener {
     private static final long serialVersionUID = 1111L;
@@ -28,6 +31,14 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     private int s_port;
     private String s_host;
     private ConnectionState c_state;
+
+    private Socket client, server;
+    private ServerSocket listenSocket;
+
+    private BufferedReader cbr, sbr;
+    private PrintWriter cpw, spw;
+
+    private Thread networkLoop;
     
     public static void main(String[] args) { new Chat(); }
 
@@ -138,6 +149,9 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         window.setVisible(true);
         
         refresh_button_states();    // Colors are weird if we do this before setting visible.
+
+        //  sockets
+        client = new Socket(s_host, s_port);
     }
 
     // ! We need to remove our listeners on close, as well as do whatever socket stuff needs doing later when that's implemented.
@@ -235,6 +249,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         } else
         if (src == bt_startserver) {
             set_client_state(ConnectionState.HOSTING);
+            startServer();
         } else
         if (src == bt_connect) {
             set_client_state(ConnectionState.CONNECTED);
@@ -279,6 +294,20 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         //    txa_chatlog.append(fullMsg + "\n");
         //    txf_message.setText("");
         //}
+    }
+
+    private void startServer() {
+        logEvent("Server Starting...");
+        //  setup socket and releated readers
+        server = new Socket(s_host, s_port);
+        spw = new PrintWriter(server.getOutputStream(), true);
+        sbr = new BufferedReader(new InputStreamReader(server.getInputStream()));
+    }
+
+    private void connectHost() {
+        client = new Socket(s_host, s_port);
+        cpw = new PrintWriter(client.getOutputStream(), true);
+        cbr = new BufferedReader(new InputStreamReader(client.getInputStream()));
     }
 
     // Unimplemented WindowListener. 
