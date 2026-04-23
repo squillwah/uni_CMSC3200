@@ -1,4 +1,4 @@
-//package chat;
+package chat;
 
 // javac -d . Chat.java
 // java chat.Chat
