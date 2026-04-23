@@ -224,8 +224,12 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
 
-        if (src == bt_sendmessage || src == txf_message) {
-            sendMessage();
+        if ((src == bt_sendmessage || src == txf_message)) {
+            String msg = txf_message.getText();
+            if (!msg.isEmpty()) {
+                sendMessage(msg);
+                txf_message.setText("");
+            } //else logEvent("Say something!");
         } else 
         if (src == bt_changehost || src == txf_host) {
             set_host(txf_host.getText());
@@ -266,13 +270,11 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     
     public void windowClosing(WindowEvent e) { shutdown(); }
 
-    private void sendMessage() {
-        String msg = txf_username.getText();
-        if (c_state == ConnectionState.HOSTING) msg += " (host): ";
-        else msg += " (client): ";
-        msg += txf_message.getText() + '\n';
+    private void sendMessage(String msg) {
+        String username = txf_username.getText();
+        if (c_state == ConnectionState.HOSTING) username += " (host)";
+        msg = username + ": " + msg + '\n';
         txa_chatlog.append(msg);
-        txf_message.setText("");
 
         //if (!msg.isEmpty()) {
         //    String fullMsg = source + "<" + user.getName() + "> " + msg;
