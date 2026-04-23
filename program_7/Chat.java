@@ -1,15 +1,17 @@
 package chat;
 
-// javac -d . Chat.java
-// java chat.Chat
+// !!!!
+// javac -d . Chat.java  <---
+// java chat.Chat        <---
+// !!!!
 
 import java.awt.*;
 import java.awt.event.*;
 
-public class Chat implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, WindowListener {
-    
+public class Chat implements ActionListener, ItemListener, Runnable, WindowListener {
     private static final long serialVersionUID = 1111L;
     private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
+    public enum ConnectionState { HOSTING, CONNECTED, DISCONNECTED }
     
     private Frame window;
     private Panel pnl_chatlog, pnl_controls;
@@ -18,27 +20,22 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
     private Menu mnu_user, mnu_help;
     private MenuItem mi_exit, mi_about;
 
-    private TextField txf_message, txf_host, txf_port;
+    private TextField txf_username, txf_message, txf_host, txf_port;
     private TextArea txa_chatlog, txa_eventlog;
     private Button bt_sendmessage, bt_changehost, bt_changeport, bt_startserver, bt_connect, bt_disconnect;
-    private Label lbl_host, lbl_port;
+    private Label lbl_host, lbl_port; 
 
-    private User user;
-    String source;
-
-    int DEFAULT_PORT = 44004;
-    int port;
-    String ip;
-
-
-    public static void main(String[] args) {
-        new Chat();
-    }
+    private int s_port;
+    private String s_host;
+    private ConnectionState c_state;
+    
+    public static void main(String[] args) { new Chat(); }
 
     public Chat() {
         window = new Frame("Chat");
         window.setMinimumSize(MIN_WINDOW_SIZE);
         window.setLayout(new BorderLayout());
+        window.setBackground(Color.lightGray);
 
         //  menu bar
         mbar = new MenuBar();
@@ -55,21 +52,24 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         // Chatlog panel:
         pnl_chatlog = new Panel();
         pnl_chatlog.setLayout(new BorderLayout());
-        txa_chatlog = new TextArea("", 20, 1); txa_chatlog.setEditable(false);
+        txa_chatlog = new TextArea("", 20, 1); 
+        txa_chatlog.setEditable(false);
+        txa_chatlog.setBackground(Color.white);
         pnl_chatlog.add(txa_chatlog, BorderLayout.CENTER);
         window.add(pnl_chatlog, BorderLayout.CENTER);
-        txa_chatlog.setBackground(Color.WHITE);
-
+        
         // Controls panel:
         pnl_controls = new Panel();
         pnl_controls.setLayout(new GridBagLayout());
         txf_message = new TextField();
-        txf_host = new TextField();
-        txf_port = new TextField();
+        txf_username = new TextField(); 
+        txf_host = new TextField(); 
+        txf_port = new TextField(); 
         lbl_host = new Label("Host: ", Label.RIGHT);
         lbl_port = new Label("Port: ", Label.RIGHT);
-        txa_eventlog = new TextArea("", 5, 1); txa_eventlog.setEditable(false);
-        txa_eventlog.setBackground(Color.WHITE);
+        txa_eventlog = new TextArea("", 5, 1); 
+        txa_eventlog.setEditable(false);
+        txa_eventlog.setBackground(Color.white);
         bt_sendmessage = new Button("Send");
         bt_changehost  = new Button("Change Host");
         bt_changeport  = new Button("Change Port");
@@ -77,21 +77,24 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         bt_connect     = new Button("Connect");
         bt_disconnect  = new Button("Disconnect");
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 4; gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.NONE; gbc.anchor = GridBagConstraints.LINE_END; //gbc.ipadx = 100; 
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = 0.0;
+        pnl_controls.add(txf_username, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .0;
+        pnl_controls.add(lbl_host, gbc);
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .0;
+        pnl_controls.add(lbl_port, gbc);
+        gbc.fill = GridBagConstraints.HORIZONTAL; gbc.anchor = GridBagConstraints.CENTER; gbc.ipadx = 0;
+        gbc.gridx = 1; gbc.gridy = 0; gbc.gridwidth = 3; gbc.weightx = 1;
         pnl_controls.add(txf_message, gbc);
         gbc.gridx = 4; gbc.gridy = 0; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_sendmessage, gbc);
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
-        pnl_controls.add(lbl_host, gbc);
         gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = 1;
         pnl_controls.add(txf_host, gbc);
         gbc.gridx = 3; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_changehost, gbc);
         gbc.gridx = 4; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = .1;
         pnl_controls.add(bt_startserver, gbc);
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .1;
-        pnl_controls.add(lbl_port, gbc);
         gbc.gridx = 1; gbc.gridy = 2; gbc.gridwidth = 2; gbc.weightx = 1;
         pnl_controls.add(txf_port, gbc);
         gbc.gridx = 3; gbc.gridy = 2; gbc.gridwidth = 1; gbc.weightx = .1;
@@ -103,56 +106,143 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 5; gbc.weightx = 1;
         pnl_controls.add(txa_eventlog, gbc);
         window.add(pnl_controls, BorderLayout.SOUTH);
+        
+        //  networking defaults
+        s_port = 44004;
+        s_host = "127.0.0.1";
+        //set_client_state(ConnectionState.DISCONNECTED); // c_state = DISCONNECTED, buttons states configured.
+        c_state = ConnectionState.DISCONNECTED;
 
+        // Defaults for textfields, button status.
+        txf_username.setText("Johnson Doe");     // The size of this default string is the size the username box will stay. Don't make it too small.
+        txf_host.setText(s_host);
+        txf_port.setText(Integer.toString(s_port));
+        txf_message.setText("");
+        
         //   listeners
         window.addWindowListener(this);
-        window.addComponentListener(this);
         mi_exit.addActionListener(this);
         mi_about.addActionListener(this);
-        bt_sendmessage.addActionListener(this);
         txf_message.addActionListener(this);
+        txf_port.addActionListener(this);
+        txf_host.addActionListener(this);
+        bt_sendmessage.addActionListener(this);
+        bt_changehost.addActionListener(this);
+        bt_changeport.addActionListener(this);
+        bt_startserver.addActionListener(this);
+        bt_connect.addActionListener(this);
+        bt_disconnect.addActionListener(this);
 
         //  show window
         window.validate();
         window.setVisible(true);
-
-        //  user data
-        user = new User();
-        source = "U";       //  U if user, H if host    
-
-        //  networking defaults
-        port = DEFAULT_PORT;
-        ip = "127.0.0.1";
-
-        txf_host.setText(ip);
-        txf_port.setText(Integer.toString(port));
+        
+        refresh_button_states();    // Colors are weird if we do this before setting visible.
     }
 
     // ! We need to remove our listeners on close, as well as do whatever socket stuff needs doing later when that's implemented.
     private void shutdown() {
         window.removeWindowListener(this);
-        window.removeComponentListener(this);
         mi_exit.removeActionListener(this);
         mi_about.removeActionListener(this);
-        bt_sendmessage.removeActionListener(this);
         txf_message.removeActionListener(this);
+        txf_port.removeActionListener(this);
+        txf_host.removeActionListener(this);
+        bt_sendmessage.removeActionListener(this);
+        bt_changehost.removeActionListener(this);
+        bt_changeport.removeActionListener(this);
+        bt_startserver.removeActionListener(this);
+        bt_connect.removeActionListener(this);
+        bt_disconnect.removeActionListener(this);
 
         // @todo other listeners, socket closing, etc.
 
         window.dispose();
         System.exit(0);
     }
-    
-    //  Listeners
 
-    public void windowClosing(WindowEvent e) {
-        shutdown(); 
+    public void run() {}
+
+    private void set_client_state(ConnectionState s) {
+        // Adjust button and textfield states:
+        switch (s) {
+            case HOSTING: bt_disconnect.setLabel("Stop Server"); break;
+            case DISCONNECTED: bt_disconnect.setLabel("Disconnect"); break;
+            case CONNECTED: break;
+            default: logEvent("Uh oh!");
+        }
+        c_state = s;
+        refresh_button_states();
+        logEvent("You are now: " + c_state);
+    }
+
+    private void refresh_button_states() {
+        bt_sendmessage.setEnabled(c_state != ConnectionState.DISCONNECTED);
+        txf_message.setEnabled(c_state != ConnectionState.DISCONNECTED);
+        txf_message.setEditable(c_state != ConnectionState.DISCONNECTED);
+        bt_changehost.setEnabled(c_state == ConnectionState.DISCONNECTED);
+        txf_host.setEnabled(c_state == ConnectionState.DISCONNECTED);
+        txf_host.setEditable(c_state == ConnectionState.DISCONNECTED);
+        bt_changeport.setEnabled(c_state == ConnectionState.DISCONNECTED);
+        txf_port.setEnabled(c_state == ConnectionState.DISCONNECTED);
+        txf_port.setEditable(c_state == ConnectionState.DISCONNECTED);
+        bt_startserver.setEnabled(s_port != -1 && c_state == ConnectionState.DISCONNECTED);
+        bt_connect.setEnabled(s_port != -1 && s_host != null && c_state == ConnectionState.DISCONNECTED);
+        bt_disconnect.setEnabled(c_state != ConnectionState.DISCONNECTED);
+    }
+
+    private void set_host(String host) {
+        if (host.isEmpty()) {
+            logEvent("Err: host can't be nothing!");
+            s_host = null;
+        } else {
+            s_host = host;
+            logEvent("Host set to " + s_host);
+        }
+        refresh_button_states();
     }
     
-    public void itemStateChanged(ItemEvent e) {}
+    private void set_port(String portstring) { 
+        int port;
+        try { port = Integer.parseInt(portstring); }
+        catch (NumberFormatException ex) { port = -1; }
+        set_port(port);
+    }
+    private void set_port(int port) {
+        if (port < 1024 || port > 65535) {
+            s_port = -1;
+            logEvent("Err: bad port; must be integer 1024 -> 65535");
+        } else {
+            s_port = port;
+            logEvent("Port set to " + s_port);
+        }
+        refresh_button_states();
+    }
+    
+    private void logEvent(String event) { txa_eventlog.append(event + '\n'); }
+
     public void actionPerformed(ActionEvent e) {
         Object src = e.getSource();
 
+        if (src == bt_sendmessage || src == txf_message) {
+            sendMessage();
+        } else 
+        if (src == bt_changehost || src == txf_host) {
+            set_host(txf_host.getText());
+        } else
+        if (src == bt_changeport || src == txf_port) {
+            set_port(txf_port.getText());
+        } else
+        if (src == bt_startserver) {
+            set_client_state(ConnectionState.HOSTING);
+        } else
+        if (src == bt_connect) {
+            set_client_state(ConnectionState.CONNECTED);
+        } else
+        if (src == bt_disconnect) {
+            set_client_state(ConnectionState.DISCONNECTED);
+        } else 
+            
         if (src == mi_exit) { 
             shutdown(); 
         } else
@@ -161,57 +251,37 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
             about.setSize(300, 150);
             about.setLayout(new BorderLayout());
             about.add(new Label("By using this program you agree to give a 100% on all grades related to it.", Label.CENTER), BorderLayout.CENTER);
-
             about.addWindowListener(new WindowAdapter() {
                 public void windowClosing(WindowEvent e) {
                     about.removeWindowListener(this);
                     about.dispose();
                 }
             });
-
             about.setVisible(true);
-        } else
-        if (src == bt_sendmessage || src == txf_message) {
-            String msg = txf_message.getText();
-
-            if (!msg.isEmpty()) {
-                String fullMsg = source + "<" + user.getName() + "> " + msg;
-                sendMessage(fullMsg);
-            }
         }
     }
-
-    //  reusable for both message sent from client and server
-    private void sendMessage(String message) {
-        txa_chatlog.append(message + "\n");
-        txf_message.setText("");
-    }
-
-    private void logEvent(String event) {
-        txa_eventlog.setForeground(Color.BLACK);
-        txa_eventlog.append(event + "\n");
-    }
     
-    // ! If we're using layouts, we probably don't need ComponentListener (at least not to resize anything)
-    public void componentHidden(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {} public void componentResized(ComponentEvent e) {} public void componentShown(ComponentEvent e) {}
-    // ! Don't think we'll be using any scrolls either. 
-    public void adjustmentValueChanged(AdjustmentEvent e) {}
+    //  Listeners
+    public void itemStateChanged(ItemEvent e) {}    // @ todo: If we don't have any radio or checkbox button's, we don't need this listener.
+    
+    public void windowClosing(WindowEvent e) { shutdown(); }
+
+    private void sendMessage() {
+        String msg = txf_username.getText();
+        if (c_state == ConnectionState.HOSTING) msg += " (host): ";
+        else msg += " (client): ";
+        msg += txf_message.getText() + '\n';
+        txa_chatlog.append(msg);
+        txf_message.setText("");
+
+        //if (!msg.isEmpty()) {
+        //    String fullMsg = source + "<" + user.getName() + "> " + msg;
+        //    txa_chatlog.append(fullMsg + "\n");
+        //    txf_message.setText("");
+        //}
+    }
+
     // Unimplemented WindowListener. 
     public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
 }
 
-//  store user data
-class User {
-    
-    private String name;
-
-
-    User() {
-
-        name = "DEFAULT USER";
-    }
-
-    public String getName() {
-        return name;
-    }
-}
