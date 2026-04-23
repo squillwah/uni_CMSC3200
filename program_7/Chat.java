@@ -252,15 +252,18 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         if (sock == null) logEvent("Err: Listening failure; socket is null.");
         else if (incoming == null) logEvent("Err: Listening failure; incoming stream is null.");
         else {
-            boolean disconnect = false;
-            while (!disconnect) {
-                try { Thread.sleep(1); }
-                catch (InterruptedException e) { disconnect = true; }
+            try {
+                String line;
+                while (!Thread.currentThread().isInterrupt() && (line = incoming.readLine()) != null) {
+                    txa_chatlog.append(line + '\n');
+                }
+                if (!Thread.currentThread().isInterrupted()) logEvent("Peer disconnected.");
+            } catch (IOExpetion e) {
+                if (!Thread.currentThread().isInterrupted()) logEvent("Connection lost; " + e.getMessage());
             }
             logEvent("Stopping listener.");
         }
     }
-
     private void change_state(ConnectionState s) {
         // Adjust button and textfield states:
         boolean state_changed = false;
@@ -270,25 +273,36 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
                 else if (s_port == -1)          logEvent("Err: Can't start server; invalid port.");
                 else { 
                     logEvent("Establishing host connection, waiting for client...");
-                    if (establish_connection(ConnectionType.HOST)) {
-                        bt_disconnect.setLabel("Stop Server");
+                    boolean ok = establish_connection(ConnectionType.HOST);
+                    if (ok) {
+                        c_state = ConnectionState.HOSTING;
+                        bt_disconnect.setLabel("Stop server");
                         logEvent("Starting listener thread...");
                         start_listening();
-                        state_changed = true;
                     }
-                } break;
+                    refresh_button_states();
+                    logEvent("You are now: " + c_state);
+                }.start();
+            }break;
             case CONNECTED:
                 if (listening_thread != null)   logEvent("Err: Can't open connection; the listening thread is active (are you hosting?).");
                 else if (s_host == null)        logEvent("Err: Can't open connection; invalid host.");
                 else if (s_port == -1)          logEvent("Err: Can't open connection; invalid port.");
                 else { 
                     logEvent("Establishing client connection, awaiting host response...");
-                    if (establish_connection(ConnectionType.CLIENT)) {
-                        logEvent("Starting listener thread...");
-                        start_listening();
-                        state_changed = true;
+                    bt_startserver.setEnabled(false);
+                    bt_connect.setEnabled(false);
+                    new Thread(() -> {
+                        boolean ok = establish(ConnectionType.CLIENT);
+                        if (ok) {
+                            c_state = ConnectionState.CONNECTED;
+                            logEvent("Starting listener thread...");
+                            start_listening();                        
                     }
-                } break;
+                    refresh_button_states();
+                    logEvent("You are now: " + c_state);
+                }).start();
+            } break;
             case DISCONNECTED: 
                 if (c_state == ConnectionState.DISCONNECTED) logEvent("Err: Can't disconnect, you're already disconnected?");
                 else {
@@ -410,11 +424,13 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         msg = username + ": " + msg + '\n';
         txa_chatlog.append(msg);
 
-        //if (!msg.isEmpty()) {
-        //    String fullMsg = source + "<" + user.getName() + "> " + msg;
-        //    txa_chatlog.append(fullMsg + "\n");
-        //    txf_message.setText("");
-        //}
+        if (outgoing != null) {
+            outgoing.println(msg);
+            outgoing.flush();
+        } else {
+            logEvent("Err: Cant't send; no outgoing stream.");
+            }
+        }
     }
 
     // Unimplemented WindowListener. 
