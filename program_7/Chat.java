@@ -32,10 +32,12 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     private int s_port;
     private String s_host;
     private ConnectionState c_state;
+
     private Socket sock;
     private PrintWriter outgoing;
     private BufferedReader incoming;
-    private Thread listening_thread;
+    private Thread listen_thread;
+    private boolean listen_thread_listening;
 
     // PrintWriter and BufferedReader is created for the socket created by the first socket connection (listen).
     // Or their created on the first client socket. For the client, set a connection time out.
@@ -81,7 +83,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         txf_port = new TextField(); 
         lbl_host = new Label("Host: ", Label.RIGHT);
         lbl_port = new Label("Port: ", Label.RIGHT);
-        txa_eventlog = new TextArea("", 5, 1); 
+        txa_eventlog = new TextArea("", 6, 1); 
         txa_eventlog.setEditable(false);
         txa_eventlog.setBackground(Color.white);
         bt_sendmessage = new Button("Send");
@@ -129,7 +131,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         sock = null;
         outgoing = null;
         incoming = null;
-        listening_thread = null;
+        listen_thread = null;
 
         // Defaults for textfields, button status.
         txf_username.setText("Johnson Doeth");     // The size of this default string is the size the username box will stay. Don't make it too small.
@@ -178,153 +180,140 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         window.dispose();
         System.exit(0);
     }
-    
+
     private boolean establish_connection(ConnectionType c) {
         boolean established = false;
-        if (c_state != ConnectionState.DISCONNECTED) logEvent("Err: can't establish a new " + c + " connection; you're " + c_state);
-        else if (sock != null) logEvent("Err: can't establish a new " + c + " connection; a socket still exists!");
-        else {
-            try {
+        if (c_state == ConnectionState.CONNECTED) logEvent("Connection Failure: already connected");
+        else if (listen_thread != null || sock != null || outgoing != null || incoming != null) logEvent("Connection Failure: evidence of ongoing connection (bug)");
+        else { 
+            // Create socket:
+            ServerSocket serversock = null;
+            try { 
                 switch (c) {
                     case HOST:
-                        ServerSocket servsock = new ServerSocket(s_port);
-                        servsock.setSoTimeout(TIMEOUT);
-                        sock = servsock.accept();
-                        servsock.close();
-                        logEvent("Connection recieved from: " + sock.getInetAddress());
-                        outgoing = new PrintWriter(sock.getOutputStream());
-                        incoming = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-                        established = true;
+                        logEvent("Server started, waiting for client...");
+                        serversock = new ServerSocket(s_port);
+                        serversock.setSoTimeout(TIMEOUT);
+                        try { 
+                            sock = serversock.accept(); 
+                            logEvent("Connection recieved from: " + sock.getInetAddress());
+                        } catch (SocketTimeoutException e) { 
+                            throw new IOException("timeout reached; giving up");  // To trigger outer catch, for IO degunking.
+                        }
+                        serversock.close(); serversock = null;
+                        established = true; 
                         break;
                     case CLIENT:
+                        logEvent("Attempting connection...");
                         sock = new Socket();
                         sock.setSoTimeout(TIMEOUT);
-                        sock.connect(new InetSocketAddress(s_host, s_port));
-                        logEvent("Connection accepted to: " + sock.getInetAddress());
-                        outgoing = new PrintWriter(sock.getOutputStream());
-                        incoming = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+                        try { 
+                            sock.connect(new InetSocketAddress(s_host, s_port)); // Assuming all the checking's been done beforehand.
+                            logEvent("Successfully connected to: " + sock.getInetAddress());
+                        } catch (SocketTimeoutException e) { 
+                            throw new IOException("timeout reached; giving up");
+                        }
                         established = true;
                         break;
-                    default: logEvent("Bad!"); break;
+                    default: logEvent("Bad bad!"); break;
                 }
-            } catch (SocketTimeoutException e) {
-                logEvent("Connection timeout reached; giving up.");
-                sock = null;
-            } catch (IllegalArgumentException e) {
-                logEvent("Connection failure; bad port, somehow...");
-                sock = null;
-            } catch (IOException e) {
-                logEvent("Connection failure: " + e.getMessage());
-                sock = null;
+                // Create streams from socket, start listener:
+                if (established) {
+                    sock.setSoTimeout(100); // Lower timeout for connect/disconnect responsiveness in thread.
+                    outgoing = new PrintWriter(sock.getOutputStream(), true);
+                    incoming = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+                    listen_thread = new Thread(this);
+                    listen_thread_listening = true;
+                    listen_thread.start();
+                }
+            } catch (IOException e) { 
+                logEvent("Connection Failure: " + e.getMessage()); 
+                if (sock != null) {
+                    try { sock.close(); } catch (IOException ee) {}              // Cleanup of IO stuff.
+                    sock = null;
+                } 
+                if (serversock != null) {
+                    try { serversock.close(); } catch (IOException ee) {}
+                    serversock = null;
+                }
+                if (outgoing != null) {
+                    outgoing.close();
+                    //try { outgoing.close(); } catch (IOException ee) {}
+                    outgoing = null;
+                }
+                if (incoming != null) {
+                    try { incoming.close(); } catch (IOException ee) {}
+                    incoming = null;
+                }
             }
         }
         return established;
     }
 
-    private boolean disconnect() {
-        if (listening_thread != null) logEvent("Err: can't disconnect; listening thread still alive.");
-        else {
+    private boolean disconnect() { 
+        boolean disconnected = false;  
+        if (c_state == ConnectionState.DISCONNECTED) logEvent("Disconnect Failure: already disconnected");
+        else if (listen_thread == null || sock == null || outgoing == null || incoming == null) {
+            logEvent("Disconnect Failure: evidence of partial disconnect (bug)");
+            System.out.println(listen_thread + " " + sock + " " + outgoing + " " + incoming);
+        }
+        else { 
+            listen_thread_listening = false; 
+            if (Thread.currentThread() != listen_thread) {  // Disconnect() may be called inside listen_thread too, when peer disconnects.
+                listen_thread.interrupt(); 
+                try { listen_thread.join(); }       // Wait for listening thread to finish before closing sockets, streams.
+                catch (InterruptedException e) {}
+            }
             try {
-                if (sock == null) logEvent("Err: there is no socket?");
-                else {
-                    sock.close();
-                    logEvent("Connection to " + sock.getInetAddress() + " closed.");
-                    sock = null; incoming = null; outgoing = null;
-                }
-            } catch (IOException e) {
-                logEvent("Disconnection failure; " + e );
-            }
+                sock.close();
+                outgoing.close();
+                incoming.close();
+            } catch (IOException e) { logEvent("Ugly Disconnect: " + e.getMessage()); }
+            listen_thread = null; sock = null; outgoing = null; incoming = null; // Do away with it all.
+            disconnected = true;
         }
-        return sock == null;
+        return disconnected;    // Doesn't make as much sense here as in establish_connection(), but it is still useful to have the confirmation.
     }
-
-    private void start_listening() {
-        if (listening_thread == null) {
-            listening_thread = new Thread(this);
-            listening_thread.start();
-        } 
-    }
-    private void stop_listening() {
-        if (listening_thread != null) {
-            listening_thread.interrupt();
-            try { listening_thread.join(); } 
-            catch (InterruptedException e) {}
-            //while (listening_thread.isAlive()); // Busy wait for any buffered reads to finish.
-            listening_thread = null;
-        }
-    }
-
+        
     public void run() {
-        if (sock == null) logEvent("Err: Listening failure; socket is null.");
-        else if (incoming == null) logEvent("Err: Listening failure; incoming stream is null.");
-        else {
-            boolean disconnect = false;
-            String msg = null;
-            while (!disconnect) {
-                try { 
-                    msg = incoming.readLine(); 
-                    if (msg == null) {
-                        logEvent("Peer disconnected...");
-                        c_state = ConnectionState.DISCONNECTED;  // Bad. Find a way to do this with change_state()?
-                        refresh_button_states();
-                        listening_thread = null;
-                        disconnect();
-                        disconnect = true;
-                    } else 
-                        txa_chatlog.append(msg + '\n'); 
-                } 
-                catch (SocketTimeoutException e) {}
-                catch (IOException e) { logEvent("Err: bad incoming message: " + e); }
+        String msg;
+        while (listen_thread_listening) {
+            try { 
+                msg = incoming.readLine();
+                if (msg == null) {
+                    logEvent("Peer disconnected; closing connection.");
+                    change_state(ConnectionState.DISCONNECTED); 
+                }
+                else txa_chatlog.append(msg + '\n');
+            } 
+            catch (SocketTimeoutException e) {}
+            catch (IOException e) { logEvent("Err: bad incoming message: " + e); }
 
-                try { Thread.sleep(1); }
-                catch (InterruptedException e) { disconnect = true; }
-            }
-            logEvent("Stopping listener.");
+            try { Thread.sleep(1); }
+            catch (InterruptedException e) {}
         }
     }
-
+    
     private void change_state(ConnectionState s) {
         // Adjust button and textfield states:
         boolean state_changed = false;
         switch (s) {
-            case HOSTING: 
-                if (listening_thread != null)   logEvent("Err: Can't start server; the listening thread is active (are you connected?).");
-                else if (s_port == -1)          logEvent("Err: Can't start server; invalid port.");
-                else { 
-                    logEvent("Establishing host connection, waiting for client...");
-                    if (establish_connection(ConnectionType.HOST)) {
-                        bt_disconnect.setLabel("Stop Server");
-                        logEvent("Starting listener thread...");
-                        start_listening();
-                        state_changed = true;
-                    }
-                } break;
+            case HOSTING:
+                if (listen_thread != null)  logEvent("Err: Can't start server; the listening thread is active (are you connected?).");
+                else if (s_port == -1)      logEvent("Err: Can't start server; invalid port.");
+                else state_changed = establish_connection(ConnectionType.HOST);
+                break;
             case CONNECTED:
-                if (listening_thread != null)   logEvent("Err: Can't open connection; the listening thread is active (are you hosting?).");
-                else if (s_host == null)        logEvent("Err: Can't open connection; invalid host.");
-                else if (s_port == -1)          logEvent("Err: Can't open connection; invalid port.");
-                else { 
-                    logEvent("Establishing client connection, awaiting host response...");
-                    if (establish_connection(ConnectionType.CLIENT)) {
-                        logEvent("Starting listener thread...");
-                        start_listening();
-                        state_changed = true;
-                    }
-                } break;
-            case DISCONNECTED: 
-                if (c_state == ConnectionState.DISCONNECTED) logEvent("Err: Can't disconnect, you're already disconnected?");
-                else {
-                    if (listening_thread == null) logEvent("Err: Listening thread was killed before disconnect; something terrible has happened.");
-                    logEvent("Closing connection...");
-                    stop_listening();
-                    disconnect();
-                    // @todo interrupt the thread to stop listenning, close the sockets. 
-                    // Will need to send something to peer to signal their disconnect as well. Have log too, like ("peer disconnected").
-                    bt_disconnect.setLabel("Disconnect");
-                    state_changed = true;
-                } break;
+                if (listen_thread != null)  logEvent("Err: Can't open connection; the listening thread is active (are you hosting?).");
+                else if (s_host == null)    logEvent("Err: Can't open connection; invalid host.");
+                else if (s_port == -1)      logEvent("Err: Can't open connection; invalid port.");
+                else state_changed = establish_connection(ConnectionType.CLIENT);
+                break;
+            case DISCONNECTED:
+                state_changed = disconnect();
+                break;
             default: logEvent("Uh oh!"); break;
-        } 
+        }
         if (state_changed) {
             c_state = s;
             refresh_button_states();
@@ -394,6 +383,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
             set_port(txf_port.getText());
         } else
         if (src == bt_startserver) {
+            logEvent("startin");
             change_state(ConnectionState.HOSTING);
         } else
         if (src == bt_connect) {
