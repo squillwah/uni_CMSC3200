@@ -26,6 +26,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
     private User user;
     String source;
 
+    int DEFAULT_PORT = 44004;
     int port;
     String ip;
 
@@ -120,7 +121,7 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         source = "U";       //  U if user, H if host    
 
         //  networking defaults
-        port = 44004;
+        port = DEFAULT_PORT;
         ip = "127.0.0.1";
 
         txf_host.setText(ip);
