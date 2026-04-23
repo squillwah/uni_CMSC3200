@@ -163,6 +163,8 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         System.exit(0);
     }
 
+    // Creates the socket (either waits for or attempts, depending on ConnectionType), starts 
+    // listening thread if socket creation was successful. Returns success/fail of connection.
     private boolean establish_connection(ConnectionType c) {
         boolean established = false;
         if (c_state == ConnectionState.CONNECTED) logEvent("Connection Failure: already connected");
@@ -232,6 +234,8 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         return established;
     }
 
+    // Stops the listening thread if applicable, destroys socket and in/out streams.
+    // Returns success/fail of disconnection.
     private boolean disconnect() { 
         boolean disconnected = false;  
         if (c_state == ConnectionState.DISCONNECTED) logEvent("Disconnect Failure: already disconnected");
@@ -253,7 +257,9 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         }
         return disconnected;    // Doesn't make as much sense here as in establish_connection(), but it is still useful to have the confirmation.
     }
-        
+    
+    // The incoming message update thread. The listener.
+    // Will trigger its own change_state(DISCONNECT) on a null recieve. 
     public void run() {
         String msg;
         while (listen_thread_listening) {
@@ -275,7 +281,8 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         }
     }
    
-    // Call this to make a connection, host a server, or disconnect/shutdown server. (do not call establish_connection() or disconnect() directly)
+    // Call this to make a connection, host a server, or disconnect/shutdown server.
+    // (do not call establish_connection() or disconnect() directly).
     private void change_state(ConnectionState s) {
         boolean state_changed = false;
         if (s != c_state) {
@@ -304,6 +311,7 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         }
     }
 
+    // Update the enable/disable state of the buttons and textfields based on the client connection state.
     private void refresh_button_states() {
         if (c_state == ConnectionState.HOSTING) bt_disconnect.setLabel("Stop Server");
         else bt_disconnect.setLabel("Disconnect");
@@ -321,6 +329,7 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         bt_disconnect.setEnabled(c_state != ConnectionState.DISCONNECTED);
     }
 
+    // Set the hostname to this string. With empty check.
     private void set_host(String host) {
         if (host.isEmpty()) {
             logEvent("Err: host can't be nothing!");
@@ -331,7 +340,9 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         }
         refresh_button_states();
     }
-    
+   
+    // Set the hostname to number, either in integer or string format.
+    // Does digit check on string variant, and bounds check on integer variant. 
     private void set_port(String portstring) { 
         int port;
         try { port = Integer.parseInt(portstring); }
@@ -348,7 +359,8 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         }
         refresh_button_states();
     }
-    
+   
+    // Log an event to the event log. 
     private void logEvent(String event) { txa_eventlog.append(event + '\n'); }
 
     public void actionPerformed(ActionEvent e) {
@@ -377,7 +389,10 @@ public class Chat implements ActionListener, Runnable, WindowListener {
             change_state(ConnectionState.DISCONNECTED);
         }
     }
-    
+   
+    // Send a message over the outgoing stream, append to local chatlog.
+    // Inserts username and host status at beginning of message.
+    // Only works if outgoing stream is not null.
     private void sendMessage(String msg) {
         if (outgoing == null) logEvent("Err: can't send message; outgoing stream is null.");
         else {
