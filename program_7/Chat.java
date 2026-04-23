@@ -327,6 +327,7 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         bt_startserver.setEnabled(s_port != -1 && c_state == ConnectionState.DISCONNECTED);
         bt_connect.setEnabled(s_port != -1 && s_host != null && c_state == ConnectionState.DISCONNECTED);
         bt_disconnect.setEnabled(c_state != ConnectionState.DISCONNECTED);
+        if (c_state == ConnectionState.HOSTING || c_state == ConnectionState.CONNECTED) txf_message.requestFocus();
     }
 
     // Set the hostname to this string. With empty check.
