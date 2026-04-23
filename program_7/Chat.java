@@ -1,9 +1,20 @@
-package chat;
 
-// !!!!
-// javac -d . Chat.java  <---
-// java chat.Chat        <---
-// !!!!
+// [CMSC3200] Technical Computing Using Java
+// Program 7: Chat
+//
+// ............
+// . hello    .
+// .          .
+// .          .
+// .----------.
+// . :=====###.
+// ............
+//
+// Group 2
+// Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
+// SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
+
+package chat;
 
 import java.io.*;
 import java.net.*;
@@ -136,7 +147,6 @@ public class Chat implements ActionListener, Runnable, WindowListener {
         refresh_button_states();    // Colors are weird if we do this before setting visible.
     }
 
-    // ! We need to remove our listeners on close, as well as do whatever socket stuff needs doing later when that's implemented.
     private void shutdown() {
         window.removeWindowListener(this);
         txf_message.removeActionListener(this);
@@ -225,10 +235,7 @@ public class Chat implements ActionListener, Runnable, WindowListener {
     private boolean disconnect() { 
         boolean disconnected = false;  
         if (c_state == ConnectionState.DISCONNECTED) logEvent("Disconnect Failure: already disconnected");
-        else if (listen_thread == null || sock == null || outgoing == null || incoming == null) {
-            logEvent("Disconnect Failure: evidence of partial disconnect (bug)");
-            System.out.println(listen_thread + " " + sock + " " + outgoing + " " + incoming);
-        }
+        else if (listen_thread == null || sock == null || outgoing == null || incoming == null) logEvent("Disconnect Failure: evidence of partial disconnect (bug)");
         else { 
             listen_thread_listening = false; 
             if (Thread.currentThread() != listen_thread) {  // Disconnect() may be called inside listen_thread too, when peer disconnects.
@@ -263,14 +270,13 @@ public class Chat implements ActionListener, Runnable, WindowListener {
                 logEvent("Err: bad incoming message: " + e); 
                 change_state(ConnectionState.DISCONNECTED); 
             }
-
             try { Thread.sleep(1); }
             catch (InterruptedException e) {}
         }
     }
-    
+   
+    // Call this to make a connection, host a server, or disconnect/shutdown server. (do not call establish_connection() or disconnect() directly)
     private void change_state(ConnectionState s) {
-        // Adjust button and textfield states:
         boolean state_changed = false;
         if (s != c_state) {
             switch (s) {
