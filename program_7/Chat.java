@@ -253,6 +253,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         } else
         if (src == bt_connect) {
             set_client_state(ConnectionState.CONNECTED);
+            connectHost();
         } else
         if (src == bt_disconnect) {
             set_client_state(ConnectionState.DISCONNECTED);
@@ -297,7 +298,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     }
 
     private void startServer() {
-        logEvent("Server Starting...");
+        logEvent("Server Starting...\n");
         //  setup socket and releated readers
         server = new Socket(s_host, s_port);
         spw = new PrintWriter(server.getOutputStream(), true);
@@ -305,6 +306,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     }
 
     private void connectHost() {
+        logEvent("Connecting to host...\n");
         client = new Socket(s_host, s_port);
         cpw = new PrintWriter(client.getOutputStream(), true);
         cbr = new BufferedReader(new InputStreamReader(client.getInputStream()));
