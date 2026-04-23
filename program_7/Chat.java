@@ -254,11 +254,11 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         else {
             try {
                 String line;
-                while (!Thread.currentThread().isInterrupt() && (line = incoming.readLine()) != null) {
+                while (!Thread.currentThread().isInterrupted() && (line = incoming.readLine()) != null) {
                     txa_chatlog.append(line + '\n');
                 }
                 if (!Thread.currentThread().isInterrupted()) logEvent("Peer disconnected.");
-            } catch (IOExpetion e) {
+            } catch (IOException e) {
                 if (!Thread.currentThread().isInterrupted()) logEvent("Connection lost; " + e.getMessage());
             }
             logEvent("Stopping listener.");
@@ -273,7 +273,10 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
                 else if (s_port == -1)          logEvent("Err: Can't start server; invalid port.");
                 else { 
                     logEvent("Establishing host connection, waiting for client...");
-                    boolean ok = establish_connection(ConnectionType.HOST);
+                    bt_startserver.setEnabled(false);
+                    bt_connect.setEnabled(false);
+                    new Thread(() -> {
+                        boolean ok = establish_connection(ConnectionType.HOST);
                     if (ok) {
                         c_state = ConnectionState.HOSTING;
                         bt_disconnect.setLabel("Stop server");
@@ -282,7 +285,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
                     }
                     refresh_button_states();
                     logEvent("You are now: " + c_state);
-                }.start();
+                }).start();
             }break;
             case CONNECTED:
                 if (listening_thread != null)   logEvent("Err: Can't open connection; the listening thread is active (are you hosting?).");
@@ -293,7 +296,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
                     bt_startserver.setEnabled(false);
                     bt_connect.setEnabled(false);
                     new Thread(() -> {
-                        boolean ok = establish(ConnectionType.CLIENT);
+                        boolean ok = establish_connection(ConnectionType.CLIENT);
                         if (ok) {
                             c_state = ConnectionState.CONNECTED;
                             logEvent("Starting listener thread...");
@@ -421,8 +424,8 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     private void sendMessage(String msg) {
         String username = txf_username.getText();
         if (c_state == ConnectionState.HOSTING) username += " (host)";
-        msg = username + ": " + msg + '\n';
-        txa_chatlog.append(msg);
+        msg = username + ": " + msg;
+        txa_chatlog.append(msg + '\n');
 
         if (outgoing != null) {
             outgoing.println(msg);
@@ -431,7 +434,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
             logEvent("Err: Cant't send; no outgoing stream.");
             }
         }
-    }
+    
 
     // Unimplemented WindowListener. 
     public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
