@@ -551,5 +551,7 @@ public class FileCopyGui extends Frame implements WindowListener, ActionListener
         }
     }
 
-    public static void set_errmsg(String msg) {}
+    public static void set_errmsg(String msg) {
+        status_label.setText(msg);
+    }
 }
