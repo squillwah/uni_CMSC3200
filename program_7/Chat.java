@@ -10,19 +10,15 @@ import java.net.*;
 import java.awt.*;
 import java.awt.event.*;
 
-public class Chat implements ActionListener, ItemListener, Runnable, WindowListener {
+public class Chat implements ActionListener, Runnable, WindowListener {
     private static final long serialVersionUID = 1111L;
     private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
     private enum ConnectionState { HOSTING, CONNECTED, DISCONNECTED }
     private enum ConnectionType { HOST, CLIENT }
-    private int TIMEOUT = 10000; // 10 second connection timeout.
+    private int TIMEOUT = 8000; // 8 second connection timeout.
     
     private Frame window;
     private Panel pnl_chatlog, pnl_controls;
-
-    private MenuBar mbar;
-    private Menu mnu_user, mnu_help;
-    private MenuItem mi_exit, mi_about;
 
     private TextField txf_username, txf_message, txf_host, txf_port;
     private TextArea txa_chatlog, txa_eventlog;
@@ -39,12 +35,6 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     private Thread listen_thread;
     private boolean listen_thread_listening;
 
-    // PrintWriter and BufferedReader is created for the socket created by the first socket connection (listen).
-    // Or their created on the first client socket. For the client, set a connection time out.
-    // Connection made, thread loop checks bufferedread for input, 
-    // when input recieved, it is appended to text area.
-    // When user tpes message, it is sent and appended to text area.
-    
     public static void main(String[] args) { new Chat(); }
 
     public Chat() {
@@ -52,18 +42,6 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         window.setMinimumSize(MIN_WINDOW_SIZE);
         window.setLayout(new BorderLayout());
         window.setBackground(Color.lightGray);
-
-        //  menu bar
-        mbar = new MenuBar();
-        mnu_user = new Menu("User");
-        mnu_help = new Menu("Help");
-        mi_exit = new MenuItem("Exit");
-        mi_about = new MenuItem("About");
-        mnu_user.add(mi_exit);
-        mnu_help.add(mi_about);
-        mbar.add(mnu_user);
-        mbar.add(mnu_help);
-        window.setMenuBar(mbar);
 
         // Chatlog panel:
         pnl_chatlog = new Panel();
@@ -126,12 +104,12 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         //  networking defaults
         s_port = 44004;
         s_host = "127.0.0.1";
-        //set_client_state(ConnectionState.DISCONNECTED); // c_state = DISCONNECTED, buttons states configured.
         c_state = ConnectionState.DISCONNECTED;
         sock = null;
         outgoing = null;
         incoming = null;
         listen_thread = null;
+        listen_thread_listening = false;
 
         // Defaults for textfields, button status.
         txf_username.setText("Johnson Doeth");     // The size of this default string is the size the username box will stay. Don't make it too small.
@@ -141,8 +119,6 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         
         //   listeners
         window.addWindowListener(this);
-        mi_exit.addActionListener(this);
-        mi_about.addActionListener(this);
         txf_message.addActionListener(this);
         txf_port.addActionListener(this);
         txf_host.addActionListener(this);
@@ -163,8 +139,6 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     // ! We need to remove our listeners on close, as well as do whatever socket stuff needs doing later when that's implemented.
     private void shutdown() {
         window.removeWindowListener(this);
-        mi_exit.removeActionListener(this);
-        mi_about.removeActionListener(this);
         txf_message.removeActionListener(this);
         txf_port.removeActionListener(this);
         txf_host.removeActionListener(this);
@@ -174,9 +148,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         bt_startserver.removeActionListener(this);
         bt_connect.removeActionListener(this);
         bt_disconnect.removeActionListener(this);
-
-        // @todo other listeners, socket closing, etc.
-
+        change_state(ConnectionState.DISCONNECTED);
         window.dispose();
         System.exit(0);
     }
@@ -261,7 +233,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
             listen_thread_listening = false; 
             if (Thread.currentThread() != listen_thread) {  // Disconnect() may be called inside listen_thread too, when peer disconnects.
                 listen_thread.interrupt(); 
-                try { listen_thread.join(); }       // Wait for listening thread to finish before closing sockets, streams.
+                try { listen_thread.join(); }           // Wait for listening thread to finish before closing sockets, streams.
                 catch (InterruptedException e) {}
             }
             try {
@@ -287,7 +259,10 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
                 else txa_chatlog.append(msg + '\n');
             } 
             catch (SocketTimeoutException e) {}
-            catch (IOException e) { logEvent("Err: bad incoming message: " + e); }
+            catch (IOException e) { 
+                logEvent("Err: bad incoming message: " + e); 
+                change_state(ConnectionState.DISCONNECTED); 
+            }
 
             try { Thread.sleep(1); }
             catch (InterruptedException e) {}
@@ -297,22 +272,24 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     private void change_state(ConnectionState s) {
         // Adjust button and textfield states:
         boolean state_changed = false;
-        switch (s) {
-            case HOSTING:
-                if (listen_thread != null)  logEvent("Err: Can't start server; the listening thread is active (are you connected?).");
-                else if (s_port == -1)      logEvent("Err: Can't start server; invalid port.");
-                else state_changed = establish_connection(ConnectionType.HOST);
-                break;
-            case CONNECTED:
-                if (listen_thread != null)  logEvent("Err: Can't open connection; the listening thread is active (are you hosting?).");
-                else if (s_host == null)    logEvent("Err: Can't open connection; invalid host.");
-                else if (s_port == -1)      logEvent("Err: Can't open connection; invalid port.");
-                else state_changed = establish_connection(ConnectionType.CLIENT);
-                break;
-            case DISCONNECTED:
-                state_changed = disconnect();
-                break;
-            default: logEvent("Uh oh!"); break;
+        if (s != c_state) {
+            switch (s) {
+                case HOSTING:
+                    if (listen_thread != null)  logEvent("Err: Can't start server; the listening thread is active (are you connected?).");
+                    else if (s_port == -1)      logEvent("Err: Can't start server; invalid port.");
+                    else state_changed = establish_connection(ConnectionType.HOST);
+                    break;
+                case CONNECTED:
+                    if (listen_thread != null)  logEvent("Err: Can't open connection; the listening thread is active (are you hosting?).");
+                    else if (s_host == null)    logEvent("Err: Can't open connection; invalid host.");
+                    else if (s_port == -1)      logEvent("Err: Can't open connection; invalid port.");
+                    else state_changed = establish_connection(ConnectionType.CLIENT);
+                    break;
+                case DISCONNECTED:
+                    state_changed = disconnect();
+                    break;
+                default: logEvent("Uh oh!"); break;
+            }
         }
         if (state_changed) {
             c_state = s;
@@ -322,6 +299,8 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     }
 
     private void refresh_button_states() {
+        if (c_state == ConnectionState.HOSTING) bt_disconnect.setLabel("Stop Server");
+        else bt_disconnect.setLabel("Disconnect");
         bt_sendmessage.setEnabled(c_state != ConnectionState.DISCONNECTED);
         txf_message.setEnabled(c_state != ConnectionState.DISCONNECTED);
         txf_message.setEditable(c_state != ConnectionState.DISCONNECTED);
@@ -383,7 +362,6 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
             set_port(txf_port.getText());
         } else
         if (src == bt_startserver) {
-            logEvent("startin");
             change_state(ConnectionState.HOSTING);
         } else
         if (src == bt_connect) {
@@ -391,31 +369,9 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         } else
         if (src == bt_disconnect) {
             change_state(ConnectionState.DISCONNECTED);
-        } else 
-            
-        if (src == mi_exit) { 
-            shutdown(); 
-        } else
-        if (src == mi_about) {
-            Frame about = new Frame("About");
-            about.setSize(300, 150);
-            about.setLayout(new BorderLayout());
-            about.add(new Label("By using this program you agree to give a 100% on all grades related to it.", Label.CENTER), BorderLayout.CENTER);
-            about.addWindowListener(new WindowAdapter() {
-                public void windowClosing(WindowEvent e) {
-                    about.removeWindowListener(this);
-                    about.dispose();
-                }
-            });
-            about.setVisible(true);
         }
     }
     
-    //  Listeners
-    public void itemStateChanged(ItemEvent e) {}    // @ todo: If we don't have any radio or checkbox button's, we don't need this listener.
-    
-    public void windowClosing(WindowEvent e) { shutdown(); }
-
     private void sendMessage(String msg) {
         if (outgoing == null) logEvent("Err: can't send message; outgoing stream is null.");
         else {
@@ -426,7 +382,9 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
             txa_chatlog.append(msg + '\n');
         }
     }
-
+    
+    //  Listeners
+    public void windowClosing(WindowEvent e) { shutdown(); }
     // Unimplemented WindowListener. 
     public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
 }
