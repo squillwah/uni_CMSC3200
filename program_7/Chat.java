@@ -1,13 +1,14 @@
-//package chat;
+package chat;
 
-// javac -d . Chat.java
-// java chat.Chat
+// !!!!
+// javac -d . Chat.java  <---
+// java chat.Chat        <---
+// !!!!
 
 import java.awt.*;
 import java.awt.event.*;
 
-public class Chat implements ActionListener, AdjustmentListener, ComponentListener, ItemListener, WindowListener {
-    
+public class Chat implements ActionListener, ItemListener, Runnable, WindowListener {
     private static final long serialVersionUID = 1111L;
     private final Dimension MIN_WINDOW_SIZE = new Dimension(640, 480);
     
@@ -109,7 +110,6 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
 
         //   listeners
         window.addWindowListener(this);
-        window.addComponentListener(this);
         mi_exit.addActionListener(this);
         mi_about.addActionListener(this);
         bt_sendmessage.addActionListener(this);
@@ -134,7 +134,6 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
     // ! We need to remove our listeners on close, as well as do whatever socket stuff needs doing later when that's implemented.
     private void shutdown() {
         window.removeWindowListener(this);
-        window.removeComponentListener(this);
         mi_exit.removeActionListener(this);
         mi_about.removeActionListener(this);
         bt_sendmessage.removeActionListener(this);
@@ -145,6 +144,8 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         window.dispose();
         System.exit(0);
     }
+
+    public void run() {}
     
     //  Listeners
 
@@ -193,10 +194,6 @@ public class Chat implements ActionListener, AdjustmentListener, ComponentListen
         txa_eventlog.append(event);
     }
     
-    // ! If we're using layouts, we probably don't need ComponentListener (at least not to resize anything)
-    public void componentHidden(ComponentEvent e) {} public void componentMoved(ComponentEvent e) {} public void componentResized(ComponentEvent e) {} public void componentShown(ComponentEvent e) {}
-    // ! Don't think we'll be using any scrolls either. 
-    public void adjustmentValueChanged(AdjustmentEvent e) {}
     // Unimplemented WindowListener. 
     public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
 }
