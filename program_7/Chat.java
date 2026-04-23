@@ -190,6 +190,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
                         ServerSocket servsock = new ServerSocket(s_port);
                         servsock.setSoTimeout(TIMEOUT);
                         sock = servsock.accept();
+                        servsock.close();
                         logEvent("Connection recieved from: " + sock.getInetAddress());
                         outgoing = new PrintWriter(sock.getOutputStream());
                         incoming = new BufferedReader(new InputStreamReader(sock.getInputStream()));
@@ -208,10 +209,13 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
                 }
             } catch (SocketTimeoutException e) {
                 logEvent("Connection timeout reached; giving up.");
+                sock = null;
             } catch (IllegalArgumentException e) {
                 logEvent("Connection failure; bad port, somehow...");
+                sock = null;
             } catch (IOException e) {
-                logEvent("Connection failure; " + e);
+                logEvent("Connection failure: " + e.getMessage());
+                sock = null;
             }
         }
         return established;
@@ -243,7 +247,9 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     private void stop_listening() {
         if (listening_thread != null) {
             listening_thread.interrupt();
-            while (listening_thread.isAlive()); // Busy wait for any buffered reads to finish.
+            try { listening_thread.join(); } 
+            catch (InterruptedException e) {}
+            //while (listening_thread.isAlive()); // Busy wait for any buffered reads to finish.
             listening_thread = null;
         }
     }
@@ -253,7 +259,23 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
         else if (incoming == null) logEvent("Err: Listening failure; incoming stream is null.");
         else {
             boolean disconnect = false;
+            String msg = null;
             while (!disconnect) {
+                try { 
+                    msg = incoming.readLine(); 
+                    if (msg == null) {
+                        logEvent("Peer disconnected...");
+                        c_state = ConnectionState.DISCONNECTED;  // Bad. Find a way to do this with change_state()?
+                        refresh_button_states();
+                        listening_thread = null;
+                        disconnect();
+                        disconnect = true;
+                    } else 
+                        txa_chatlog.append(msg + '\n'); 
+                } 
+                catch (SocketTimeoutException e) {}
+                catch (IOException e) { logEvent("Err: bad incoming message: " + e); }
+
                 try { Thread.sleep(1); }
                 catch (InterruptedException e) { disconnect = true; }
             }
@@ -292,7 +314,7 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
             case DISCONNECTED: 
                 if (c_state == ConnectionState.DISCONNECTED) logEvent("Err: Can't disconnect, you're already disconnected?");
                 else {
-                    if (listening_thread == null) logEvent("Err: Listening thread died before disconnect; something terrible has happened.");
+                    if (listening_thread == null) logEvent("Err: Listening thread was killed before disconnect; something terrible has happened.");
                     logEvent("Closing connection...");
                     stop_listening();
                     disconnect();
@@ -405,16 +427,14 @@ public class Chat implements ActionListener, ItemListener, Runnable, WindowListe
     public void windowClosing(WindowEvent e) { shutdown(); }
 
     private void sendMessage(String msg) {
-        String username = txf_username.getText();
-        if (c_state == ConnectionState.HOSTING) username += " (host)";
-        msg = username + ": " + msg + '\n';
-        txa_chatlog.append(msg);
-
-        //if (!msg.isEmpty()) {
-        //    String fullMsg = source + "<" + user.getName() + "> " + msg;
-        //    txa_chatlog.append(fullMsg + "\n");
-        //    txf_message.setText("");
-        //}
+        if (outgoing == null) logEvent("Err: can't send message; outgoing stream is null.");
+        else {
+            String username = txf_username.getText();
+            if (c_state == ConnectionState.HOSTING) username += " (host)";
+            msg = username + ": " + msg;
+            outgoing.println(msg);
+            txa_chatlog.append(msg + '\n');
+        }
     }
 
     // Unimplemented WindowListener. 
