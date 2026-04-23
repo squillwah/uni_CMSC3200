@@ -407,7 +407,9 @@ public class Chat implements ActionListener, Runnable, WindowListener {
     
     //  Listeners
     public void windowClosing(WindowEvent e) { shutdown(); }
+    public void windowActivated(WindowEvent e) { if (c_state == ConnectionState.HOSTING || c_state == ConnectionState.CONNECTED) txf_message.requestFocus(); }
+    public void windowDeiconified(WindowEvent e) { if (c_state == ConnectionState.HOSTING || c_state == ConnectionState.CONNECTED) txf_message.requestFocus(); }
     // Unimplemented WindowListener. 
-    public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
+    public void windowDeactivated(WindowEvent e) {} public void windowIconified(WindowEvent e) {} public void windowOpened(WindowEvent e) {} public void windowClosed(WindowEvent e) {}
 }
 
