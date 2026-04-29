@@ -15,15 +15,23 @@ import java.util.*;
 public class SpatterApplication extends JFrame implements WindowListener, ActionListener {
     final double gravity=4;
     final double wallDistance=6;
-    
+   
+    // Time of the spatter sim/anim:
     double t=0;
-    double x1=0, y1=4;
-    double oldx1=x1, oldy1=y1;
-    double x2=1, y2=5;
-    double oldx2=x2, oldy2=y2;
-    double spatterWidth=0, spatterLength=0;
-    boolean dragging1=false;
-    boolean dragging2=false;
+    // Tip+tail points of the blood's initial vel vec:
+    double x1=0, y1=4, x2=1, y2=5;
+    // Point coordinate constraints, for restricting mouse drags within bounds. 
+    double min_x_diff, min_y_diff, max_x_diff, max_y_diff, x_diff, y_diff; 
+    
+    // Pre drag event positions, used to apply the tail's Y delta to the tip.
+    //double oldx1=x1, oldy1=y1, oldx2=x2, oldy2=y2;  
+    
+    // Mouse drag flags for tip/tail points:
+    boolean dragging1=false, dragging2=false;
+    
+    double spatterWidth=0, spatterLength=0; // Unused.
+    
+    
     javax.swing.Timer animationTimer;
     boolean move=false;
     private boolean isStandalone = false;
@@ -174,18 +182,18 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     //Get parameter info
     public String[][] getParameterInfo() { return null; }
 
-    public void stop() { this.removeWindowListener(this); }
-    
-    public void windowClosing(WindowEvent e) {
-    	stop();
+    public void stop() { 
+        removeWindowListener(this); 
     	dispose();
     	System.exit(0);
     }
+    
+    public void windowClosing(WindowEvent e) { stop(); }
     public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} 
     public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} 
     public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
     
-    public void actionPerformed( ActionEvent e) {
+    public void actionPerformed(ActionEvent e) {
         Point2D p = bloodPath.getPoint(t);
         graph.plotPoint(p.getX(),p.getY());
         t += 0.02;
@@ -215,23 +223,16 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         }
     }
 
-    void graph_mousePressed(MouseEvent e) {
-        int xMouse=e.getX();
-        int yMouse=e.getY();
-        int distance1Squared = (xMouse-graph.xMathToPixel(x1))*
-        (xMouse-graph.xMathToPixel(x1))+ (yMouse-graph.yMathToPixel(y1))*
-        (yMouse-graph.yMathToPixel(y1));
-        if (distance1Squared < 9) dragging1 = true;
-        int distance2Squared = (xMouse-graph.xMathToPixel(x2))*
-        (xMouse-graph.xMathToPixel(x2))+ (yMouse-graph.yMathToPixel(y2))*
-        (yMouse-graph.yMathToPixel(y2));
-        if (distance2Squared < 9 && distance1Squared >=9) dragging2 = true;
-    }
 
-    void graph_mouseReleased(MouseEvent e) {
-        dragging1 = false;
-        dragging2 = false;
+    // Computes distance (pixels, squared) between mousepointer and tip/tail points of blood vector.
+    // If within distance limit, flags closest point as "dragging" (precedence given to tip, to avoid sticking).
+    void graph_mousePressed(MouseEvent e) {
+        int xMouse=e.getX(); int yMouse=e.getY();
+        dragging2 = ((xMouse-graph.xMathToPixel(x2))*(xMouse-graph.xMathToPixel(x2)) + (yMouse-graph.yMathToPixel(y2))*(yMouse-graph.yMathToPixel(y2))) < 50;
+        dragging1 = !dragging2 && ((xMouse-graph.xMathToPixel(x1))*(xMouse-graph.xMathToPixel(x1)) + (yMouse-graph.yMathToPixel(y1))*(yMouse-graph.yMathToPixel(y1))) < 50; // Increase value to decrease annoyance.
     }
+    // Clear drag flags.
+    void graph_mouseReleased(MouseEvent e) { dragging1 = false; dragging2 = false; }
 
     public double places1(double x) {
         x=10*x;
@@ -247,6 +248,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         return x;
     }
 
+    // Returns the x position, y position, and angle(?) of the blood particle at time 't'.
     public double x(double t) { return ((x2-x1)*t); }
     public double y(double t) { return (y1+(y2-y1)*t-gravity*t*t); }
     public double angle(double t) { return -Math.atan((y(t)-y(t-0.04))/(x(t)-x(t-0.04))); }
@@ -280,17 +282,22 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
 
     void graph_mouseDragged(MouseEvent e) {
         if (dragging1) {
-            oldy1=y1;
-            oldy2=y2;
-            y1=graph.yPixelToMath(e.getY());
-            y2=oldy2-oldy1+y1;
+            max_y_diff = graph.getYMax()-Math.max(y1,y2);   
+            min_y_diff = graph.getYMin()-Math.min(y1,y2);
+            y_diff = Math.max(min_y_diff, Math.min(max_y_diff, (graph.yPixelToMath(e.getY())-y1)));
+            y1 += y_diff;
+            y2 += y_diff;
             repaint();
-        }
+        } else 
         if (dragging2) {
-            oldx2=x2;
-            oldy2=y2;
-            x2=graph.xPixelToMath(e.getX());
-            y2=graph.yPixelToMath(e.getY());
+            max_x_diff = wallDistance-x2;   
+            min_x_diff = graph.getXMin()-x2;
+            max_y_diff = graph.getYMax()-Math.max(y1,y2); 
+            min_y_diff = graph.getYMin()-Math.min(y1,y2);
+            x_diff = Math.max(min_x_diff, Math.min(max_x_diff, (graph.xPixelToMath(e.getX())-x2)));
+            y_diff = Math.max(min_y_diff, Math.min(max_y_diff, (graph.yPixelToMath(e.getY())-y2)));
+            x2 += x_diff;
+            y2 += y_diff;
             repaint();
         }
     }
