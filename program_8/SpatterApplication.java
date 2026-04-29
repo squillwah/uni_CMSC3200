@@ -18,10 +18,8 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
    
     // Time of the spatter sim/anim:
     double t=0;
-    // Tip+tail points of the blood's initial vel vec:
+    // Tip+tail points of initial blood vel:
     double x1=0, y1=4, x2=1, y2=5;
-    // Point coordinate constraints, for restricting mouse drags within bounds. 
-    double min_x_diff, min_y_diff, max_x_diff, max_y_diff, x_diff, y_diff; 
     
     // Pre drag event positions, used to apply the tail's Y delta to the tip.
     //double oldx1=x1, oldy1=y1, oldx2=x2, oldy2=y2;  
@@ -36,11 +34,13 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     boolean move=false;
     private boolean isStandalone = false;
     JPanel jPanel1 = new JPanel();
+    
     MathGrapher graph = new MathGrapher();
     MathGrapher dropShapeGraph = new MathGrapher();
     SymbolicParametricCurve bloodPath = new SymbolicParametricCurve();
     SymbolicParametricCurve directionVector = new SymbolicParametricCurve();
     SymbolicParametricCurve wall = new SymbolicParametricCurve();
+    
     JLabel jLabel1 = new JLabel();
     JButton trackButton = new JButton();
     JLabel floorOrWallLabel = new JLabel();
@@ -52,8 +52,16 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     MathTextField angleMathTextField = new MathTextField();
     JLabel jLabel2 = new JLabel();
     JButton resetButton = new JButton();
-    //Get a parameter value
 
+    JLabel lbl_initial_angle = new JLabel();
+    JLabel lbl_initial_height = new JLabel();
+    JLabel lbl_initial_velocity = new JLabel();
+
+    MathTextField mtf_initial_angle = new MathTextField();
+    MathTextField mtf_initial_height = new MathTextField();
+    MathTextField mtf_initial_velocity = new MathTextField();
+
+    //Get a parameter value
     // Returns the property String of the given property key in the given property object.
     // Defaults to third argument 'def' if invalid 'key' or empty related property.
     // Used nowhere.
@@ -174,6 +182,64 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         graph.setPointRadius(4);
         graph.updateGraph();
         dropShapeGraph.removeAll();
+
+
+        // Add new displays
+
+        int sep_y = 10;
+        Point pos = new Point(9,190); 
+        Dimension size = new Dimension(120, 30); 
+        
+        lbl_initial_angle.setText("Initial Angle: ");
+        lbl_initial_angle.setBounds(new Rectangle(pos, size));
+        lbl_initial_angle.setHorizontalAlignment(SwingConstants.CENTER);
+        pos.y += size.height;
+        mtf_initial_angle.setBounds(new Rectangle(pos, size));
+        mtf_initial_angle.setText("");
+        mtf_initial_angle.setRequestFocusEnabled(true);
+        mtf_initial_angle.setMargin(new Insets(1, 1, 1, 1));
+        mtf_initial_angle.setHorizontalAlignment(SwingConstants.CENTER);
+        mtf_initial_angle.setFont(new java.awt.Font("Dialog", 0, 14));
+        mtf_initial_angle.setEditable(false);
+        mtf_initial_angle.setMaxNumberOfCharacters(10);
+        pos.y += size.height + sep_y;
+        
+        lbl_initial_height.setText("Initial Height (m):");
+        lbl_initial_height.setBounds(new Rectangle(pos, size));
+        lbl_initial_height.setHorizontalAlignment(SwingConstants.CENTER);
+        pos.y += size.height;
+        mtf_initial_height.setBounds(new Rectangle(pos, size));
+        mtf_initial_height.setText("");
+        mtf_initial_height.setRequestFocusEnabled(true);
+        mtf_initial_height.setMargin(new Insets(1, 1, 1, 1));
+        mtf_initial_height.setHorizontalAlignment(SwingConstants.CENTER);
+        mtf_initial_height.setFont(new java.awt.Font("Dialog", 0, 14));
+        mtf_initial_height.setEditable(false);
+        mtf_initial_height.setMaxNumberOfCharacters(10);
+        pos.y += size.height + sep_y;
+        
+        lbl_initial_velocity.setText("Initial Velocity (m):");
+        lbl_initial_velocity.setBounds(new Rectangle(pos, size));
+        lbl_initial_velocity.setHorizontalAlignment(SwingConstants.CENTER);
+        pos.y += size.height;
+        mtf_initial_velocity.setBounds(new Rectangle(pos, size));
+        mtf_initial_velocity.setText("");
+        mtf_initial_velocity.setRequestFocusEnabled(true);
+        mtf_initial_velocity.setMargin(new Insets(1, 1, 1, 1));
+        mtf_initial_velocity.setHorizontalAlignment(SwingConstants.CENTER);
+        mtf_initial_velocity.setFont(new java.awt.Font("Dialog", 0, 14));
+        mtf_initial_velocity.setEditable(false);
+        mtf_initial_velocity.setMaxNumberOfCharacters(10);
+        pos.y += size.height + sep_y;
+
+        jPanel1.add(mtf_initial_angle, null);
+        jPanel1.add(lbl_initial_angle, null);
+        jPanel1.add(mtf_initial_height, null);
+        jPanel1.add(lbl_initial_height, null);
+        jPanel1.add(mtf_initial_velocity, null);
+        jPanel1.add(lbl_initial_velocity, null);
+
+
         repaint();
     }
 
@@ -192,12 +258,15 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     public void windowClosed(WindowEvent e) {} public void windowOpened(WindowEvent e) {} 
     public void windowActivated(WindowEvent e) {} public void windowDeactivated(WindowEvent e) {} 
     public void windowIconified(WindowEvent e) {} public void windowDeiconified(WindowEvent e) {}
-    
+   
+    // Triggered by animation timer. Advances t and runs frame of spatter animation.
     public void actionPerformed(ActionEvent e) {
         Point2D p = bloodPath.getPoint(t);
         graph.plotPoint(p.getX(),p.getY());
         t += 0.02;
         graph.updateGraph();
+
+        // Stop animation and display statistics (when hit wall or floor).
         if(t>wallDistance/(x2-x1)) {
             animationTimer.stop();
             floorOrWallLabel.setText("Wall spatter shape");
@@ -224,81 +293,81 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     }
 
 
-    // Computes distance (pixels, squared) between mousepointer and tip/tail points of blood vector.
-    // If within distance limit, flags closest point as "dragging" (precedence given to tip, to avoid sticking).
+    // Flag closest point for dragging (precedence to tip avoids sticking).
     void graph_mousePressed(MouseEvent e) {
         int xMouse=e.getX(); int yMouse=e.getY();
-        dragging2 = ((xMouse-graph.xMathToPixel(x2))*(xMouse-graph.xMathToPixel(x2)) + (yMouse-graph.yMathToPixel(y2))*(yMouse-graph.yMathToPixel(y2))) < 50;
-        dragging1 = !dragging2 && ((xMouse-graph.xMathToPixel(x1))*(xMouse-graph.xMathToPixel(x1)) + (yMouse-graph.yMathToPixel(y1))*(yMouse-graph.yMathToPixel(y1))) < 50; // Increase value to decrease annoyance.
-    }
-    // Clear drag flags.
-    void graph_mouseReleased(MouseEvent e) { dragging1 = false; dragging2 = false; }
-
-    public double places1(double x) {
-        x=10*x;
-        x=Math.round(x);
-        x=(double) x/10;
-        return x;
+        dragging2 = ((xMouse-graph.xMathToPixel(x2)) * (xMouse-graph.xMathToPixel(x2)) + 
+                     (yMouse-graph.yMathToPixel(y2)) * (yMouse-graph.yMathToPixel(y2))) < 50;
+        dragging1 = !dragging2 && 
+                    ((xMouse-graph.xMathToPixel(x1)) * (xMouse-graph.xMathToPixel(x1)) + 
+                     (yMouse-graph.yMathToPixel(y1)) * (yMouse-graph.yMathToPixel(y1))) < 50; // Increase value to decrease annoyance.
     }
 
-    public double places2(double x) {
-        x=100*x;
-        x=Math.round(x);
-        x=(double) x/100;
-        return x;
-    }
+    void graph_mouseReleased(MouseEvent e) { dragging1 = false; dragging2 = false; } // Clear drag flags.
+
+    // Round to the 10s and 100s
+    public double places1(double x) { return Math.round(10*x)/10.0; }
+    public double places2(double x) { return Math.round(100*x)/100.0; } // Never used.
 
     // Returns the x position, y position, and angle(?) of the blood particle at time 't'.
+    // Only used to calculate angle.
     public double x(double t) { return ((x2-x1)*t); }
     public double y(double t) { return (y1+(y2-y1)*t-gravity*t*t); }
+    // Calculates angle of blood spatter at time t.
     public double angle(double t) { return -Math.atan((y(t)-y(t-0.04))/(x(t)-x(t-0.04))); }
                                   //return -Math.atan((y(t)-y(t-0.02))/(x(t)-x(t-0.02)));   ? Is this the error in calculation?
-    //public double angle(double t) { return -Math.atan((y(t)-y(t-0.02))/(x(t)-x(t-0.02))); }
 
     public void repaint() {
-        graph.removeAllPoints();
         graph.removeAll();
+        graph.removeAllPoints();
         graph.addPoint(x1,y1,Color.magenta);
         graph.addPoint(x2,y2,Color.magenta);
+       
+        // Update constants of vector + path equations to match x1, y1, x2, and y2.
         try {
             directionVector.setXFormula(x2+"*t");
             directionVector.setYFormula(y1+"+"+"("+y2+"-"+y1+")*"+"t");
         } catch(Graphable_error e) {}
-        if(x1==x2)
-          { // Why ?
-          }
-          else
-          {
-          }
-          try{
-               bloodPath.setXFormula("("+x2+"-"+x1+")*t");
-               bloodPath.setYFormula(y1+"+("+y2+"-"+y1+")*t-"+gravity+"*t*t");
-          }catch(Graphable_error e){
-              }
-          graph.addGraph(directionVector, Color.MAGENTA);
-          graph.addGraph(bloodPath, Color.RED);
-          graph.addGraph(wall, Color.BLUE);
-          graph.updateGraph();
+        try {
+            bloodPath.setXFormula("("+x2+"-"+x1+")*t");
+            bloodPath.setYFormula(y1+"+("+y2+"-"+y1+")*t-"+gravity+"*t*t");
+        } catch(Graphable_error e) {}
+          
+        graph.addGraph(directionVector, Color.MAGENTA);
+        graph.addGraph(bloodPath, Color.RED);
+        graph.addGraph(wall, Color.BLUE);
+        graph.updateGraph();
+        
+            
+        // if(x1==x2)
+        //   { // Why ?
+        //   }
+        //   else
+        //   {
+        //   }
     }
 
     void graph_mouseDragged(MouseEvent e) {
+        double drag_diff_x, drag_diff_y;
         if (dragging1) {
-            max_y_diff = graph.getYMax()-Math.max(y1,y2);   
-            min_y_diff = graph.getYMin()-Math.min(y1,y2);
-            y_diff = Math.max(min_y_diff, Math.min(max_y_diff, (graph.yPixelToMath(e.getY())-y1)));
-            y1 += y_diff;
-            y2 += y_diff;
+            drag_diff_y = Math.max((graph.getYMin() - Math.min(y1,y2)), 
+                          Math.min((graph.getYMax() - Math.max(y1,y2)), 
+                          (graph.yPixelToMath(e.getY()) - y1)));    // Relative to tail.
+            
+            y1 += drag_diff_y;
+            y2 += drag_diff_y;  // Drag both along y.
             repaint();
         } else 
         if (dragging2) {
-            max_x_diff = wallDistance-x2;   
-            min_x_diff = graph.getXMin()-x2;
-            max_y_diff = graph.getYMax()-Math.max(y1,y2); 
-            min_y_diff = graph.getYMin()-Math.min(y1,y2);
-            x_diff = Math.max(min_x_diff, Math.min(max_x_diff, (graph.xPixelToMath(e.getX())-x2)));
-            y_diff = Math.max(min_y_diff, Math.min(max_y_diff, (graph.yPixelToMath(e.getY())-y2)));
-            x2 += x_diff;
-            y2 += y_diff;
+            drag_diff_x = Math.max((graph.getXMin() - x2), 
+                          Math.min((wallDistance - x2),
+                          (graph.xPixelToMath(e.getX()) - x2)));
+            drag_diff_y = Math.max((graph.getYMin() - Math.min(y1,y2)), 
+                          Math.min((graph.getYMax() - Math.max(y1,y2)), 
+                          (graph.yPixelToMath(e.getY()) - y2)));    // Relative to tip.
+            
+            x2 += drag_diff_x;
+            y2 += drag_diff_y;
             repaint();
         }
     }
