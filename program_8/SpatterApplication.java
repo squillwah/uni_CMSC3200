@@ -190,20 +190,6 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         Point pos = new Point(9,190); 
         Dimension size = new Dimension(120, 30); 
         
-        lbl_initial_angle.setText("Initial Angle: ");
-        lbl_initial_angle.setBounds(new Rectangle(pos, size));
-        lbl_initial_angle.setHorizontalAlignment(SwingConstants.CENTER);
-        pos.y += size.height;
-        mtf_initial_angle.setBounds(new Rectangle(pos, size));
-        mtf_initial_angle.setText("");
-        mtf_initial_angle.setRequestFocusEnabled(true);
-        mtf_initial_angle.setMargin(new Insets(1, 1, 1, 1));
-        mtf_initial_angle.setHorizontalAlignment(SwingConstants.CENTER);
-        mtf_initial_angle.setFont(new java.awt.Font("Dialog", 0, 14));
-        mtf_initial_angle.setEditable(false);
-        mtf_initial_angle.setMaxNumberOfCharacters(10);
-        pos.y += size.height + sep_y;
-        
         lbl_initial_height.setText("Initial Height (m):");
         lbl_initial_height.setBounds(new Rectangle(pos, size));
         lbl_initial_height.setHorizontalAlignment(SwingConstants.CENTER);
@@ -216,6 +202,20 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         mtf_initial_height.setFont(new java.awt.Font("Dialog", 0, 14));
         mtf_initial_height.setEditable(false);
         mtf_initial_height.setMaxNumberOfCharacters(10);
+        pos.y += size.height + sep_y;
+        
+        lbl_initial_angle.setText("Initial Angle: ");
+        lbl_initial_angle.setBounds(new Rectangle(pos, size));
+        lbl_initial_angle.setHorizontalAlignment(SwingConstants.CENTER);
+        pos.y += size.height;
+        mtf_initial_angle.setBounds(new Rectangle(pos, size));
+        mtf_initial_angle.setText("");
+        mtf_initial_angle.setRequestFocusEnabled(true);
+        mtf_initial_angle.setMargin(new Insets(1, 1, 1, 1));
+        mtf_initial_angle.setHorizontalAlignment(SwingConstants.CENTER);
+        mtf_initial_angle.setFont(new java.awt.Font("Dialog", 0, 14));
+        mtf_initial_angle.setEditable(false);
+        mtf_initial_angle.setMaxNumberOfCharacters(10);
         pos.y += size.height + sep_y;
         
         lbl_initial_velocity.setText("Initial Velocity (m):");
@@ -239,6 +239,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         jPanel1.add(mtf_initial_velocity, null);
         jPanel1.add(lbl_initial_velocity, null);
 
+        set_initial_displays();
 
         repaint();
     }
@@ -292,6 +293,11 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         }
     }
 
+    void set_initial_displays() {
+        mtf_initial_angle.setText("" + places2(Math.toDegrees(angle(0))));
+        mtf_initial_height.setText("" + places2(y1));
+        mtf_initial_velocity.setText("" + places1(Math.sqrt(Math.pow(x2,2) + Math.pow((y2-y1), 2))));
+    }
 
     // Flag closest point for dragging (precedence to tip avoids sticking).
     void graph_mousePressed(MouseEvent e) {
@@ -317,12 +323,15 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     public double angle(double t) { return -Math.atan((y(t)-y(t-0.04))/(x(t)-x(t-0.04))); }
                                   //return -Math.atan((y(t)-y(t-0.02))/(x(t)-x(t-0.02)));   ? Is this the error in calculation?
 
+    // Something definitely wrong with the angle.
+    // Initial velocity is (1,1), so atan(1) should be giving 45 degrees, not 49.24...
+
     public void repaint() {
         graph.removeAll();
         graph.removeAllPoints();
         graph.addPoint(x1,y1,Color.magenta);
         graph.addPoint(x2,y2,Color.magenta);
-       
+      
         // Update constants of vector + path equations to match x1, y1, x2, and y2.
         try {
             directionVector.setXFormula(x2+"*t");
@@ -356,6 +365,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
             
             y1 += drag_diff_y;
             y2 += drag_diff_y;  // Drag both along y.
+            set_initial_displays();
             repaint();
         } else 
         if (dragging2) {
@@ -368,8 +378,10 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
             
             x2 += drag_diff_x;
             y2 += drag_diff_y;
+            set_initial_displays();
             repaint();
         }
+        
     }
 
     void trackButton_actionPerformed(ActionEvent e) {
@@ -409,6 +421,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         graph.setPointRadius(4);
         graph.updateGraph();
         dropShapeGraph.removeGraph(spatterEllipse);
+        set_initial_displays();
         repaint();
     }
 }
