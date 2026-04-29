@@ -90,9 +90,9 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         graph.setG(directionVector);
         graph.setGridLines(EDU.emporia.mathbeans.MathGrapher.GRIDOFF);
         graph.setToolTipText("Drag left hand point to adjust height, right hand point to adjust " + "direction and velocity");
-        graph.setXMax(6.0);
+        graph.setXMax(6.5);
         graph.setXMin(0.0);
-        graph.setYMax(6.0);
+        graph.setYMax(10.0);
         graph.setYMin(0.0);
         graph.setBounds(new Rectangle(140, 5, 364, 390));
         graph.addMouseMotionListener(new SpatterApplication_graph_mouseMotionAdapter(this));
@@ -266,9 +266,11 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         graph.plotPoint(p.getX(),p.getY());
         t += 0.02;
         graph.updateGraph();
+        System.out.println(" " + Math.toDegrees(angle(t)));
 
         // Stop animation and display statistics (when hit wall or floor).
-        if(t>wallDistance/(x2-x1)) {
+        //if(t>wallDistance/(x2-x1)) {
+        if (p.getX() > wallDistance) {
             animationTimer.stop();
             floorOrWallLabel.setText("Wall spatter shape");
             lengthLabel.setText("Height (in mm):");
@@ -278,9 +280,8 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
             widthMathTextField.setMathValue(places1(10*spatterEllipse.getXRadius()));
             lengthMathTextField.setMathValue(places1(10*spatterEllipse.getYRadius()));
             angleMathTextField.setMathValue(places1(90-angle(t)*180/Math.PI));
-        }
-        
-        if(t>(((y2-y1)+Math.sqrt((y1-y2)*(y1-y2)+4*gravity*y1)))/(2*gravity)) {
+        } else if (p.getY() < graph.getYMin()) {
+        //if(t>(((y2-y1)+Math.sqrt((y1-y2)*(y1-y2)+4*gravity*y1)))/(2*gravity)) {
             animationTimer.stop();
             floorOrWallLabel.setText("Floor spatter shape");
             lengthLabel.setText("Length (in mm):");
@@ -290,18 +291,13 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
             widthMathTextField.setMathValue(places1(10*spatterEllipse.getXRadius()));
             lengthMathTextField.setMathValue(places1(10*spatterEllipse.getYRadius()));
             angleMathTextField.setMathValue(places1(angle(t)*180/Math.PI));
+            angleMathTextField.setMathValue(places1(Math.toDegrees(angle(t))));
         }
-    }
-
-    void set_initial_displays() {
-        mtf_initial_angle.setText("" + places2(Math.toDegrees(angle(0))));
-        mtf_initial_height.setText("" + places2(y1));
-        mtf_initial_velocity.setText("" + places1(Math.sqrt(Math.pow(x2,2) + Math.pow((y2-y1), 2))));
     }
 
     // Flag closest point for dragging (precedence to tip avoids sticking).
     void graph_mousePressed(MouseEvent e) {
-        int xMouse=e.getX(); int yMouse=e.getY();
+        int xMouse = e.getX(); int yMouse = e.getY();
         dragging2 = ((xMouse-graph.xMathToPixel(x2)) * (xMouse-graph.xMathToPixel(x2)) + 
                      (yMouse-graph.yMathToPixel(y2)) * (yMouse-graph.yMathToPixel(y2))) < 50;
         dragging1 = !dragging2 && 
@@ -311,20 +307,49 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
 
     void graph_mouseReleased(MouseEvent e) { dragging1 = false; dragging2 = false; } // Clear drag flags.
 
-    // Round to the 10s and 100s
+
+
+    // Rounding 
     public double places1(double x) { return Math.round(10*x)/10.0; }
     public double places2(double x) { return Math.round(100*x)/100.0; } // Never used.
 
-    // Returns the x position, y position, and angle(?) of the blood particle at time 't'.
-    // Only used to calculate angle.
-    public double x(double t) { return ((x2-x1)*t); }
-    public double y(double t) { return (y1+(y2-y1)*t-gravity*t*t); }
-    // Calculates angle of blood spatter at time t.
-    public double angle(double t) { return -Math.atan((y(t)-y(t-0.04))/(x(t)-x(t-0.04))); }
+
+
+/*
+    // Moment velocity (components) and angle. 
+    // Altered to include initial velocity at time 0 and fix angle weirdness.
+    public double x(double t) { return ((x2-x1) + (x2-x1)*t); }
+    public double y(double t) { return ((y2-y1) + ((y2-y1) - (.5*gravity*t))*t); }
+    public double angle(double t) { return Math.atan(Math.pow(y(t),2) / Math.pow(x(t),2)); }
+        
+        //return -Math.atan((y(t)-y(t-0.04))/(x(t)-x(t-0.04))); }
                                   //return -Math.atan((y(t)-y(t-0.02))/(x(t)-x(t-0.02)));   ? Is this the error in calculation?
 
     // Something definitely wrong with the angle.
     // Initial velocity is (1,1), so atan(1) should be giving 45 degrees, not 49.24...
+
+
+
+
+
+
+*/
+
+
+
+
+
+
+
+
+
+
+    public double x(double t) { return (x2*t); }
+    public double y(double t) { return (y1 + ((y2-y1) - (gravity*t))*t); }
+    public double angle(double t) { return Math.atan(Math.pow(y(t),2) / Math.pow(x(t),2)); }
+        
+
+
 
     public void repaint() {
         graph.removeAll();
@@ -335,11 +360,13 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         // Update constants of vector + path equations to match x1, y1, x2, and y2.
         try {
             directionVector.setXFormula(x2+"*t");
-            directionVector.setYFormula(y1+"+"+"("+y2+"-"+y1+")*"+"t");
+            directionVector.setYFormula(y1+"+("+(y2-y1)+"*t)");
         } catch(Graphable_error e) {}
         try {
-            bloodPath.setXFormula("("+x2+"-"+x1+")*t");
-            bloodPath.setYFormula(y1+"+("+y2+"-"+y1+")*t-"+gravity+"*t*t");
+            //bloodPath.setXFormula(x2+"*t");
+            //bloodPath.setYFormula(y1+"+("+(y2-y1)+"*t - .5*"+gravity+"*t*t)");
+               bloodPath.setXFormula("("+x2+"-"+x1+")*t");
+               bloodPath.setYFormula(y1+"+("+y2+"-"+y1+")*t-"+gravity+"*t*t");
         } catch(Graphable_error e) {}
           
         graph.addGraph(directionVector, Color.MAGENTA);
@@ -355,6 +382,13 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         //   {
         //   }
     }
+    
+    void set_initial_displays() {
+        mtf_initial_angle.setText("" + places2(Math.signum(y(0)) * Math.toDegrees(angle(0))));
+        mtf_initial_height.setText("" + places2(y1));
+        mtf_initial_velocity.setText("" + places1(Math.sqrt(Math.pow(x2,2) + Math.pow((y2-y1), 2))));
+    }
+
 
     void graph_mouseDragged(MouseEvent e) {
         double drag_diff_x, drag_diff_y;
@@ -370,7 +404,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         } else 
         if (dragging2) {
             drag_diff_x = Math.max((graph.getXMin() - x2), 
-                          Math.min((wallDistance - x2),
+                          Math.min((graph.getXMax() - x2 - .1),
                           (graph.xPixelToMath(e.getX()) - x2)));
             drag_diff_y = Math.max((graph.getYMin() - Math.min(y1,y2)), 
                           Math.min((graph.getYMax() - Math.max(y1,y2)), 
