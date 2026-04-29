@@ -253,6 +253,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     public double y(double t) { return (y1+(y2-y1)*t-gravity*t*t); }
     public double angle(double t) { return -Math.atan((y(t)-y(t-0.04))/(x(t)-x(t-0.04))); }
                                   //return -Math.atan((y(t)-y(t-0.02))/(x(t)-x(t-0.02)));   ? Is this the error in calculation?
+    //public double angle(double t) { return -Math.atan((y(t)-y(t-0.02))/(x(t)-x(t-0.02))); }
 
     public void repaint() {
         graph.removeAllPoints();
@@ -314,12 +315,12 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     	t=0;
     	x1=0;
     	y1=4;
-    	oldx1=x1;
-    	oldy1=y1;
+    	//oldx1=x1;
+    	//oldy1=y1;
     	x2=1;
     	y2=5;
-    	oldx2=x2;
-    	oldy2=y2;
+    	//oldx2=x2;
+    	//oldy2=y2;
     	spatterWidth=0;
     	spatterLength=0;
 
