@@ -1,3 +1,13 @@
+
+// [CMSC3200] Technical Computing Using Java
+// Program 8: FixedItFilip
+//
+// A program for the personal computer.
+// 
+// Group 2
+// Brandon Schwartz, DaJuan Bowie, Joshua Staffen, Ravi Dressler
+// SCH81594@pennwest.edu, BOW90126@pennwest.edu, STA79160@pennwest.edu, DRE44769@pennwest.edu
+
 package spatter;
 
 import java.awt.*;
@@ -6,8 +16,6 @@ import javax.swing.*;
 import EDU.emporia.mathbeans.*;
 import EDU.emporia.mathtools.*;
 import java.util.*;
-
-//  - Discover and fix the "error in calculation".
 
 public class SpatterApplication extends JFrame implements WindowListener, ActionListener {
     final double gravity=9.81;
@@ -256,8 +264,6 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         graph.plotPoint(p.getX(),p.getY());
         graph.updateGraph();
 
-        System.out.println(y1 + y(t)*t);
-
         // Stop animation and display statistics (when hit wall or floor).
         //if(t>wallDistance/(x2-x1)) {
         //if (p.getX() > wallDistance) {
@@ -275,7 +281,6 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         //if(t>(((y2-y1)+Math.sqrt((y1-y2)*(y1-y2)+4*gravity*y1)))/(2*gravity)) {
         if (p.getY() < graph.getYMin()) {
         //if (y1 + y(t)*t < graph.getYMin()) {
-            System.out.println(p.getY() + "|" + y(t));
             animationTimer.stop();
             floorOrWallLabel.setText("Floor spatter shape");
             lengthLabel.setText("Length (in mm):");
