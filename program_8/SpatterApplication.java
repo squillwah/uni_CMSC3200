@@ -12,6 +12,7 @@ import java.util.*;
 public class SpatterApplication extends JFrame implements WindowListener, ActionListener {
     final double gravity=9.81;
     final double wallDistance=6;
+    final double TIMESCALE = 0.01;
    
     // Time of the spatter sim/anim
     double t=0;
@@ -253,12 +254,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     public void actionPerformed(ActionEvent e) {
         Point2D p = bloodPath.getPoint(t);
         graph.plotPoint(p.getX(),p.getY());
-        //graph.plotPoint(t,x(t));
-        //graph.plotPoint(t,2+y(t));
-        //graph.plotPoint(t,angle(t));
         graph.updateGraph();
-        //System.out.println(Math.toDegrees(angle(t)));
-        //System.out.println(y(t));
 
         System.out.println(y1 + y(t)*t);
 
@@ -291,7 +287,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
             angleMathTextField.setMathValue(places1(Math.toDegrees(Math.abs(angle(t)))));
         }
         
-        t += 0.005;
+        t += TIMESCALE;
     }
 
     // Flag closest point for dragging (precedence to tip, avoids sticking).
@@ -312,13 +308,10 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     // Moment velocity/tangent angle
     public double x(double t) {
         return (x2-x1);
-        //return (Math.sqrt(2)*Math.cos(Math.PI/4));
     }
     public double y(double t) {
-        //System.out.println((y2-y1));
         return ((y2-y1) - gravity*t);
         //return ((y2-y1) - .5*gravity*t);
-        //return (Math.sqrt(2)*Math.sin(Math.PI/4) - .5*gravity*t);
     }
     public double angle(double t) {
         return Math.atan(y(t) / x(t));
@@ -336,13 +329,6 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
             directionVector.setYFormula(y1+"+("+(y2-y1)+"*t)");
         } catch(Graphable_error e) {}
         try {
-            //bloodPath.setXFormula(x2+"*t");
-            //bloodPath.setYFormula(y1+"+("+(y2-y1)+"*t - .5*"+gravity+"*t*t)");
-            //   //bloodPath.setXFormula("("+x2+"-"+x1+")*t");
-            //   //bloodPath.setYFormula(y1+"+("+y2+"-"+y1+")*t-"+gravity+"*t*t");
-            //   bloodPath.setXFormula(x1 + "+" + x2 + "* t");//("+x2+"-"+x1+")");
-            //   bloodPath.setYFormula(y1 + "+ (" + y2 + "-" + y1 + ") * t - " + gravity + " *t*t");
-            //           //y1+"+("+y2+"-"+y1+")*t-"+gravity+"*t*t");
             bloodPath.setXFormula("("+x2+"-"+x1+")*t");
             bloodPath.setYFormula(y1+"+("+y2+"-"+y1+")*t - .5*"+gravity+"*t*t");
         } catch(Graphable_error e) {}
@@ -364,35 +350,17 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
         if (dragging1) {
             drag_diff_y = graph.yPixelToMath(e.getY()) - y1;
             if (y1 != (y1 = Math.max(graph.getYMin(), Math.min(graph.getYMax(), y1 + drag_diff_y))))
-                y2 = Math.max(graph.getYMin(), Math.min(graph.getYMax(), y2 + drag_diff_y));
-                
-            //    Math.max((graph.getYMin() - Math.min(y1,y2)), 
-            //              Math.min((graph.getYMax() - Math.max(y1,y2)), 
-            //              (graph.yPixelToMath(e.getY()) - y1)));    // Relative to tail.
-            //
-            //y1 += drag_diff_y;
-            //y2 += drag_diff_y;      // Drag both along y.
-            repaint();
+                y2 = Math.max(graph.getYMin(), Math.min(graph.getYMax(), y2 + drag_diff_y)); // Only move tip with tail if tail moves.
             set_initial_displays();
+            repaint();
         } else 
         if (dragging2) {
-            //drag_diff_x = Math.max((graph.getXMin() - x2), 
-            //              Math.min((graph.getXMax() - x2 - .1),
-            //              (graph.xPixelToMath(e.getX()) - x2)));
-            //drag_diff_y = Math.max((graph.getYMin() - Math.min(y1,y2)), 
-            //              Math.min((graph.getYMax() - Math.max(y1,y2)), 
-            //              (graph.yPixelToMath(e.getY()) - y2)));    // Relative to tip.
-            //
-            //x2 += drag_diff_x;
-            //y2 += drag_diff_y;
-            
             drag_diff_x = graph.xPixelToMath(e.getX()) - x2;
             drag_diff_y = graph.yPixelToMath(e.getY()) - y2;
-            
             x2 = Math.max(graph.getXMin(), Math.min(graph.getXMax(), x2 + drag_diff_x));
             y2 = Math.max(graph.getYMin(), Math.min(graph.getYMax(), y2 + drag_diff_y));
-            repaint();
             set_initial_displays();
+            repaint();
         }
     }
 
