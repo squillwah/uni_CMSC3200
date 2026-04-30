@@ -276,7 +276,7 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
             dropShapeGraph.addGraph(spatterEllipse, Color.RED);
             widthMathTextField.setMathValue(places1(10*spatterEllipse.getXRadius()));
             lengthMathTextField.setMathValue(places1(10*spatterEllipse.getYRadius()));
-            angleMathTextField.setMathValue(places1(Math.toDegrees(Math.abs(angle(t)))));
+            angleMathTextField.setMathValue(places1(90-Math.toDegrees(Math.abs(angle(t)))));
         } else 
         //if(t>(((y2-y1)+Math.sqrt((y1-y2)*(y1-y2)+4*gravity*y1)))/(2*gravity)) {
         if (p.getY() < graph.getYMin()) {
