@@ -362,25 +362,35 @@ public class SpatterApplication extends JFrame implements WindowListener, Action
     void graph_mouseDragged(MouseEvent e) {
         double drag_diff_x, drag_diff_y;
         if (dragging1) {
-            drag_diff_y = Math.max((graph.getYMin() - Math.min(y1,y2)), 
-                          Math.min((graph.getYMax() - Math.max(y1,y2)), 
-                          (graph.yPixelToMath(e.getY()) - y1)));    // Relative to tail.
-            
-            y1 += drag_diff_y;
-            y2 += drag_diff_y;      // Drag both along y.
+            drag_diff_y = graph.yPixelToMath(e.getY()) - y1;
+            if (y1 != (y1 = Math.max(graph.getYMin(), Math.min(graph.getYMax(), y1 + drag_diff_y))))
+                y2 = Math.max(graph.getYMin(), Math.min(graph.getYMax(), y2 + drag_diff_y));
+                
+            //    Math.max((graph.getYMin() - Math.min(y1,y2)), 
+            //              Math.min((graph.getYMax() - Math.max(y1,y2)), 
+            //              (graph.yPixelToMath(e.getY()) - y1)));    // Relative to tail.
+            //
+            //y1 += drag_diff_y;
+            //y2 += drag_diff_y;      // Drag both along y.
             repaint();
             set_initial_displays();
         } else 
         if (dragging2) {
-            drag_diff_x = Math.max((graph.getXMin() - x2), 
-                          Math.min((graph.getXMax() - x2 - .1),
-                          (graph.xPixelToMath(e.getX()) - x2)));
-            drag_diff_y = Math.max((graph.getYMin() - Math.min(y1,y2)), 
-                          Math.min((graph.getYMax() - Math.max(y1,y2)), 
-                          (graph.yPixelToMath(e.getY()) - y2)));    // Relative to tip.
+            //drag_diff_x = Math.max((graph.getXMin() - x2), 
+            //              Math.min((graph.getXMax() - x2 - .1),
+            //              (graph.xPixelToMath(e.getX()) - x2)));
+            //drag_diff_y = Math.max((graph.getYMin() - Math.min(y1,y2)), 
+            //              Math.min((graph.getYMax() - Math.max(y1,y2)), 
+            //              (graph.yPixelToMath(e.getY()) - y2)));    // Relative to tip.
+            //
+            //x2 += drag_diff_x;
+            //y2 += drag_diff_y;
             
-            x2 += drag_diff_x;
-            y2 += drag_diff_y;
+            drag_diff_x = graph.xPixelToMath(e.getX()) - x2;
+            drag_diff_y = graph.yPixelToMath(e.getY()) - y2;
+            
+            x2 = Math.max(graph.getXMin(), Math.min(graph.getXMax(), x2 + drag_diff_x));
+            y2 = Math.max(graph.getYMin(), Math.min(graph.getYMax(), y2 + drag_diff_y));
             repaint();
             set_initial_displays();
         }
